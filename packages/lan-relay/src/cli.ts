@@ -29,6 +29,7 @@ const { host, port } = await server.listen();
 console.log(`collab-lan-relay listening on ${host}:${port}`);
 console.log(`  WS     ws://<this-host>:${port}/ws/<roomId>`);
 console.log(`  invite collab://lan/<this-host>:${port}/<roomId>#<roomKey>`);
+console.log(`  dir    http://<this-host>:${port}/directory/rooms`);
 console.log(`  mDNS   ${has("--no-mdns") ? "off" : "_collab._tcp.local (auto-discovery)"}`);
 console.log(`  browse collab-lan-relay --browse`);
 

@@ -2,8 +2,11 @@
 
 export const PROTOCOL_VERSION = 1 as const;
 
-/** Public Collab relay (Cloudflare Durable Object). Override with COLLAB_RELAY / relayUrl. */
-export const DEFAULT_RELAY_URL = "wss://collab-relay.cecwxf.workers.dev";
+/** Default VPS Node relay (ws). Override with COLLAB_RELAY / relayUrl. CF Worker remains optional. */
+export const DEFAULT_RELAY_URL = "ws://62.234.113.56:80";
+
+/** Default host:port for new LAN/VPS rooms (same VPS as DEFAULT_RELAY_URL). */
+export const DEFAULT_LAN_HOST_PORT = "62.234.113.56:80";
 
 export type AgentId = string;
 export type RoomId = string;

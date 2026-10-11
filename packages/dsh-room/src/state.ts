@@ -19,7 +19,7 @@ export interface RoomMeta {
   name: string;
   description: string;
   tags: string[];
-  /** Listed in the relay's public directory (not confidential). Relay-only. */
+  /** Listed in the relay's public directory (not confidential). */
   public: boolean;
   /** Created here: this identity signs the directory listing. */
   owner: boolean;

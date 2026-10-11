@@ -23,7 +23,7 @@ describe("dsh-room plugin module (dsh 0.2 shape)", () => {
 
   it("Config (Standard Schema) applies defaults and rejects bad values", () => {
     const ok = plugin.Config["~standard"].validate({});
-    assert.equal(ok.value.relayUrl, "wss://collab-relay.cecwxf.workers.dev");
+    assert.equal(ok.value.relayUrl, "ws://62.234.113.56:80");
     assert.equal(ok.value.autoReply, "mention-or-task");
     assert.equal(ok.value.permissionPreset, "read-only");
     assert.equal(ok.value.wakeOnReplies, false);

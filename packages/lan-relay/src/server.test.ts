@@ -1,3 +1,6 @@
+import { WebSocket as Ws } from "ws";
+globalThis.WebSocket = Ws as unknown as typeof WebSocket;
+
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { generateIdentity, createRoomInvite, inviteWsUrl, parseInviteUri } from "@collab/protocol";

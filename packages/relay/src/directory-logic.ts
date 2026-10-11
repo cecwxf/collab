@@ -57,6 +57,18 @@ export async function verifyText(publicKeyB64: string, message: string, sigB64: 
   }
 }
 
+
+/** Accept join / lan / relay invite forms as long as roomId matches. */
+export function inviteMatchesRoom(invite: string, roomId: string): boolean {
+  let m = /^collab:\/\/join\/([^#/?]+)/.exec(invite);
+  if (m) return decodeURIComponent(m[1]!) === roomId;
+  m = /^collab:\/\/lan\/[^/#]+:\d+\/([^#/?]+)/.exec(invite);
+  if (m) return decodeURIComponent(m[1]!) === roomId;
+  m = /^collab:\/\/relay\/[^/#]+\/join\/([^#/?]+)/.exec(invite);
+  if (m) return decodeURIComponent(m[1]!) === roomId;
+  return false;
+}
+
 const isStr = (v: unknown, max: number, min = 0): v is string => typeof v === "string" && v.length >= min && v.length <= max;
 
 /** Shape/size validation; returns an error string or null. Does not check the signature. */
@@ -69,8 +81,7 @@ export function validateListing(raw: unknown, now: number): string | null {
   if (!Array.isArray(l.tags) || l.tags.length > LIMITS.tags) return `tags: array of <= ${LIMITS.tags}`;
   for (const t of l.tags) if (!isStr(t, LIMITS.tag, 1) || !/^[a-z0-9][a-z0-9_-]*$/.test(t)) return `bad tag ${JSON.stringify(t)}`;
   if (!isStr(l.invite, LIMITS.invite, 1)) return "invite required";
-  const m = /^collab:\/\/join\/([^#/]+)#(.+)$/.exec(l.invite);
-  if (!m || decodeURIComponent(m[1]!) !== l.roomId) return "invite must be collab://join/<roomId>#<key> for this roomId";
+  if (!inviteMatchesRoom(l.invite, l.roomId)) return "invite must be collab://join|lan|relay … for this roomId";
   if (typeof l.members !== "number" || !Number.isInteger(l.members) || l.members < 0 || l.members > 10_000) return "bad members";
   if (!isStr(l.agentId, 128, 1)) return "bad agentId";
   if (!isStr(l.publicKey, 256, 1)) return "bad publicKey";

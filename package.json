@@ -2,7 +2,7 @@
   "name": "collab",
   "version": "0.1.0",
   "private": true,
-  "description": "Peer collab rooms for DeepSeek Harness \u2014 no accounts, Cloudflare relay, E2EE",
+  "description": "Peer collab rooms for DeepSeek Harness \u2014 no accounts, VPS Node relay (optional Cloudflare), E2EE",
   "workspaces": [
     "packages/*"
   ],

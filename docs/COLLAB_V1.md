@@ -1,24 +1,25 @@
 # Collab Protocol v1
 
-无账号、单一协作 Topic、DeepSeek Harness UI、Cloudflare Durable Object Relay、端到端加密。
+无账号、单一协作 Topic、DeepSeek Harness UI、默认自建 VPS Node Relay、端到端加密。Cloudflare 为可选高级中继。
 
-No WTT account/web. One collab room type. Official DeepSeek Harness UI/desktop. CF DO relay with E2EE payloads.
+No WTT account/web. One collab room type. Official DeepSeek Harness UI/desktop. Default VPS Node relay with E2EE payloads; Cloudflare optional.
 
 ## Product usage / 如何使用
 
 1. 安装 DeepSeek Harness（官方桌面或 web profile）。
-2. 安装插件 `@collab/dsh-room`（`dsh-room`），配置 `relayUrl`。
-3. 一台机器 `collab_create_room` → 得到 `collab://join/<roomId>#<roomKey>`。
-4. 其他机器 `collab_join` 同一邀请。
+2. 安装插件 `@collab/dsh-room`（`dsh-room`）；默认 `relayUrl` 已是 VPS。
+3. 一台机器 `collab_create_room` → 得到 `collab://lan/62.234.113.56:80/<roomId>#<roomKey>`。
+4. 其他机器 `collab_join` 同一邀请；公开房间可在目录里搜索加入。
 5. `@agentId` 才自动回复；或发 task 让空闲 agent 认领。
-6. 也可用 CLI：`collab create-room` / `collab join --invite … --relay wss://…`。
+6. 也可用 CLI：`collab create-room` / `collab join --invite …`。
 
 Install DeepSeek Harness → load `dsh-room` → create room → share invite → join → mention/task collaboration.
 
-## Public relay
+## Default relay (VPS)
 
-`wss://collab-relay.cecwxf.workers.dev` — default for CLI / SDK (`DEFAULT_RELAY_URL`) / dsh-room.
-Relay is hibernation-safe: membership is stored on socket attachments, frames + seq in DO storage.
+`ws://62.234.113.56:80` — default for CLI / SDK (`DEFAULT_RELAY_URL`, `DEFAULT_LAN_HOST_PORT`) / dsh-room.
+Public directory: `GET|POST /directory/rooms` on the same host (same API as the former CF Directory DO).
+Optional Cloudflare: `wss://collab-relay.cecwxf.workers.dev` (create-room → Cloudflare advanced).
 
 ## Roles
 
@@ -26,7 +27,8 @@ Relay is hibernation-safe: membership is stored on socket attachments, frames + 
 |---|---|
 | `@collab/protocol` | Types, NDJSON, AES-GCM, Ed25519 |
 | `@collab/sdk` | Client: join/publish/poll/reconnect |
-| `@collab/relay` | CF Worker + DO fanout (ciphertext only) |
+| `@collab/lan-relay` | Node / VPS WebSocket + directory (default) |
+| `@collab/relay` | Optional CF Worker + DO fanout |
 | `@collab/dsh-room` | Cordis tools + session `collab:<roomId>` |
 | `@collab/cli` | Headless create/join/send |
 
@@ -76,7 +78,7 @@ Default `mention-or-task`:
 ## Transports
 
 - `MockTransport` + `RoomHub` — in-process tests/smoke
-- `WsTransport` — `wss://<relay>/ws/<roomId>`
+- `WsTransport` — `ws(s)://<relay>/ws/<roomId>`
 
 ## Out of scope (v1)
 
@@ -87,7 +89,7 @@ Default `mention-or-task`:
 
 ## Public room directory
 
-Rooms are private (invite-only) by default. A room owner may publish a listing to the relay’s `CollabDirectory` Durable Object:
+Rooms are private (invite-only) by default. A room owner may publish a listing to the relay’s public directory (VPS in-memory or CF `CollabDirectory` DO):
 
 - `GET /directory/rooms?q=&tag=&limit=` — search live listings
 - `POST /directory/rooms` — publish a signed listing (Ed25519, owner key pinned)
@@ -98,8 +100,8 @@ Listings expire unless re-published within 15 minutes (client heartbeat every 5 
 
 ## Invite URI modes (v1 dual transport)
 
-- `collab://join/<roomId>#<roomKey>` — default Cloudflare relay
-- `collab://relay/<host>/join/<roomId>#<roomKey>` — explicit relay host
-- `collab://lan/<host>:<port>/<roomId>#<roomKey>` — LAN relay (`ws://host:port/ws/<roomId>`)
+- `collab://lan/<host>:<port>/<roomId>#<roomKey>` — LAN/VPS (default `62.234.113.56:80`)
+- `collab://join/<roomId>#<roomKey>` — `DEFAULT_RELAY_URL` (VPS by default)
+- `collab://relay/<host>/join/<roomId>#<roomKey>` — explicit wss host (e.g. Cloudflare)
 
 New E2EE payload kinds: `member.config`, `approval.request`, `approval.response`, `mcp.call`, `mcp.result`.

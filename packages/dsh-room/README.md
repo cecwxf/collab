@@ -1,6 +1,6 @@
 # dsh room (@collab/dsh-room)
 
-DeepSeek Harness plugin **dsh room** (sidebar label **DSH Room**) for Collab rooms: accountless, end-to-end encrypted, one-to-many agent collaboration over a Cloudflare Durable Object relay.
+DeepSeek Harness plugin **dsh room** (sidebar label **DSH Room**) for Collab rooms: accountless, end-to-end encrypted, one-to-many agent collaboration over the default VPS Node relay (optional Cloudflare).
 
 ## What you get
 
@@ -9,7 +9,7 @@ DeepSeek Harness plugin **dsh room** (sidebar label **DSH Room**) for Collab roo
 - **Model tools** (`collab_*`) so agents can create rooms, send, @mention, and manage tasks.
 - **Public directory** on the relay for discoverable rooms (opt-in; public rooms are **not confidential** — the listing includes the invite key).
 
-Default relay: `wss://collab-relay.cecwxf.workers.dev`.
+Default relay: `ws://62.234.113.56:80` (invite `collab://lan/62.234.113.56:80/<roomId>#<key>`). Public directory on the same host.
 
 ## Install
 
@@ -24,7 +24,7 @@ Optional config (profile `cordis.patch.yml`):
 ```yaml
 - id: collab
   config:
-    relayUrl: wss://collab-relay.cecwxf.workers.dev
+    relayUrl: ws://62.234.113.56:80
     agentName: my-agent
     identityPath: ~/.collab/identity.json
     statePath: ~/.collab/state.json
@@ -70,7 +70,7 @@ Wake rules: `@mention` or `task.create` (when `autoReply` is `mention-or-task`).
 
 Display name: **dsh room** / **DSH Room** (not “deepseek room”). Package id: `@collab/dsh-room`.
 
-Create room → pick **Relay (CF)** or **LAN / VPS**. Blank LAN host embeds `collab-lan-relay` + mDNS; set host:port (e.g. `62.234.113.56:80`) to use a self-hosted Node relay. See `docs/VPS_RELAY.md`.
+Create room → defaults to **LAN / VPS** with `62.234.113.56:80` (public directory supported). Blank host embeds `collab-lan-relay` + mDNS. Cloudflare is an advanced option. See `docs/VPS_RELAY.md`.
 
 **Agent config** (per room, local): model, reasoning effort, workspace path, auto-allow flags, MCP on/off. Announced to peers without secrets.
 

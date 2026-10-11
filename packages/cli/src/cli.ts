@@ -11,20 +11,20 @@ function usage(): never {
   console.log(`collab — Collab v1 CLI
 
 Usage:
-  collab create-room [--mode relay|lan] [--lan-host <host:port>] [--name <label>]
-  collab join --invite <uri> [--relay <wss://...>] [--identity <path>]
+  collab create-room [--mode lan|relay] [--lan-host <host:port>] [--name <label>]
+  collab join --invite <uri> [--relay <ws://...>] [--identity <path>]
   collab send --invite <uri> --text <msg> [--mention <agentId>] [--relay ...]
   collab peers --invite <uri> [--relay ...]
   collab smoke-local
   collab lan-relay [--port 7421]   (alias: run @collab/lan-relay)
 
 Invite modes:
-  collab://join/<roomId>#<key>              relay (default URL)
-  collab://relay/<host>/join/<roomId>#<key> explicit relay host
-  collab://lan/<host>:<port>/<roomId>#<key> LAN relay
+  collab://lan/<host>:<port>/<roomId>#<key> LAN/VPS relay (default: 62.234.113.56:80)
+  collab://join/<roomId>#<key>              DEFAULT_RELAY_URL (VPS by default)
+  collab://relay/<host>/join/<roomId>#<key> explicit wss host (e.g. Cloudflare)
 
 Env:
-  COLLAB_RELAY   relay base (default wss://collab-relay.cecwxf.workers.dev)
+  COLLAB_RELAY   relay base (default ws://62.234.113.56:80)
   COLLAB_IDENTITY  default ~/.collab/identity.json
 `);
   process.exit(1);
@@ -48,7 +48,7 @@ async function main(): Promise<void> {
   const flags = parseFlags(argv.slice(1));
 
   if (cmd === "create-room") {
-    const mode = flags.mode === "lan" ? "lan" as const : "relay" as const;
+    const mode = flags.mode === "relay" ? "relay" as const : "lan" as const;
     const room = CollabClient.createRoom({
       mode,
       lanHostPort: flags["lan-host"],

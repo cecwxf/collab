@@ -108,7 +108,7 @@ export interface AgentServices {
 }
 
 export interface DshCollabConfig {
-  /** Relay base URL. Default: wss://collab-relay.cecwxf.workers.dev */
+  /** Relay base URL (directory + default join). Default: ws://62.234.113.56:80 */
   relayUrl: string;
   /** Room to auto-join on start (collab://join/<roomId>#<roomKey>). */
   invite?: string;

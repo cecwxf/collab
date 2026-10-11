@@ -49,7 +49,7 @@ describe("room invite", () => {
     const parsed = parseInviteUri(inv.uri);
     assert.equal(parsed.roomId, inv.roomId);
     assert.equal(parsed.roomKeyB64, inv.roomKeyB64);
-    assert.equal(parsed.mode, "relay");
+    assert.equal(parsed.mode, "lan");
     assert.equal(parsed.roomKeyB64, inv.roomKeyB64);
   });
 

@@ -68,7 +68,7 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
       if (method === "GET" && path === "/directory") return sendJson(res, 200, { rooms: await bridge.search(str(url.searchParams.get("q")), str(url.searchParams.get("tag"))) });
       if (method === "POST" && path === "/rooms") {
         const b = await readJson(req);
-        return sendJson(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "lan" ? "lan" : "relay", lanHostPort: str(b.lanHostPort), workspaceId: str(b.workspaceId) }));
+        return sendJson(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "relay" ? "relay" : "lan", lanHostPort: typeof b.lanHostPort === "string" ? b.lanHostPort.trim() : undefined, workspaceId: str(b.workspaceId) }));
       }
       if (method === "POST" && path === "/join") {
         const b = await readJson(req);

@@ -4,10 +4,10 @@
 
 | Mode | Invite | Wire |
 |------|--------|------|
-| **Relay** (default) | `collab://join/<roomId>#<key>` or `collab://relay/<host>/join/<roomId>#<key>` | `wss://…/ws/<roomId>` (Cloudflare DO) |
-| **LAN** | `collab://lan/<host>:<port>/<roomId>#<key>` | `ws://host:port/ws/<roomId>` |
+| **LAN / VPS** (default) | `collab://lan/<host>:<port>/<roomId>#<key>` | `ws://host:port/ws/<roomId>` (default VPS `62.234.113.56:80`) |
+| **Cloudflare** (advanced) | `collab://join/<roomId>#<key>` or `collab://relay/<host>/join/<roomId>#<key>` | `wss://…/ws/<roomId>` (Cloudflare DO) |
 
-Create-room UI picks **Relay** or **LAN**. LAN starts an embedded `@collab/lan-relay` (port 7421, fallback ephemeral) and prefers a Tailscale `100.x` address when present.
+Create-room UI defaults to **LAN / VPS** with host `62.234.113.56:80`. Blank host embeds `@collab/lan-relay` (port 7421, fallback ephemeral) + mDNS / Tailscale. Public directory search works on the VPS (and CF if you still use that relay).
 
 ### mDNS
 

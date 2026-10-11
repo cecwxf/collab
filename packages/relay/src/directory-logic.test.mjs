@@ -34,3 +34,11 @@ test("canonical messages stay stable", () => {
   assert.match(unlistMessage("r", "p", 1), /^collab-v1-dir:/);
   assert.equal(isLive({ lastSeen: Date.now() }, Date.now()), true);
 });
+
+test("validateListing accepts lan invite form", () => {
+  const now = Date.now();
+  assert.equal(validateListing({
+    roomId: "room1", name: "Alpha", description: "", tags: [],
+    invite: "collab://lan/62.234.113.56:80/room1#key", members: 1, agentId: "a", publicKey: "pk", ts: now, sig: "sig",
+  }, now), null);
+});

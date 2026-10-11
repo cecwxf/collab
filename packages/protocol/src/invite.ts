@@ -1,13 +1,13 @@
 /**
  * Invite URIs
- *   collab://join/<roomId>#<key>                    → relay (DEFAULT_RELAY_URL or config)
- *   collab://relay/<host>/join/<roomId>#<key>       → explicit wss://host relay
- *   collab://lan/<host>:<port>/<roomId>#<key>       → LAN ws://host:port/ws/<roomId>
+ *   collab://lan/<host>:<port>/<roomId>#<key>       → LAN/VPS ws://host:port/ws/<roomId> (default)
+ *   collab://join/<roomId>#<key>                    → DEFAULT_RELAY_URL (VPS by default)
+ *   collab://relay/<host>/join/<roomId>#<key>       → explicit wss://host relay (e.g. Cloudflare)
  *
  * Optional query: ?name=<display> (ignored by parse; for humans/mDNS).
  */
 import { b64uEncode, randomBytes, ulidLike } from "./util.js";
-import { DEFAULT_RELAY_URL } from "./types.js";
+import { DEFAULT_RELAY_URL, DEFAULT_LAN_HOST_PORT } from "./types.js";
 
 export type TransportMode = "relay" | "lan";
 
@@ -38,18 +38,18 @@ export function createRoomInvite(opts?: {
   mode?: TransportMode;
   /** For relay: override host (no scheme), default DEFAULT_RELAY_URL host. */
   relayHost?: string;
-  /** For lan: host:port of the LAN relay, e.g. 100.x.x.x:7421 */
+  /** For lan: host:port of the LAN/VPS relay. Default DEFAULT_LAN_HOST_PORT. */
   lanHostPort?: string;
   name?: string;
 }): { roomId: string; roomKey: Uint8Array; roomKeyB64: string; uri: string; mode: TransportMode } {
-  const mode = opts?.mode ?? "relay";
+  const mode = opts?.mode ?? "lan";
   const roomId = ulidLike();
   const roomKey = randomBytes(32);
   const roomKeyB64 = b64uEncode(roomKey);
   const q = opts?.name ? `?name=${encodeURIComponent(opts.name)}` : "";
   let uri: string;
   if (mode === "lan") {
-    const hp = opts?.lanHostPort;
+    const hp = opts?.lanHostPort ?? DEFAULT_LAN_HOST_PORT;
     if (!hp || !/^[A-Za-z0-9._:-]+:\d+$/.test(hp)) throw new Error("lan invite needs lanHostPort as host:port");
     uri = `collab://lan/${hp}/${roomId}${q}#${roomKeyB64}`;
   } else if (opts?.relayHost) {

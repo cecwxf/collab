@@ -1,6 +1,6 @@
 # Self-hosted Collab Relay on a VPS
 
-You can run the same Node relay (`@collab/lan-relay`) on any VPS instead of Cloudflare. Protocol and invites are identical; use **LAN / VPS** transport in DSH Room.
+Default transport for new rooms. Runs `@collab/lan-relay` (Node WebSocket + **public directory**) on any VPS. Protocol matches Cloudflare; invites use the LAN form.
 
 ## Public URL (current deploy)
 
@@ -8,24 +8,22 @@ You can run the same Node relay (`@collab/lan-relay`) on any VPS instead of Clou
 |------|--------|
 | Health | `http://62.234.113.56/health` |
 | WebSocket | `ws://62.234.113.56:80/ws/<roomId>` |
+| Directory | `http://62.234.113.56/directory/rooms` |
 | Invite form | `collab://lan/62.234.113.56:80/<roomId>#<roomKey>` |
 | systemd | `collab-relay.service` on the VPS |
 | Install dir | `/opt/collab-relay` |
 
-**Why port 80?** This host’s cloud security group already allowed 22/80/443. Port `8787` was open in ufw but blocked at the SG layer. Relay listens on **80** so it works without console changes. You can still run on `8787` after opening that port in the Tencent/云厂商安全组.
+**Why port 80?** This host’s cloud security group already allowed 22/80/443. Port `8787` was open in ufw but blocked at the SG layer. Relay listens on **80** so it works without console changes.
 
-Public room **directory** is Cloudflare-only today → VPS rooms are **invite-only**.
+Public room **directory** runs on this VPS (same API as the CF Directory DO): search, publish, unlist, signed listings, TTL heartbeats.
 
 ## Point DSH Room / Mac / box at it
 
-1. Open DSH Room → **Create room**.
-2. Transport → **LAN / VPS**.
-3. Set **Relay host:port** to `62.234.113.56:80` (do not leave blank — blank starts an embedded local relay).
-4. Create → **Copy invite** → peers **Join by invite**.
+1. Open DSH Room → **Create room** (transport defaults to **LAN / VPS**, host prefilled `62.234.113.56:80`).
+2. Optionally enable **List in public directory**.
+3. Create → **Copy invite** → peers **Join by invite**, or **Browse public rooms** / search.
 
-Peers do not need the Cloudflare Worker. Any dsh with `@collab/dsh-room` that can reach `ws://62.234.113.56:80` can join.
-
-Config alternative (always use CF by default, VPS only when invite says so): leave `relayUrl` as the CF `wss://…` URL; LAN/VPS invites carry the host in the URI.
+Defaults in code: `DEFAULT_RELAY_URL` / `DEFAULT_LAN_HOST_PORT` / dsh-room `relayUrl` all point here. Override with `COLLAB_RELAY` or profile `relayUrl` if needed.
 
 ## Deploy / update (Ubuntu)
 
@@ -39,12 +37,14 @@ cd /opt/collab-relay && tar xzf collab-relay-deploy.tgz && npm install --omit=de
 sudo systemctl enable --now collab-relay
 sudo ufw allow 80/tcp
 curl -sS http://127.0.0.1/health
+# expect: {"ok":true,"service":"collab-lan-relay","directory":true,...}
 ```
 
 Smoke from a machine with the collab repo:
 
 ```sh
 node scripts/smoke-vps-relay.mjs
+COLLAB_RELAY=ws://62.234.113.56:80 node scripts/directory-live.mjs
 # or: RELAY_HOST=62.234.113.56:80 node scripts/smoke-vps-relay.mjs
 ```
 
@@ -60,7 +60,7 @@ node scripts/smoke-vps-relay.mjs
 - Prefer **SSH key** auth; change or disable password login (`PasswordAuthentication no`).
 - Traffic on `ws://` is not TLS-wrapped; room payloads are still **E2EE** (AES-GCM). Network observers see ciphertext + metadata (roomId, timing). Use TLS when you care about metadata / mixed networks.
 - VPS bill is flat (or your host plan); no Cloudflare Durable Object wake costs.
-- Do not expose MCP or workspace paths on the relay — the relay only fans out ciphertext.
+- Do not expose MCP or workspace paths on the relay — the relay only fans out ciphertext + directory listings.
 - Keep ufw on; open only SSH + the relay port. Also open the same port in the **cloud security group**.
 
 ## Ops
@@ -69,4 +69,5 @@ node scripts/smoke-vps-relay.mjs
 sudo systemctl status collab-relay
 sudo journalctl -u collab-relay -f
 curl -sS http://62.234.113.56/health
+curl -sS 'http://62.234.113.56/directory/rooms?limit=5'
 ```

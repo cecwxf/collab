@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
  * Live e2e against a deployed relay.
- *   COLLAB_RELAY=wss://collab-relay.cecwxf.workers.dev node scripts/e2e-live.mjs [idleSeconds]
+ *   COLLAB_RELAY=ws://62.234.113.56:80 node scripts/e2e-live.mjs [idleSeconds]
  * B joins first and idles (lets the DO hibernate), then A joins, chats, @mentions B,
  * creates a task; B auto-replies (stream) + claims/updates the task; A must see all of it.
  */
 import { generateIdentity } from "@collab/protocol";
 import { CollabClient, WsTransport } from "@collab/sdk";
 
-const RELAY = (process.env.COLLAB_RELAY ?? "wss://collab-relay.cecwxf.workers.dev").replace(/\/$/, "");
+const RELAY = (process.env.COLLAB_RELAY ?? "ws://62.234.113.56:80").replace(/\/$/, "");
 const IDLE = Number(process.argv[2] ?? 15);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);

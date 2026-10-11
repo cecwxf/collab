@@ -15,6 +15,7 @@ import {
   type Identity,
   type MemberConfigPayload,
   type McpCallPayload,
+  DEFAULT_LAN_HOST_PORT,
 } from "@collab/protocol";
 import { CollabClient, WsTransport } from "@collab/sdk";
 import { LanRelayServer, browseLanRelays } from "@collab/lan-relay";
@@ -157,9 +158,9 @@ export interface CreateRoomOptions {
   description?: string;
   tags?: string[] | string;
   public?: boolean;
-  /** Dual transport: default relay. LAN starts/uses embedded lan-relay. */
+  /** Dual transport: default LAN/VPS. LAN uses DEFAULT_LAN_HOST_PORT or embedded lan-relay when host blank. */
   mode?: "relay" | "lan";
-  /** For LAN: host:port override (default discovered/local listen). */
+  /** For LAN: host:port (default VPS). Omit/blank with mode=lan from UI embedded path uses ensureLanRelay. */
   lanHostPort?: string;
   /** Workspace that owns this room (defaults to active). */
   workspaceId?: string;
@@ -430,12 +431,19 @@ export class CollabBridge {
 
   /** Create a room (private unless opts.public) and join it. */
   async createRoom(opts: CreateRoomOptions = {}, bindTo?: AgentLike) {
-    const mode = opts.mode === "lan" ? "lan" : "relay";
-    // Public directory is relay-only (listings go to CF Directory DO).
-    const isPublic = mode === "relay" && opts.public === true;
+    const mode = opts.mode === "relay" ? "relay" : "lan";
+    // Public directory lives on config.relayUrl (default VPS Node relay).
+    const isPublic = opts.public === true;
     let room;
     if (mode === "lan") {
-      const lanHostPort = opts.lanHostPort ?? (await this.ensureLanRelay());
+      let lanHostPort: string;
+      if (typeof opts.lanHostPort === "string" && opts.lanHostPort.trim()) {
+        lanHostPort = opts.lanHostPort.trim();
+      } else if (opts.lanHostPort === "") {
+        lanHostPort = await this.ensureLanRelay();
+      } else {
+        lanHostPort = DEFAULT_LAN_HOST_PORT;
+      }
       room = CollabClient.createRoom({ mode: "lan", lanHostPort, name: opts.name });
     } else {
       room = CollabClient.createRoom({ mode: "relay", name: opts.name });
@@ -974,7 +982,7 @@ export class CollabBridge {
     return [
       def(
         "collab_create_room",
-        "Create a new Collab room and join it. Private (invite-only) by default; public=true lists it in the relay directory with its key, so anyone can find, join and read it. Returns the invite (collab://join/<roomId>#<roomKey>).",
+        "Create a new Collab room and join it. Private (invite-only) by default; public=true lists it in the relay directory with its key, so anyone can find, join and read it. Returns the invite (default collab://lan/<vps>/<roomId>#<roomKey>).",
         obj({ name: s("Room name"), description: s("Short description"), tags: { type: "array", items: { type: "string" } }, public: { type: "boolean", description: "List in the public directory (NOT confidential)" } }),
         (a) => this.createRoom({ name: str(a.name), description: str(a.description), tags: strs(a.tags), public: a.public === true }),
       ),

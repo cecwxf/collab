@@ -7,6 +7,6 @@
     - id: collab
       name: '@collab/dsh-room'
       config:
-        relayUrl: wss://collab-relay.cecwxf.workers.dev
+        relayUrl: ws://62.234.113.56:80
         autoReply: mention-or-task
         permissionPreset: read-only
