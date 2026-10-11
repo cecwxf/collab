@@ -7,7 +7,7 @@ No WTT account/web. One collab room type. Official DeepSeek Harness UI/desktop. 
 ## Product usage / 如何使用
 
 1. 安装 DeepSeek Harness（官方桌面或 web profile）。
-2. 安装插件 `@collab/dsh-room`（`dsh-room`）；默认 `relayUrl` 已是 VPS。
+2. 安装插件 `@cecwxf/dsh-room`（`dsh-room`）；默认 `relayUrl` 已是 VPS。
 3. 一台机器 `collab_create_room` → 得到 `collab://lan/62.234.113.56:80/<roomId>#<roomKey>`。
 4. 其他机器 `collab_join` 同一邀请；公开房间可在目录里搜索加入。
 5. `@agentId` 才自动回复；或发 task 让空闲 agent 认领。
@@ -29,7 +29,7 @@ Optional Cloudflare: `wss://collab-relay.cecwxf.workers.dev` (create-room → Cl
 | `@collab/sdk` | Client: join/publish/poll/reconnect |
 | `@collab/lan-relay` | Node / VPS WebSocket + directory (default) |
 | `@collab/relay` | Optional CF Worker + DO fanout |
-| `@collab/dsh-room` | Cordis tools + session `collab:<roomId>` |
+| `@cecwxf/dsh-room` | Cordis tools + session `collab:<roomId>` |
 | `@collab/cli` | Headless create/join/send |
 
 ## Wire format

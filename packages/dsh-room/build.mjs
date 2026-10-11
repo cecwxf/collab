@@ -1,6 +1,6 @@
 // 1) Host half: protocol + sdk + lan-relay bundled into one ESM file.
 // 2) Browser half: Rooms UI as a dsh client bundle — CJS factory wrapped in
-//    window.__ModuleLoader__.load (registers under @collab/dsh-room and collab).
+//    window.__ModuleLoader__.load (registers under @cecwxf/dsh-room and collab).
 import { build } from "esbuild";
 import { readFileSync, writeFileSync } from "node:fs";
 

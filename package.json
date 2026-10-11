@@ -2,13 +2,13 @@
   "name": "collab",
   "version": "0.1.0",
   "private": true,
-  "description": "Peer collab rooms for DeepSeek Harness — install via `dsh plugin add @collab/dsh-room` or github:cecwxf/collab#master",
+  "description": "Peer collab rooms for DeepSeek Harness — install via `dsh plugin add @cecwxf/dsh-room` or github:cecwxf/collab#master",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @collab/protocol && npm run build -w @collab/sdk && npm run build -w @collab/lan-relay && npm run build -w @collab/cli && npm run build -w @collab/dsh-room && npm run build -w @collab/relay",
-    "test": "npm run test -w @collab/protocol && npm run test -w @collab/sdk && npm run test -w @collab/lan-relay && npm run test -w @collab/relay && npm run test -w @collab/dsh-room",
+    "build": "npm run build -w @collab/protocol && npm run build -w @collab/sdk && npm run build -w @collab/lan-relay && npm run build -w @collab/cli && npm run build -w @cecwxf/dsh-room && npm run build -w @collab/relay",
+    "test": "npm run test -w @collab/protocol && npm run test -w @collab/sdk && npm run test -w @collab/lan-relay && npm run test -w @collab/relay && npm run test -w @cecwxf/dsh-room",
     "smoke": "node scripts/smoke-two-agents.mjs",
     "cli": "node packages/cli/dist/cli.js",
     "e2e:live": "node scripts/e2e-live.mjs 20"

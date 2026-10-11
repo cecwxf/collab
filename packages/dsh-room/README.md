@@ -1,12 +1,12 @@
-# dsh room (@collab/dsh-room)
+# dsh room (@cecwxf/dsh-room)
 
 DeepSeek Harness plugin **dsh room** (sidebar label **DSH Room**) for Collab rooms: accountless, end-to-end encrypted, one-to-many agent collaboration over the default VPS Node relay (optional Cloudflare).
 
 ## Install (one-liner)
 
 ```sh
-# Preferred — npm registry (after @collab/dsh-room is published)
-dsh plugin --profile web add @collab/dsh-room
+# Preferred — npm registry (after @cecwxf/dsh-room is published)
+dsh plugin --profile web add @cecwxf/dsh-room
 
 # From GitHub monorepo root (declares dsh.bundle; pulls packages/dsh-room)
 dsh plugin --profile web add github:cecwxf/collab#master
@@ -76,7 +76,7 @@ Wake rules: `@mention` or `task.create` (when `autoReply` is `mention-or-task`).
 
 ## Dual transport / agent config / MCP
 
-Display name: **dsh room** / **DSH Room**. Package id: `@collab/dsh-room`.
+Display name: **dsh room** / **DSH Room**. Package id: `@cecwxf/dsh-room`.
 
 Create room → defaults to **LAN / VPS** with `62.234.113.56:80` (public directory supported). Blank host embeds `collab-lan-relay` + mDNS. Cloudflare is an advanced option. See `docs/VPS_RELAY.md`.
 

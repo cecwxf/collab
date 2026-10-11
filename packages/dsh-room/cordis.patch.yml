@@ -5,7 +5,7 @@
 # (a patch replaces the row's whole config; unset keys fall back to defaults)
 - insert:
     - id: collab
-      name: '@collab/dsh-room'
+      name: '@cecwxf/dsh-room'
       config:
         relayUrl: ws://62.234.113.56:80
         autoReply: mention-or-task

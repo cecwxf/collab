@@ -1,5 +1,5 @@
 {
-  "name": "@collab/dsh-room",
+  "name": "@cecwxf/dsh-room",
   "version": "0.1.0",
   "description": "DSH Room — DeepSeek Harness plugin for accountless E2EE Collab rooms (sidebar: DSH Room)",
   "type": "module",

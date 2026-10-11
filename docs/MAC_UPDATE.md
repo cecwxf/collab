@@ -1,6 +1,6 @@
 # Updating the Mac mini dsh room profile
 
-Package id: `@collab/dsh-room`. Sidebar: **DSH Room**. Launch command: **`dsh room`** (profile name = subcommand).
+Package id: `@cecwxf/dsh-room`. Sidebar: **DSH Room**. Launch command: **`dsh room`** (profile name = subcommand).
 
 ## Exact Mac launch
 
@@ -29,7 +29,7 @@ bash ~/collab-e2e/restart-mac-dsh.sh
 ```sh
 cd ~/collab-e2e/collab
 git fetch origin && git checkout master && git pull --ff-only
-npm install && npm run build -w @collab/dsh-room
+npm install && npm run build -w @cecwxf/dsh-room
 dsh plugin --profile room add ./packages/dsh-room
 bash ~/collab-e2e/restart-mac-dsh.sh
 ```

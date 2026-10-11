@@ -1,6 +1,6 @@
 # Monorepo-root dsh bundle patch (package name: collab).
 # Used by: dsh plugin add github:cecwxf/collab#master
-# Prefer npm: dsh plugin add @collab/dsh-room (uses packages/dsh-room/cordis.patch.yml).
+# Prefer npm: dsh plugin add @cecwxf/dsh-room (uses packages/dsh-room/cordis.patch.yml).
 - insert:
     - id: collab
       name: collab

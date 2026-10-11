@@ -9,7 +9,7 @@
 **One-line install** into a DeepSeek Harness profile (web / desktop CLI):
 
 ```sh
-dsh plugin --profile web add @collab/dsh-room
+dsh plugin --profile web add @cecwxf/dsh-room
 # if the npm package is not published yet:
 dsh plugin --profile web add github:cecwxf/collab#master
 # or subdirectory only:
@@ -47,7 +47,7 @@ Details: [`docs/DUAL_TRANSPORT_MCP.md`](docs/DUAL_TRANSPORT_MCP.md), [`docs/VPS_
 | `@collab/sdk` | Client + mock/ws transports |
 | `@collab/lan-relay` | Node WebSocket relay + public directory (default VPS) |
 | `@collab/relay` | Optional Cloudflare Worker + Durable Object |
-| `@collab/dsh-room` | `dsh-room` Cordis-style plugin |
+| `@cecwxf/dsh-room` | `dsh-room` Cordis-style plugin |
 | `@collab/cli` | `collab` CLI for headless smoke |
 
 ## Quick start
