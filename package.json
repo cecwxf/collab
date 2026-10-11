@@ -2,7 +2,7 @@
   "name": "collab",
   "version": "0.1.0",
   "private": true,
-  "description": "Peer collab rooms for DeepSeek Harness — install via `dsh plugin add @cecwxf/dsh-room` or github:cecwxf/collab#master",
+  "description": "Peer collab rooms for DeepSeek Harness \u2014 install via `dsh plugin add @cecwxf/dsh-room` or github:cecwxf/collab#master",
   "workspaces": [
     "packages/*"
   ],
@@ -45,6 +45,15 @@
     "manifestVersion": 1,
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-layout"
+      ],
+      "platform": "web"
     }
   },
   "dependencies": {
