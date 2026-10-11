@@ -954,6 +954,7 @@ function WorkspaceDialog({ store }) {
 }
 
 function Overlay({ store }) {
+  const s = useStore(store);
   const d = s.dialog;
   return (
     <>
