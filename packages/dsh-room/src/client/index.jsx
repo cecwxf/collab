@@ -65,9 +65,9 @@ function RoomsSidebar({ store, ensurePanel }) {
   const s = useStore(store);
   const a = store.actions;
   const [menu, setMenu] = useState(null);
-  const [searching, setSearching] = useState(false);
   const [joining, setJoining] = useState(null);
   const inputRef = useRef(null);
+  const searching = !!s.search.open;
   const activeWs = (s.workspaces || []).find((w) => w.id === s.activeWorkspaceId) || (s.workspaces || [])[0] || null;
 
   useEffect(() => {
@@ -109,7 +109,7 @@ function RoomsSidebar({ store, ensurePanel }) {
     <div className="rm-root rm-side" data-collab-sidebar="">
       <div className="rm-side-toolbar">
         <span className="rm-side-title">DSH Room</span>
-        <button type="button" className="rm-icon-btn" aria-label={searching ? "Close search" : "Search rooms"} aria-pressed={searching} onClick={() => { setSearching(!searching); a.setSearchOpen(!searching); }}>
+        <button type="button" className="rm-icon-btn" aria-label={searching ? "Close search" : "Search rooms"} aria-pressed={searching} onClick={() => a.setSearchOpen(!searching)}>
           {searching ? <CloseIcon /> : <SearchIcon />}
         </button>
         <button type="button" className="rm-icon-btn" data-rm-new="" aria-label="New" aria-haspopup="menu" aria-expanded={!!menu}
@@ -121,7 +121,7 @@ function RoomsSidebar({ store, ensurePanel }) {
             <button type="button" role="menuitem" onClick={() => { setMenu(null); a.openDialog({ kind: "create" }); }}><PlusIcon />Create room in workspace</button>
             <button type="button" role="menuitem" onClick={() => { setMenu(null); a.openDialog({ kind: "join" }); }}><LinkIcon />Join by invite</button>
             <button type="button" role="menuitem" onClick={() => { setMenu(null); a.openDialog({ kind: "workspace" }); }}><FolderIcon />Add / switch workspace</button>
-            <button type="button" role="menuitem" onClick={() => { setMenu(null); setSearching(true); a.setSearchOpen(true); }}><GlobeIcon />Browse public rooms</button>
+            <button type="button" role="menuitem" onClick={() => { setMenu(null); a.openDialog({ kind: "browse" }); }}><GlobeIcon />Browse public rooms</button>
           </div>
         ) : null}
       </div>
@@ -131,6 +131,9 @@ function RoomsSidebar({ store, ensurePanel }) {
           <FolderIcon /><span>{activeWs.name}</span>
         </button>
         <span className="rm-ws-path" title={activeWs.path}>{activeWs.path}</span>
+        <button type="button" className="rm-new-room" data-rm-new-room="" onClick={() => { a.openDialog({ kind: "create" }); ensurePanel(); }}>
+          <PlusIcon /><span>New Room</span>
+        </button>
       </div>
 
       {searching ? (
@@ -184,7 +187,7 @@ function RoomsSidebar({ store, ensurePanel }) {
                 <div className="rm-dir-item-body">
                   <div className="rm-room-item-name">{r.name}</div>
                   <div className="rm-room-item-meta">{r.description || "No description"} · {r.members} online</div>
-                  {r.tags.length ? <div className="rm-dir-tags">{r.tags.map((tg) => <span key={tg} className="rm-tag">#{tg}</span>)}</div> : null}
+                  {(r.tags || []).length ? <div className="rm-dir-tags">{(r.tags || []).map((tg) => <span key={tg} className="rm-tag">#{tg}</span>)}</div> : null}
                 </div>
                 <Button size="sm" variant={r.joined ? "ghost" : "outline"} disabled={r.joined || joining === r.roomId} onClick={() => join(r)}>
                   {r.joined ? "Joined" : joining === r.roomId ? "…" : "Join"}
@@ -353,23 +356,7 @@ function Composer({ room, store, draft, setDraft }) {
     } catch (e) { a.toast(e.message); }
   };
 
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq) return;
-    const insert = `@${it.id} `;
-    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
-    setDraft(next);
-    const pos = mq.start + insert.length;
-    setCaret(pos);
-    setMentionActive(0);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (el) { el.focus(); el.setSelectionRange(pos, pos); }
-    });
-  };
+
   const submit = async () => {
     const text = draft.trim();
     if (!text || busy) return;
@@ -607,8 +594,8 @@ function EmptyMain({ store }) {
           <button type="button" className="rm-welcome-action" onClick={() => a.openDialog({ kind: "join" })}>
             <LinkIcon /><span><b>Join by invite</b><span>Paste a collab://join/… invite</span></span>
           </button>
-          <button type="button" className="rm-welcome-action" onClick={() => a.setSearchOpen(true)}>
-            <SearchIcon /><span><b>Browse public rooms</b><span>Search the relay directory by name or #tag</span></span>
+          <button type="button" className="rm-welcome-action" onClick={() => a.openDialog({ kind: "browse" })}>
+            <SearchIcon /><span><b>Browse public rooms</b><span>Search the VPS directory by name or #tag</span></span>
           </button>
         </div>
       </div>
@@ -662,23 +649,7 @@ function CreateDialog({ store }) {
   const [busy, setBusy] = useState(false);
   const [lanPeers, setLanPeers] = useState([]);
   const ok = f.name.trim() && !busy;
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq) return;
-    const insert = `@${it.id} `;
-    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
-    setDraft(next);
-    const pos = mq.start + insert.length;
-    setCaret(pos);
-    setMentionActive(0);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (el) { el.focus(); el.setSelectionRange(pos, pos); }
-    });
-  };
+  const ws = (s.workspaces || []).find((w) => w.id === s.activeWorkspaceId) || (s.workspaces || [])[0];
   const submit = async () => {
     if (!ok) return;
     setBusy(true); setErr(null);
@@ -694,45 +665,47 @@ function CreateDialog({ store }) {
     try { const r = await a.browseLan(); setLanPeers(r.peers || []); } catch (e) { setErr(e.message); }
   };
   return (
-    <Modal open onClose={a.closeDialog} title="Create room" closeLabel="Close"
-      description="Room is created inside the active workspace (path becomes MCP sandbox). Default transport is the VPS Node relay (62.234.113.56:80) with optional public directory. Cloudflare remains an advanced option. The room key never goes to the relay."
+    <Modal open onClose={a.closeDialog} title="Create room" closeLabel="Close" className="rm-modal-wide"
+      description={ws ? `In workspace “${ws.name}”. Default relay 62.234.113.56:80 · E2EE · keys stay local.` : "Bind a workspace first. Default relay 62.234.113.56:80."}
       footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={!ok} onClick={submit}>{busy ? "Creating…" : "Create"}</Button></>}>
-      <div className="rm-root rm-form" onKeyDown={(e) => e.key === "Enter" && e.target.tagName === "INPUT" && submit()}>
-        <Field label="Transport" hint="Default: VPS Node relay at 62.234.113.56:80 (invite-only or public directory). Blank host = embedded local LAN + mDNS. Cloudflare is optional.">
-          <div className="rm-mode-row">
-            <button type="button" className={"rm-mode-btn" + (f.mode === "lan" ? " is-on" : "")} onClick={() => setF({ ...f, mode: "lan", lanHostPort: f.lanHostPort || "62.234.113.56:80" })}>LAN / VPS</button>
-            <button type="button" className={"rm-mode-btn" + (f.mode === "relay" ? " is-on" : "")} onClick={() => setF({ ...f, mode: "relay" })}>Cloudflare (advanced)</button>
-          </div>
-        </Field>
+      <div className="rm-root rm-form rm-form-wide" onKeyDown={(e) => e.key === "Enter" && e.target.tagName === "INPUT" && submit()}>
         <Field label="Name" htmlFor="rm-create-name">
           <div className="rm-name-row"><Avatar name={f.name || "room"} size={36} /><Input id="rm-create-name" autoFocus placeholder="e.g. release-crew" maxLength={60} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
         </Field>
-        <Field label="Description (optional)" htmlFor="rm-create-desc" hint="Shown to members and, if public, in search results.">
+        <Field label="Transport" hint="VPS directory works on LAN/VPS. Cloudflare is optional.">
+          <div className="rm-mode-row">
+            <button type="button" className={"rm-mode-btn" + (f.mode === "lan" ? " is-on" : "")} onClick={() => setF({ ...f, mode: "lan", lanHostPort: f.lanHostPort || "62.234.113.56:80" })}>LAN / VPS</button>
+            <button type="button" className={"rm-mode-btn" + (f.mode === "relay" ? " is-on" : "")} onClick={() => setF({ ...f, mode: "relay" })}>Cloudflare</button>
+          </div>
+        </Field>
+        <Field label="Description" htmlFor="rm-create-desc" hint="Shown to members and in public search.">
           <Input id="rm-create-desc" placeholder="e.g. Agents that review and ship releases" maxLength={280} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
         </Field>
-        <Field label="Tags (optional)" htmlFor="rm-create-tags" hint="Spaces or commas, up to 8. Used by public room search.">
+        <Field label="Tags" htmlFor="rm-create-tags" hint="Spaces or commas, up to 8.">
           <Input id="rm-create-tags" placeholder="e.g. review rust" value={f.tags} onChange={(e) => setF({ ...f, tags: e.target.value })} />
         </Field>
         {f.mode === "lan" ? (
-          <Field label="Relay host:port" htmlFor="rm-lan-hp" hint="Default VPS 62.234.113.56:80 (public directory works). Blank = this machine (LAN/Tailscale + mDNS). Invite: collab://lan/host:port/room#key.">
-            <Input id="rm-lan-hp" placeholder="62.234.113.56:80 or 100.x.x.x:7421" value={f.lanHostPort} onChange={(e) => setF({ ...f, lanHostPort: e.target.value })} />
-            <div className="rm-lan-browse"><Button size="sm" variant="outline" onClick={browseLan}>Browse mDNS</Button>
-              {lanPeers.map((p) => (
-                <button key={p.hostPort} type="button" className="rm-lan-peer" onClick={() => setF({ ...f, lanHostPort: p.hostPort })}>{p.hostPort}{p.name ? ` · ${p.name}` : ""}</button>
-              ))}
-            </div>
-          </Field>
+          <div className="rm-span-2">
+            <Field label="Relay host:port" htmlFor="rm-lan-hp" hint="Default 62.234.113.56:80. Blank = this machine + mDNS.">
+              <Input id="rm-lan-hp" placeholder="62.234.113.56:80 or 100.x.x.x:7421" value={f.lanHostPort} onChange={(e) => setF({ ...f, lanHostPort: e.target.value })} />
+              <div className="rm-lan-browse"><Button size="sm" variant="outline" onClick={browseLan}>Browse mDNS</Button>
+                {lanPeers.map((p) => (
+                  <button key={p.hostPort} type="button" className="rm-lan-peer" onClick={() => setF({ ...f, lanHostPort: p.hostPort })}>{p.hostPort}{p.name ? ` · ${p.name}` : ""}</button>
+                ))}
+              </div>
+            </Field>
+          </div>
         ) : null}
-        <div className="rm-switch-row">
+        <div className="rm-span-2 rm-switch-row">
           <div>
             <div className="rm-field-label">List in public directory</div>
             <div className="rm-field-hint">{f.public
-              ? "Anyone can find this room by name or tag and join it. Its key is published with the listing — NOT confidential."
-              : "Private: invite only. Nothing about the room is published."}</div>
+              ? "Anyone can find and join — key is published with the listing."
+              : "Private: invite only."}</div>
           </div>
           <Switch checked={f.public} onChange={(v) => setF({ ...f, public: v })} label="List in public directory" />
         </div>
-        {err ? <div className="rm-error">{err}</div> : null}
+        {err ? <div className="rm-span-2 rm-error">{err}</div> : null}
       </div>
     </Modal>
   );
@@ -745,23 +718,7 @@ function JoinDialog({ store }) {
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const valid = /^collab:\/\/(join|lan|relay)\/.+#\S+$/.test(invite.trim());
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq) return;
-    const insert = `@${it.id} `;
-    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
-    setDraft(next);
-    const pos = mq.start + insert.length;
-    setCaret(pos);
-    setMentionActive(0);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (el) { el.focus(); el.setSelectionRange(pos, pos); }
-    });
-  };
+
   const submit = async () => {
     if (!valid || busy) return;
     setBusy(true); setErr(null);
@@ -826,23 +783,7 @@ function ConfigDialog({ store, d }) {
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { a.getConfig(d.roomId).then((c) => setF((x) => ({ ...x, workspacePath: c.workspacePath || "", workspaceLabel: c.workspaceLabel || x.workspaceLabel, model: c.model || "", provider: c.provider || "", reasoningEffort: c.reasoningEffort || "medium", autoRead: c.permissions?.autoRead !== false, autoWrite: !!c.permissions?.autoWrite, autoShell: !!c.permissions?.autoShell, autoNetwork: !!c.permissions?.autoNetwork, mcpEnabled: c.mcpEnabled !== false }))).catch(() => {}); }, [d.roomId]);
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq) return;
-    const insert = `@${it.id} `;
-    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
-    setDraft(next);
-    const pos = mq.start + insert.length;
-    setCaret(pos);
-    setMentionActive(0);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (el) { el.focus(); el.setSelectionRange(pos, pos); }
-    });
-  };
+
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
@@ -913,23 +854,7 @@ function WorkspaceDialog({ store }) {
   const [path, setPath] = useState("");
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq) return;
-    const insert = `@${it.id} `;
-    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
-    setDraft(next);
-    const pos = mq.start + insert.length;
-    setCaret(pos);
-    setMentionActive(0);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (el) { el.focus(); el.setSelectionRange(pos, pos); }
-    });
-  };
+
   const submit = async () => {
     if (!path.trim()) { setErr("Absolute workspace path required"); return; }
     setBusy(true); setErr(null);
@@ -965,6 +890,61 @@ function WorkspaceDialog({ store }) {
   );
 }
 
+
+function BrowseDialog({ store }) {
+  const s = useStore(store);
+  const a = store.actions;
+  const [joining, setJoining] = useState(null);
+  const inputRef = useRef(null);
+  const activeWs = (s.workspaces || []).find((w) => w.id === s.activeWorkspaceId) || (s.workspaces || [])[0];
+  useEffect(() => {
+    a.setSearchOpen(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
+    return () => { /* keep sidebar search state; dialog close does not clear results */ };
+  }, []);
+  const join = async (r) => {
+    setJoining(r.roomId);
+    try {
+      await a.join(r.invite, { name: r.name, description: r.description, tags: r.tags, public: true, workspaceId: activeWs?.id });
+    } catch (e) { a.toast(e.message); }
+    finally { setJoining(null); }
+  };
+  return (
+    <Modal open onClose={a.closeDialog} title="Browse public rooms" closeLabel="Close" className="rm-modal-wide"
+      description="Directory on VPS 62.234.113.56:80. Search by name or #tag, then join into the active workspace."
+      footer={<Button variant="outline" onClick={a.closeDialog}>Close</Button>}>
+      <div className="rm-root rm-browse">
+        <div className="rm-search rm-browse-search">
+          <SearchIcon />
+          <input ref={inputRef} type="text" placeholder="Search rooms or #tags" value={s.search.query}
+            onChange={(e) => a.setQuery(e.target.value)} aria-label="Search public rooms" />
+          {s.search.loading ? <span className="rm-browse-status">Searching…</span> : null}
+        </div>
+        <div className="rm-browse-list">
+          {s.search.results.map((r) => (
+            <div key={r.roomId} className="rm-dir-item" data-dir-room-id={r.roomId}>
+              <Avatar name={r.name} size={30} />
+              <div className="rm-dir-item-body">
+                <div className="rm-room-item-name">{r.name}</div>
+                <div className="rm-room-item-meta">{r.description || "No description"} · {r.members} online</div>
+                {(r.tags || []).length ? <div className="rm-dir-tags">{(r.tags || []).map((tg) => <span key={tg} className="rm-tag">#{tg}</span>)}</div> : null}
+              </div>
+              <Button size="sm" variant={r.joined ? "ghost" : "outline"} disabled={r.joined || joining === r.roomId || !activeWs} onClick={() => join(r)}>
+                {!activeWs ? "Need workspace" : r.joined ? "Joined" : joining === r.roomId ? "…" : "Join"}
+              </Button>
+            </div>
+          ))}
+          {!s.search.loading && !s.search.results.length ? (
+            <div className="rm-empty-hint">{s.search.error
+              ? `Directory error: ${s.search.error}`
+              : "No public rooms listed yet. Create a room with “List in public directory” on, then refresh here."}</div>
+          ) : null}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 function Overlay({ store }) {
   const s = useStore(store);
   const d = s.dialog;
@@ -976,6 +956,7 @@ function Overlay({ store }) {
       {d?.kind === "leave" ? <LeaveDialog store={store} d={d} /> : null}
       {d?.kind === "config" ? <ConfigDialog store={store} d={d} /> : null}
       {d?.kind === "workspace" ? <WorkspaceDialog store={store} /> : null}
+      {d?.kind === "browse" ? <BrowseDialog store={store} /> : null}
       {s.toast ? <Toast text={s.toast} onDone={store.actions.clearToast} holdMs={2200} /> : null}
     </>
   );

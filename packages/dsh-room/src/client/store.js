@@ -61,7 +61,13 @@ export function createRoomsStore() {
       if (text) p.set("q", text);
       if (tag) p.set("tag", tag);
       const r = await call(`/directory?${p}`);
-      set((s) => (s.search.query === query ? { search: { ...s.search, results: r.rooms, loading: false } } : {}));
+      const rooms = Array.isArray(r.rooms) ? r.rooms.map((x) => ({
+        ...x,
+        tags: Array.isArray(x.tags) ? x.tags : [],
+        members: typeof x.members === "number" ? x.members : 0,
+        description: x.description || "",
+      })) : [];
+      set((s) => (s.search.query === query ? { search: { ...s.search, results: rooms, loading: false, error: null } } : {}));
     } catch (e) {
       set((s) => ({ search: { ...s.search, loading: false, error: e.message } }));
     }

@@ -37,7 +37,7 @@ var import_react = require("react");
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/rooms.css
-var rooms_default = '/* Collab Rooms UI \u2014 original surface inside the dsh shell. Uses only dsh --dsw-* tokens.\n   Independent Rooms surface. Prefix: rm- (rooms). */\n\n.rm-root {\n  --rm-accent: var(--dsw-alias-state-business-primary);\n  --rm-hover: var(--dsw-alias-interactive-bg-hover);\n  --rm-border: var(--dsw-alias-border-l2);\n  --rm-bg: var(--dsw-alias-bg-base);\n  --rm-panel: var(--dsw-alias-bg-module-platform);\n  --rm-label: var(--dsw-alias-label-primary);\n  --rm-muted: var(--dsw-alias-label-secondary);\n  --rm-quiet: var(--dsw-alias-label-tertiary);\n  font: 13px/1.5 var(--dsw-font-family);\n  color: var(--rm-label);\n  box-sizing: border-box;\n}\n.rm-root *, .rm-root *::before, .rm-root *::after { box-sizing: border-box; }\n.rm-root button, .rm-root input, .rm-root textarea { font: inherit; }\n\n/* \u2500\u2500 sidebar (joined rooms + public search) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-side {\n  display: flex; flex-direction: column; height: 100%; min-height: 0;\n  padding: 0 8px 8px 0; gap: 8px;\n}\n.rm-side-toolbar {\n  display: flex; align-items: center; gap: 6px; flex: none; padding: 4px 0 2px;\n}\n.rm-side-title {\n  flex: 1; font-size: 12px; font-weight: 600; letter-spacing: .04em;\n  text-transform: uppercase; color: var(--rm-quiet);\n}\n.rm-icon-btn {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; padding: 0;\n}\n.rm-icon-btn:hover { background: var(--rm-hover); color: var(--rm-label); }\n.rm-search {\n  display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;\n  border: .5px solid var(--rm-border); border-radius: 8px; background: var(--rm-panel);\n}\n.rm-search input {\n  flex: 1; min-width: 0; border: 0; background: transparent; outline: none; color: var(--rm-label); font-size: 13px;\n}\n.rm-search input::placeholder { color: var(--rm-quiet); }\n.rm-side-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }\n.rm-group-label { font-size: 11px; font-weight: 600; color: var(--rm-quiet); padding: 0 4px 4px; text-transform: uppercase; letter-spacing: .03em; }\n.rm-room-list { display: flex; flex-direction: column; gap: 2px; }\n.rm-room-item {\n  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px;\n  border: 0; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; text-align: left;\n}\n.rm-room-item:hover { background: var(--rm-hover); }\n.rm-room-item[aria-current="true"] { background: var(--rm-hover); }\n.rm-room-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }\n.rm-room-item-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-meta { font-size: 11.5px; color: var(--rm-quiet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-trail { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }\n.rm-badge {\n  display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px;\n  border-radius: 999px; font-size: 10.5px; font-weight: 500; background: var(--rm-panel); color: var(--rm-muted);\n  border: .5px solid var(--rm-border);\n}\n.rm-badge-public { color: var(--rm-accent); border-color: color-mix(in srgb, var(--rm-accent) 35%, transparent); background: color-mix(in srgb, var(--rm-accent) 8%, transparent); }\n.rm-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--rm-quiet); }\n.rm-dot-online { background: var(--dsw-alias-state-success-primary, #2bb673); }\n.rm-dot-connecting { background: var(--dsw-alias-state-warn-primary, #e9a23b); }\n.rm-dot-offline { background: var(--dsw-alias-state-error-primary, #e5484d); }\n.rm-empty-hint { padding: 8px 10px; font-size: 12px; color: var(--rm-quiet); line-height: 1.45; }\n.rm-dir-item {\n  display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 10px;\n  border: .5px solid var(--rm-border); background: var(--rm-bg); margin-bottom: 6px;\n}\n.rm-dir-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }\n.rm-dir-tags { display: flex; flex-wrap: wrap; gap: 4px; }\n.rm-tag { font-size: 11px; color: var(--rm-muted); background: var(--rm-hover); border-radius: 4px; padding: 0 5px; }\n.rm-menu {\n  position: fixed; z-index: 1000; min-width: 180px; padding: 4px;\n  border-radius: 10px; background: var(--dsw-alias-bg-layer-1, var(--rm-bg));\n  border: .5px solid var(--rm-border);\n  box-shadow: 0 8px 24px color-mix(in srgb, var(--rm-label) 12%, transparent);\n  display: flex; flex-direction: column;\n}\n.rm-menu button {\n  display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-menu button:hover { background: var(--rm-hover); }\n\n/* \u2500\u2500 main: room workspace \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-main { display: flex; flex: 1; min-height: 0; height: 100%; width: 100%; background: var(--rm-bg); }\n.rm-workspace { display: flex; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat-header {\n  flex: none; display: flex; align-items: center; gap: 10px; height: 48px;\n  padding: 0 16px; border-bottom: .5px solid var(--rm-border);\n}\n.rm-chat-header-title { font-size: 14px; font-weight: 600; }\n.rm-chat-header-sub { font-size: 12px; color: var(--rm-quiet); }\n.rm-messages {\n  flex: 1; min-height: 0; overflow: auto; padding: 16px 18px 8px;\n  display: flex; flex-direction: column; gap: 2px;\n}\n.rm-day {\n  align-self: center; margin: 10px 0 12px; padding: 2px 10px; border-radius: 999px;\n  font-size: 11px; color: var(--rm-quiet); background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n}\n.rm-msg {\n  display: grid; grid-template-columns: 32px 1fr; gap: 0 10px; padding: 4px 6px; border-radius: 8px;\n  max-width: 720px;\n}\n.rm-msg:hover { background: color-mix(in srgb, var(--rm-hover) 60%, transparent); }\n.rm-msg-self { margin-left: auto; grid-template-columns: 1fr; max-width: 640px; }\n.rm-msg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 1px; }\n.rm-msg-author { font-size: 12px; font-weight: 600; color: var(--rm-muted); }\n.rm-msg-time { font-size: 11px; color: var(--rm-quiet); }\n.rm-msg-body { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }\n.rm-msg-self .rm-msg-body {\n  background: var(--dsw-alias-label-primary); color: var(--dsw-alias-label-primary-foreground);\n  padding: 8px 12px; border-radius: 12px 12px 4px 12px; width: fit-content; margin-left: auto;\n}\n.rm-msg-event {\n  grid-template-columns: 1fr; max-width: 560px; margin: 6px 0;\n  padding: 8px 12px; border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-panel);\n}\n.rm-mention { color: var(--rm-accent); font-weight: 500; }\n.rm-msg-self .rm-mention { color: inherit; text-decoration: underline; text-underline-offset: 2px; }\n.rm-task-card { display: flex; flex-direction: column; gap: 4px; }\n.rm-task-head { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--rm-muted); }\n.rm-task-title { font-weight: 600; font-size: 13.5px; }\n.rm-composer {\n  flex: none; display: flex; align-items: flex-end; gap: 8px; padding: 10px 16px 14px;\n  border-top: .5px solid var(--rm-border);\n}\n.rm-composer-box {\n  flex: 1; display: flex; align-items: flex-end; gap: 6px; min-height: 44px;\n  padding: 8px 10px; border: .5px solid var(--rm-border); border-radius: 12px; background: var(--rm-panel);\n}\n.rm-composer-box:focus-within { border-color: color-mix(in srgb, var(--rm-accent) 50%, var(--rm-border)); }\n.rm-composer-box textarea {\n  flex: 1; min-height: 28px; max-height: 120px; border: 0; background: transparent; outline: none;\n  resize: none; color: var(--rm-label); line-height: 1.45;\n}\n.rm-composer-box textarea::placeholder { color: var(--rm-quiet); }\n.rm-composer-mode {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; flex: none;\n}\n.rm-composer-mode:hover, .rm-composer-mode[aria-pressed="true"] {\n  color: var(--rm-accent); background: color-mix(in srgb, var(--rm-accent) 12%, transparent);\n}\n.rm-chat-hint { margin: 48px auto; text-align: center; color: var(--rm-quiet); font-size: 13px; max-width: 360px; line-height: 1.5; }\n\n/* \u2500\u2500 detail column (members / invite / about) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-detail {\n  flex: 0 0 280px; width: 280px; display: flex; flex-direction: column; min-height: 0;\n  border-left: .5px solid var(--rm-border); background: var(--rm-bg); overflow: auto;\n}\n.rm-detail-section { padding: 14px 14px 8px; border-bottom: .5px solid var(--rm-border); }\n.rm-detail-section:last-child { border-bottom: 0; }\n.rm-detail-h {\n  display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;\n  text-transform: uppercase; letter-spacing: .04em; color: var(--rm-quiet); margin-bottom: 8px;\n}\n.rm-member {\n  display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 8px; min-height: 34px;\n}\n.rm-member:hover { background: var(--rm-hover); }\n.rm-member-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }\n.rm-member-actions { display: none; gap: 2px; }\n.rm-member:hover .rm-member-actions, .rm-member:focus-within .rm-member-actions { display: inline-flex; }\n.rm-mini {\n  width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-muted); cursor: pointer; font-size: 12px;\n}\n.rm-mini:hover { background: var(--dsw-alias-interactive-bg-active); color: var(--rm-label); }\n.rm-task-row { display: flex; align-items: center; gap: 6px; padding: 4px; font-size: 12.5px; }\n.rm-task-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-about { display: grid; grid-template-columns: 88px 1fr; gap: 6px 8px; font-size: 12.5px; margin: 0; }\n.rm-about dt { color: var(--rm-quiet); margin: 0; }\n.rm-about dd { margin: 0; min-width: 0; overflow-wrap: anywhere; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }\n.rm-mono { font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace); font-size: 11.5px; }\n.rm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }\n.rm-danger { color: var(--dsw-alias-state-error-primary, #e5484d) !important; }\n.rm-note { font-size: 12px; color: var(--rm-quiet); line-height: 1.45; margin: 0 0 8px; }\n\n/* \u2500\u2500 empty / welcome \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-welcome-wrap {\n  flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px; background: var(--rm-bg);\n}\n.rm-welcome {\n  width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px;\n  padding: 20px; border-radius: 14px; border: .5px solid var(--rm-border); background: var(--rm-panel);\n}\n.rm-welcome h1 { margin: 0; font-size: 16px; font-weight: 600; }\n.rm-welcome p { margin: 0; font-size: 13px; color: var(--rm-muted); line-height: 1.5; }\n.rm-welcome-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }\n.rm-welcome-action {\n  display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 12px;\n  border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-bg);\n  color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-welcome-action:hover { background: var(--rm-hover); }\n.rm-welcome-action b { display: block; font-size: 13px; }\n.rm-welcome-action span { display: block; font-size: 12px; color: var(--rm-quiet); margin-top: 2px; }\n\n/* \u2500\u2500 avatars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-avatar {\n  display: inline-flex; align-items: center; justify-content: center; flex: none;\n  font-weight: 600; letter-spacing: .02em; user-select: none;\n}\n.rm-avatar-wrap { position: relative; display: inline-flex; flex: none; }\n\n/* \u2500\u2500 dialogs (inside dsh Modal) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-form { display: flex; flex-direction: column; gap: 14px; }\n.rm-field { display: flex; flex-direction: column; gap: 6px; }\n.rm-field-label { font-size: 13px; font-weight: 500; }\n.rm-field-hint { font-size: 12px; color: var(--rm-quiet); }\n.rm-name-row { display: flex; align-items: center; gap: 10px; }\n.rm-name-row > :last-child { flex: 1; }\n.rm-switch-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 14px;\n  padding: 10px 12px; border-radius: 10px; background: var(--rm-panel);\n}\n.rm-error { color: var(--dsw-alias-state-error-primary, #e5484d); font-size: 12.5px; }\n.rm-invite {\n  display: block; padding: 10px 12px; border-radius: 8px; background: var(--rm-panel);\n  font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace);\n  font-size: 12px; word-break: break-all; user-select: all;\n}\n\n/* Dual transport + approvals + agent config */\n.rm-mode-row { display: flex; gap: 8px; }\n.rm-mode-btn {\n  flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer; font: inherit;\n}\n.rm-mode-btn.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent); }\n.rm-lan-browse { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }\n.rm-lan-peer {\n  font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer;\n}\n.rm-approvals { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); background: color-mix(in srgb, #f5a524 12%, transparent); }\n.rm-approval { display: flex; gap: 12px; align-items: center; justify-content: space-between; }\n.rm-approval-body { font-size: 13px; }\n.rm-approval-actions { display: flex; gap: 6px; flex-shrink: 0; }\n.rm-input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; font: inherit; }\n\n.rm-ws-bar { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); }\n.rm-ws-chip { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12.5px; }\n.rm-ws-path { font-size: 11px; color: var(--rm-quiet, #8b93a7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item.is-active { background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); }\n\n/* Native-aligned room composer (mirrors dsh conversation control row) */\n.rm-composer-card {\n  box-sizing: border-box;\n  width: 100%;\n  max-width: 920px;\n  margin: 0 auto;\n  border-radius: 16px;\n  background: var(--rm-elev, var(--rm-panel, #12151c));\n  border: 1px solid var(--rm-border, #2a2f3a);\n  box-shadow: 0 1px 2px rgba(0,0,0,.06);\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  padding: 8px 0 6px;\n}\n.rm-composer-grow { position: relative; padding: 0 4px; }\n.rm-composer-grow textarea {\n  box-sizing: border-box; width: 100%; min-height: 36px; max-height: 160px;\n  resize: none; border: none; outline: none; background: transparent;\n  color: inherit; font: inherit; font-size: 14px; line-height: 22px;\n  padding: 4px 12px 0 14px;\n}\n.rm-composer-grow textarea:disabled { opacity: .55; cursor: not-allowed; }\n.rm-composer-row {\n  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;\n  gap: 10px; min-width: 0; padding: 2px 8px 4px;\n}\n.rm-composer-tools, .rm-composer-modes, .rm-composer-trailing {\n  display: flex; align-items: center; min-width: 0; gap: 8px;\n}\n.rm-composer-trailing { flex: none; margin-left: auto; }\n.rm-composer-add {\n  width: 28px; height: 28px; border: none; border-radius: 999px;\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n  color: inherit; cursor: pointer; display: grid; place-items: center;\n}\n.rm-composer-add:hover, .rm-composer-add[aria-pressed="true"] {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 22%, transparent);\n}\n.rm-composer-select {\n  max-width: 220px; height: 28px; border: none; border-radius: 8px;\n  background: transparent; color: var(--rm-quiet, #8b93a7);\n  font: inherit; font-size: 13px; font-weight: 500; line-height: 20px;\n  padding: 0 8px; cursor: pointer; white-space: nowrap;\n}\n.rm-composer-select:hover:not(:disabled) {\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n}\n.rm-composer-select:disabled { opacity: .5; cursor: default; }\n.rm-composer-model-text { display: inline; }\n.rm-composer-model-icon { display: none; font-size: 10px; }\n.rm-composer-effort {\n  margin-left: 6px; font-size: 11px; opacity: .75;\n  text-transform: uppercase; letter-spacing: .02em;\n}\n.rm-composer-send {\n  width: 34px; height: 34px; border: none; border-radius: 999px;\n  background: var(--rm-accent, #5b8cff); color: #fff; cursor: pointer;\n  display: grid; place-items: center; transform: translateY(-2px);\n}\n.rm-composer-send:hover:not(:disabled) { filter: brightness(1.08); }\n.rm-composer-send:disabled { opacity: .4; cursor: default; }\n.rm-composer-popwrap { position: relative; }\n.rm-composer-menu {\n  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 40;\n  min-width: 200px; max-height: 320px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 8px 24px rgba(0,0,0,.28);\n  padding: 6px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-composer-menu-wide { min-width: 280px; max-width: 340px; }\n.rm-composer-menu-label {\n  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;\n  color: var(--rm-quiet, #8b93a7); padding: 6px 8px 2px;\n}\n.rm-composer-menu button[role="menuitem"] {\n  text-align: left; border: none; background: transparent; color: inherit;\n  font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-composer-menu button[role="menuitem"]:hover,\n.rm-composer-menu button[role="menuitem"].is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent);\n}\n.rm-composer-check {\n  display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 8px; cursor: pointer;\n}\n.rm-grant-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 8px;\n  padding: 2px 8px; font-size: 12.5px;\n}\n.rm-grant-row select {\n  font: inherit; font-size: 12px; border-radius: 6px;\n  border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; padding: 2px 6px;\n}\n.rm-peer-grant-block { border-top: 1px solid var(--rm-border, #2a2f3a); padding-top: 4px; margin-top: 4px; }\n.rm-peer-grant-name { font-size: 12px; font-weight: 600; padding: 4px 8px; overflow: hidden; text-overflow: ellipsis; }\n\n/* Hide legacy tight composer if still referenced */\n.rm-composer { display: none; }\n\n.rm-composer-grow { position: relative; }\n.rm-mention-menu {\n  position: absolute; left: 8px; right: 8px; bottom: calc(100% + 6px); z-index: 50;\n  max-height: 240px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 10px 28px rgba(0,0,0,.32);\n  padding: 4px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-mention-item {\n  display: flex; align-items: center; gap: 8px; text-align: left;\n  border: none; background: transparent; color: inherit; font: inherit;\n  padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-mention-item:hover, .rm-mention-item.is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 18%, transparent);\n}\n.rm-mention-item-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }\n.rm-mention-item-name { font-size: 13px; font-weight: 600; }\n.rm-mention-item-meta { font-size: 11px; color: var(--rm-quiet, #8b93a7); }\n';
+var rooms_default = '/* Collab Rooms UI \u2014 original surface inside the dsh shell. Uses only dsh --dsw-* tokens.\n   Independent Rooms surface. Prefix: rm- (rooms). */\n\n.rm-root {\n  --rm-accent: var(--dsw-alias-state-business-primary);\n  --rm-hover: var(--dsw-alias-interactive-bg-hover);\n  --rm-border: var(--dsw-alias-border-l2);\n  --rm-bg: var(--dsw-alias-bg-base);\n  --rm-panel: var(--dsw-alias-bg-module-platform);\n  --rm-label: var(--dsw-alias-label-primary);\n  --rm-muted: var(--dsw-alias-label-secondary);\n  --rm-quiet: var(--dsw-alias-label-tertiary);\n  font: 13px/1.5 var(--dsw-font-family);\n  color: var(--rm-label);\n  box-sizing: border-box;\n}\n.rm-root *, .rm-root *::before, .rm-root *::after { box-sizing: border-box; }\n.rm-root button, .rm-root input, .rm-root textarea { font: inherit; }\n\n/* \u2500\u2500 sidebar (joined rooms + public search) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-side {\n  display: flex; flex-direction: column; height: 100%; min-height: 0;\n  padding: 0 8px 8px 0; gap: 8px;\n}\n.rm-side-toolbar {\n  display: flex; align-items: center; gap: 6px; flex: none; padding: 4px 0 2px;\n}\n.rm-side-title {\n  flex: 1; font-size: 12px; font-weight: 600; letter-spacing: .04em;\n  text-transform: uppercase; color: var(--rm-quiet);\n}\n.rm-icon-btn {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; padding: 0;\n}\n.rm-icon-btn:hover { background: var(--rm-hover); color: var(--rm-label); }\n.rm-search {\n  display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;\n  border: .5px solid var(--rm-border); border-radius: 8px; background: var(--rm-panel);\n}\n.rm-search input {\n  flex: 1; min-width: 0; border: 0; background: transparent; outline: none; color: var(--rm-label); font-size: 13px;\n}\n.rm-search input::placeholder { color: var(--rm-quiet); }\n.rm-side-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }\n.rm-group-label { font-size: 11px; font-weight: 600; color: var(--rm-quiet); padding: 0 4px 4px; text-transform: uppercase; letter-spacing: .03em; }\n.rm-room-list { display: flex; flex-direction: column; gap: 2px; }\n.rm-room-item {\n  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px;\n  border: 0; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; text-align: left;\n}\n.rm-room-item:hover { background: var(--rm-hover); }\n.rm-room-item[aria-current="true"] { background: var(--rm-hover); }\n.rm-room-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }\n.rm-room-item-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-meta { font-size: 11.5px; color: var(--rm-quiet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-trail { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }\n.rm-badge {\n  display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px;\n  border-radius: 999px; font-size: 10.5px; font-weight: 500; background: var(--rm-panel); color: var(--rm-muted);\n  border: .5px solid var(--rm-border);\n}\n.rm-badge-public { color: var(--rm-accent); border-color: color-mix(in srgb, var(--rm-accent) 35%, transparent); background: color-mix(in srgb, var(--rm-accent) 8%, transparent); }\n.rm-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--rm-quiet); }\n.rm-dot-online { background: var(--dsw-alias-state-success-primary, #2bb673); }\n.rm-dot-connecting { background: var(--dsw-alias-state-warn-primary, #e9a23b); }\n.rm-dot-offline { background: var(--dsw-alias-state-error-primary, #e5484d); }\n.rm-empty-hint { padding: 8px 10px; font-size: 12px; color: var(--rm-quiet); line-height: 1.45; }\n.rm-dir-item {\n  display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 10px;\n  border: .5px solid var(--rm-border); background: var(--rm-bg); margin-bottom: 6px;\n}\n.rm-dir-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }\n.rm-dir-tags { display: flex; flex-wrap: wrap; gap: 4px; }\n.rm-tag { font-size: 11px; color: var(--rm-muted); background: var(--rm-hover); border-radius: 4px; padding: 0 5px; }\n.rm-menu {\n  position: fixed; z-index: 1000; min-width: 180px; padding: 4px;\n  border-radius: 10px; background: var(--dsw-alias-bg-layer-1, var(--rm-bg));\n  border: .5px solid var(--rm-border);\n  box-shadow: 0 8px 24px color-mix(in srgb, var(--rm-label) 12%, transparent);\n  display: flex; flex-direction: column;\n}\n.rm-menu button {\n  display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-menu button:hover { background: var(--rm-hover); }\n\n/* \u2500\u2500 main: room workspace \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-main { display: flex; flex: 1; min-height: 0; height: 100%; width: 100%; background: var(--rm-bg); }\n.rm-workspace { display: flex; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat-header {\n  flex: none; display: flex; align-items: center; gap: 10px; height: 48px;\n  padding: 0 16px; border-bottom: .5px solid var(--rm-border);\n}\n.rm-chat-header-title { font-size: 14px; font-weight: 600; }\n.rm-chat-header-sub { font-size: 12px; color: var(--rm-quiet); }\n.rm-messages {\n  flex: 1; min-height: 0; overflow: auto; padding: 16px 18px 8px;\n  display: flex; flex-direction: column; gap: 2px;\n}\n.rm-day {\n  align-self: center; margin: 10px 0 12px; padding: 2px 10px; border-radius: 999px;\n  font-size: 11px; color: var(--rm-quiet); background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n}\n.rm-msg {\n  display: grid; grid-template-columns: 32px 1fr; gap: 0 10px; padding: 4px 6px; border-radius: 8px;\n  max-width: 720px;\n}\n.rm-msg:hover { background: color-mix(in srgb, var(--rm-hover) 60%, transparent); }\n.rm-msg-self { margin-left: auto; grid-template-columns: 1fr; max-width: 640px; }\n.rm-msg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 1px; }\n.rm-msg-author { font-size: 12px; font-weight: 600; color: var(--rm-muted); }\n.rm-msg-time { font-size: 11px; color: var(--rm-quiet); }\n.rm-msg-body { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }\n.rm-msg-self .rm-msg-body {\n  background: var(--dsw-alias-label-primary); color: var(--dsw-alias-label-primary-foreground);\n  padding: 8px 12px; border-radius: 12px 12px 4px 12px; width: fit-content; margin-left: auto;\n}\n.rm-msg-event {\n  grid-template-columns: 1fr; max-width: 560px; margin: 6px 0;\n  padding: 8px 12px; border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-panel);\n}\n.rm-mention { color: var(--rm-accent); font-weight: 500; }\n.rm-msg-self .rm-mention { color: inherit; text-decoration: underline; text-underline-offset: 2px; }\n.rm-task-card { display: flex; flex-direction: column; gap: 4px; }\n.rm-task-head { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--rm-muted); }\n.rm-task-title { font-weight: 600; font-size: 13.5px; }\n.rm-composer {\n  flex: none; display: flex; align-items: flex-end; gap: 8px; padding: 10px 16px 14px;\n  border-top: .5px solid var(--rm-border);\n}\n.rm-composer-box {\n  flex: 1; display: flex; align-items: flex-end; gap: 6px; min-height: 44px;\n  padding: 8px 10px; border: .5px solid var(--rm-border); border-radius: 12px; background: var(--rm-panel);\n}\n.rm-composer-box:focus-within { border-color: color-mix(in srgb, var(--rm-accent) 50%, var(--rm-border)); }\n.rm-composer-box textarea {\n  flex: 1; min-height: 28px; max-height: 120px; border: 0; background: transparent; outline: none;\n  resize: none; color: var(--rm-label); line-height: 1.45;\n}\n.rm-composer-box textarea::placeholder { color: var(--rm-quiet); }\n.rm-composer-mode {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; flex: none;\n}\n.rm-composer-mode:hover, .rm-composer-mode[aria-pressed="true"] {\n  color: var(--rm-accent); background: color-mix(in srgb, var(--rm-accent) 12%, transparent);\n}\n.rm-chat-hint { margin: 48px auto; text-align: center; color: var(--rm-quiet); font-size: 13px; max-width: 360px; line-height: 1.5; }\n\n/* \u2500\u2500 detail column (members / invite / about) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-detail {\n  flex: 0 0 280px; width: 280px; display: flex; flex-direction: column; min-height: 0;\n  border-left: .5px solid var(--rm-border); background: var(--rm-bg); overflow: auto;\n}\n.rm-detail-section { padding: 14px 14px 8px; border-bottom: .5px solid var(--rm-border); }\n.rm-detail-section:last-child { border-bottom: 0; }\n.rm-detail-h {\n  display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;\n  text-transform: uppercase; letter-spacing: .04em; color: var(--rm-quiet); margin-bottom: 8px;\n}\n.rm-member {\n  display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 8px; min-height: 34px;\n}\n.rm-member:hover { background: var(--rm-hover); }\n.rm-member-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }\n.rm-member-actions { display: none; gap: 2px; }\n.rm-member:hover .rm-member-actions, .rm-member:focus-within .rm-member-actions { display: inline-flex; }\n.rm-mini {\n  width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-muted); cursor: pointer; font-size: 12px;\n}\n.rm-mini:hover { background: var(--dsw-alias-interactive-bg-active); color: var(--rm-label); }\n.rm-task-row { display: flex; align-items: center; gap: 6px; padding: 4px; font-size: 12.5px; }\n.rm-task-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-about { display: grid; grid-template-columns: 88px 1fr; gap: 6px 8px; font-size: 12.5px; margin: 0; }\n.rm-about dt { color: var(--rm-quiet); margin: 0; }\n.rm-about dd { margin: 0; min-width: 0; overflow-wrap: anywhere; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }\n.rm-mono { font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace); font-size: 11.5px; }\n.rm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }\n.rm-danger { color: var(--dsw-alias-state-error-primary, #e5484d) !important; }\n.rm-note { font-size: 12px; color: var(--rm-quiet); line-height: 1.45; margin: 0 0 8px; }\n\n/* \u2500\u2500 empty / welcome \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-welcome-wrap {\n  flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px; background: var(--rm-bg);\n}\n.rm-welcome {\n  width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px;\n  padding: 20px; border-radius: 14px; border: .5px solid var(--rm-border); background: var(--rm-panel);\n}\n.rm-welcome h1 { margin: 0; font-size: 16px; font-weight: 600; }\n.rm-welcome p { margin: 0; font-size: 13px; color: var(--rm-muted); line-height: 1.5; }\n.rm-welcome-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }\n.rm-welcome-action {\n  display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 12px;\n  border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-bg);\n  color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-welcome-action:hover { background: var(--rm-hover); }\n.rm-welcome-action b { display: block; font-size: 13px; }\n.rm-welcome-action span { display: block; font-size: 12px; color: var(--rm-quiet); margin-top: 2px; }\n\n/* \u2500\u2500 avatars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-avatar {\n  display: inline-flex; align-items: center; justify-content: center; flex: none;\n  font-weight: 600; letter-spacing: .02em; user-select: none;\n}\n.rm-avatar-wrap { position: relative; display: inline-flex; flex: none; }\n\n/* \u2500\u2500 dialogs (inside dsh Modal) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-form { display: flex; flex-direction: column; gap: 14px; }\n.rm-field { display: flex; flex-direction: column; gap: 6px; }\n.rm-field-label { font-size: 13px; font-weight: 500; }\n.rm-field-hint { font-size: 12px; color: var(--rm-quiet); }\n.rm-name-row { display: flex; align-items: center; gap: 10px; }\n.rm-name-row > :last-child { flex: 1; }\n.rm-switch-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 14px;\n  padding: 10px 12px; border-radius: 10px; background: var(--rm-panel);\n}\n.rm-error { color: var(--dsw-alias-state-error-primary, #e5484d); font-size: 12.5px; }\n.rm-invite {\n  display: block; padding: 10px 12px; border-radius: 8px; background: var(--rm-panel);\n  font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace);\n  font-size: 12px; word-break: break-all; user-select: all;\n}\n\n/* Dual transport + approvals + agent config */\n.rm-mode-row { display: flex; gap: 8px; }\n.rm-mode-btn {\n  flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer; font: inherit;\n}\n.rm-mode-btn.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent); }\n.rm-lan-browse { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }\n.rm-lan-peer {\n  font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer;\n}\n.rm-approvals { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); background: color-mix(in srgb, #f5a524 12%, transparent); }\n.rm-approval { display: flex; gap: 12px; align-items: center; justify-content: space-between; }\n.rm-approval-body { font-size: 13px; }\n.rm-approval-actions { display: flex; gap: 6px; flex-shrink: 0; }\n.rm-input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; font: inherit; }\n\n.rm-ws-bar { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); }\n.rm-ws-chip { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12.5px; }\n.rm-ws-path { font-size: 11px; color: var(--rm-quiet, #8b93a7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item.is-active { background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); }\n\n/* Native-aligned room composer (mirrors dsh conversation control row) */\n.rm-composer-card {\n  box-sizing: border-box;\n  width: 100%;\n  max-width: 920px;\n  margin: 0 auto;\n  border-radius: 16px;\n  background: var(--rm-elev, var(--rm-panel, #12151c));\n  border: 1px solid var(--rm-border, #2a2f3a);\n  box-shadow: 0 1px 2px rgba(0,0,0,.06);\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  padding: 8px 0 6px;\n}\n.rm-composer-grow { position: relative; padding: 0 4px; }\n.rm-composer-grow textarea {\n  box-sizing: border-box; width: 100%; min-height: 36px; max-height: 160px;\n  resize: none; border: none; outline: none; background: transparent;\n  color: inherit; font: inherit; font-size: 14px; line-height: 22px;\n  padding: 4px 12px 0 14px;\n}\n.rm-composer-grow textarea:disabled { opacity: .55; cursor: not-allowed; }\n.rm-composer-row {\n  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;\n  gap: 10px; min-width: 0; padding: 2px 8px 4px;\n}\n.rm-composer-tools, .rm-composer-modes, .rm-composer-trailing {\n  display: flex; align-items: center; min-width: 0; gap: 8px;\n}\n.rm-composer-trailing { flex: none; margin-left: auto; }\n.rm-composer-add {\n  width: 28px; height: 28px; border: none; border-radius: 999px;\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n  color: inherit; cursor: pointer; display: grid; place-items: center;\n}\n.rm-composer-add:hover, .rm-composer-add[aria-pressed="true"] {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 22%, transparent);\n}\n.rm-composer-select {\n  max-width: 220px; height: 28px; border: none; border-radius: 8px;\n  background: transparent; color: var(--rm-quiet, #8b93a7);\n  font: inherit; font-size: 13px; font-weight: 500; line-height: 20px;\n  padding: 0 8px; cursor: pointer; white-space: nowrap;\n}\n.rm-composer-select:hover:not(:disabled) {\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n}\n.rm-composer-select:disabled { opacity: .5; cursor: default; }\n.rm-composer-model-text { display: inline; }\n.rm-composer-model-icon { display: none; font-size: 10px; }\n.rm-composer-effort {\n  margin-left: 6px; font-size: 11px; opacity: .75;\n  text-transform: uppercase; letter-spacing: .02em;\n}\n.rm-composer-send {\n  width: 34px; height: 34px; border: none; border-radius: 999px;\n  background: var(--rm-accent, #5b8cff); color: #fff; cursor: pointer;\n  display: grid; place-items: center; transform: translateY(-2px);\n}\n.rm-composer-send:hover:not(:disabled) { filter: brightness(1.08); }\n.rm-composer-send:disabled { opacity: .4; cursor: default; }\n.rm-composer-popwrap { position: relative; }\n.rm-composer-menu {\n  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 40;\n  min-width: 200px; max-height: 320px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 8px 24px rgba(0,0,0,.28);\n  padding: 6px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-composer-menu-wide { min-width: 280px; max-width: 340px; }\n.rm-composer-menu-label {\n  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;\n  color: var(--rm-quiet, #8b93a7); padding: 6px 8px 2px;\n}\n.rm-composer-menu button[role="menuitem"] {\n  text-align: left; border: none; background: transparent; color: inherit;\n  font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-composer-menu button[role="menuitem"]:hover,\n.rm-composer-menu button[role="menuitem"].is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent);\n}\n.rm-composer-check {\n  display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 8px; cursor: pointer;\n}\n.rm-grant-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 8px;\n  padding: 2px 8px; font-size: 12.5px;\n}\n.rm-grant-row select {\n  font: inherit; font-size: 12px; border-radius: 6px;\n  border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; padding: 2px 6px;\n}\n.rm-peer-grant-block { border-top: 1px solid var(--rm-border, #2a2f3a); padding-top: 4px; margin-top: 4px; }\n.rm-peer-grant-name { font-size: 12px; font-weight: 600; padding: 4px 8px; overflow: hidden; text-overflow: ellipsis; }\n\n/* Hide legacy tight composer if still referenced */\n.rm-composer { display: none; }\n\n.rm-composer-grow { position: relative; }\n.rm-mention-menu {\n  position: absolute; left: 8px; right: 8px; bottom: calc(100% + 6px); z-index: 50;\n  max-height: 240px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 10px 28px rgba(0,0,0,.32);\n  padding: 4px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-mention-item {\n  display: flex; align-items: center; gap: 8px; text-align: left;\n  border: none; background: transparent; color: inherit; font: inherit;\n  padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-mention-item:hover, .rm-mention-item.is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 18%, transparent);\n}\n.rm-mention-item-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }\n.rm-mention-item-name { font-size: 13px; font-weight: 600; }\n.rm-mention-item-meta { font-size: 11px; color: var(--rm-quiet, #8b93a7); }\n\n\n/* New Room shortcut under workspace (mirrors New Session affordance) */\n.rm-new-room {\n  display: flex; align-items: center; justify-content: center; gap: 6px;\n  width: 100%; height: 36px; margin-top: 8px;\n  border: .5px solid var(--rm-border); border-radius: 10px;\n  background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n  color: var(--rm-label); cursor: pointer; font-weight: 500; font-size: 13.5px;\n}\n.rm-new-room:hover { background: var(--dsw-alias-button-floating-hover, var(--rm-hover)); }\n.rm-new-room svg { flex: none; }\n\n/* Wide / landscape create + browse modals (overrides default 380px Modal card) */\n.rm-modal-wide {\n  width: min(720px, calc(100vw - 48px)) !important;\n  max-height: min(640px, calc(100vh - 48px));\n}\n.rm-form-wide {\n  display: grid;\n  grid-template-columns: 1fr 1fr;\n  gap: 12px 18px;\n  align-items: start;\n}\n.rm-form-wide .rm-span-2 { grid-column: 1 / -1; }\n.rm-browse { display: flex; flex-direction: column; gap: 12px; min-height: 280px; max-height: 420px; }\n.rm-browse-search { flex: none; }\n.rm-browse-status { font-size: 11.5px; color: var(--rm-quiet); white-space: nowrap; }\n.rm-browse-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }\n@media (max-width: 640px) {\n  .rm-form-wide { grid-template-columns: 1fr; }\n  .rm-modal-wide { width: min(420px, calc(100vw - 32px)) !important; }\n}\n';
 
 // src/client/store.js
 var API = "/api/collab";
@@ -115,7 +115,13 @@ function createRoomsStore() {
       if (text) p.set("q", text);
       if (tag) p.set("tag", tag);
       const r = await call(`/directory?${p}`);
-      set((s) => s.search.query === query ? { search: { ...s.search, results: r.rooms, loading: false } } : {});
+      const rooms = Array.isArray(r.rooms) ? r.rooms.map((x) => ({
+        ...x,
+        tags: Array.isArray(x.tags) ? x.tags : [],
+        members: typeof x.members === "number" ? x.members : 0,
+        description: x.description || ""
+      })) : [];
+      set((s) => s.search.query === query ? { search: { ...s.search, results: rooms, loading: false, error: null } } : {});
     } catch (e) {
       set((s) => ({ search: { ...s.search, loading: false, error: e.message } }));
     }
@@ -291,9 +297,9 @@ function RoomsSidebar({ store, ensurePanel }) {
   const s = useStore(store);
   const a = store.actions;
   const [menu, setMenu] = (0, import_react.useState)(null);
-  const [searching, setSearching] = (0, import_react.useState)(false);
   const [joining, setJoining] = (0, import_react.useState)(null);
   const inputRef = (0, import_react.useRef)(null);
+  const searching = !!s.search.open;
   const activeWs = (s.workspaces || []).find((w) => w.id === s.activeWorkspaceId) || (s.workspaces || [])[0] || null;
   (0, import_react.useEffect)(() => {
     if (!menu) return;
@@ -333,10 +339,7 @@ function RoomsSidebar({ store, ensurePanel }) {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-side", "data-collab-sidebar": "", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-side-toolbar", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-side-title", children: "DSH Room" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", "aria-label": searching ? "Close search" : "Search rooms", "aria-pressed": searching, onClick: () => {
-        setSearching(!searching);
-        a.setSearchOpen(!searching);
-      }, children: searching ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CloseIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", "aria-label": searching ? "Close search" : "Search rooms", "aria-pressed": searching, onClick: () => a.setSearchOpen(!searching), children: searching ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CloseIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         "button",
         {
@@ -378,8 +381,7 @@ function RoomsSidebar({ store, ensurePanel }) {
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", role: "menuitem", onClick: () => {
           setMenu(null);
-          setSearching(true);
-          a.setSearchOpen(true);
+          a.openDialog({ kind: "browse" });
         }, children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlobeIcon, {}),
           "Browse public rooms"
@@ -391,7 +393,14 @@ function RoomsSidebar({ store, ensurePanel }) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FolderIcon, {}),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: activeWs.name })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-ws-path", title: activeWs.path, children: activeWs.path })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-ws-path", title: activeWs.path, children: activeWs.path }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-new-room", "data-rm-new-room": "", onClick: () => {
+        a.openDialog({ kind: "create" });
+        ensurePanel();
+      }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlusIcon, {}),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "New Room" })
+      ] })
     ] }),
     searching ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-search", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}),
@@ -467,7 +476,7 @@ function RoomsSidebar({ store, ensurePanel }) {
               r.members,
               " online"
             ] }),
-            r.tags.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-dir-tags", children: r.tags.map((tg) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-tag", children: [
+            (r.tags || []).length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-dir-tags", children: (r.tags || []).map((tg) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-tag", children: [
               "#",
               tg
             ] }, tg)) }) : null
@@ -588,23 +597,23 @@ function MentionMenu({ items, active, onPick, onHover }) {
     it.id
   )) });
 }
-function Composer({ room, store, draft: draft2, setDraft: setDraft2 }) {
+function Composer({ room, store, draft, setDraft }) {
   const a = store.actions;
   const [mode, setMode] = (0, import_react.useState)("chat");
   const [busy, setBusy] = (0, import_react.useState)(false);
   const [modelOpen, setModelOpen] = (0, import_react.useState)(false);
   const [permOpen, setPermOpen] = (0, import_react.useState)(false);
   const [peerOpen, setPeerOpen] = (0, import_react.useState)(false);
-  const [mentionActive, setMentionActive2] = (0, import_react.useState)(0);
-  const [caret, setCaret2] = (0, import_react.useState)(0);
+  const [mentionActive, setMentionActive] = (0, import_react.useState)(0);
+  const [caret, setCaret] = (0, import_react.useState)(0);
   const [mentionDismissed, setMentionDismissed] = (0, import_react.useState)(false);
-  const taRef2 = (0, import_react.useRef)(null);
+  const taRef = (0, import_react.useRef)(null);
   const offline = room.status !== "online";
-  const mqRaw = mentionQueryAt(draft2, caret);
-  const mq2 = mentionDismissed ? null : mqRaw;
+  const mqRaw = mentionQueryAt(draft, caret);
+  const mq = mentionDismissed ? null : mqRaw;
   const mentionItems = (() => {
-    if (!mq2) return [];
-    const q = mq2.query.toLowerCase();
+    if (!mq) return [];
+    const q = mq.query.toLowerCase();
     const members = (room.members || []).filter((m) => !m.self);
     const known = members.map((m) => ({
       id: m.agentId,
@@ -628,7 +637,7 @@ function Composer({ room, store, draft: draft2, setDraft: setDraft2 }) {
     return bits.length ? `Auto \xB7 ${bits.join("+")}` : "Ask to run";
   })();
   (0, import_react.useEffect)(() => {
-    setMentionActive2(0);
+    setMentionActive(0);
     setMentionDismissed(false);
   }, [mqRaw && mqRaw.query, mqRaw && mqRaw.start]);
   const MODELS = ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"];
@@ -651,28 +660,8 @@ function Composer({ room, store, draft: draft2, setDraft: setDraft2 }) {
       a.toast(e.message);
     }
   };
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret2(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq2) return;
-    const insert = `@${it.id} `;
-    const next = draft2.slice(0, mq2.start) + insert + draft2.slice(mq2.end);
-    setDraft2(next);
-    const pos = mq2.start + insert.length;
-    setCaret2(pos);
-    setMentionActive2(0);
-    requestAnimationFrame(() => {
-      const el = taRef2.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      }
-    });
-  };
   const submit = async () => {
-    const text = draft2.trim();
+    const text = draft.trim();
     if (!text || busy) return;
     setBusy(true);
     try {
@@ -681,7 +670,7 @@ function Composer({ room, store, draft: draft2, setDraft: setDraft2 }) {
         await a.task(room.roomId, m ? text.slice(m[0].length) : text, m ? m[1] : void 0);
         setMode("chat");
       } else await a.send(room.roomId, text);
-      setDraft2("");
+      setDraft("");
     } catch (e) {
       a.toast(e.message);
     } finally {
@@ -690,33 +679,33 @@ function Composer({ room, store, draft: draft2, setDraft: setDraft2 }) {
   };
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-composer-card", "data-rm-composer": "", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-composer-grow", children: [
-      mq2 && mentionItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MentionMenu, { items: mentionItems, active: mentionActive, onHover: setMentionActive2, onPick: insertMention }) : null,
+      mq && mentionItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MentionMenu, { items: mentionItems, active: mentionActive, onHover: setMentionActive, onPick: insertMention }) : null,
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         "textarea",
         {
-          ref: taRef2,
+          ref: taRef,
           rows: 1,
           disabled: offline,
           "aria-label": "Message the room",
           placeholder: offline ? "Room is offline" : mode === "task" ? "Task: @assignee title (optional assignee)" : `Message ${room.name} \xB7 @agent or @all`,
-          value: draft2,
+          value: draft,
           onChange: (e) => {
-            setDraft2(e.target.value);
+            setDraft(e.target.value);
             syncCaret(e.target);
           },
           onClick: (e) => syncCaret(e.target),
           onKeyUp: (e) => syncCaret(e.target),
           onSelect: (e) => syncCaret(e.target),
           onKeyDown: (e) => {
-            if (mq2 && mentionItems.length) {
+            if (mq && mentionItems.length) {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
-                setMentionActive2((i) => (i + 1) % mentionItems.length);
+                setMentionActive((i) => (i + 1) % mentionItems.length);
                 return;
               }
               if (e.key === "ArrowUp") {
                 e.preventDefault();
-                setMentionActive2((i) => (i - 1 + mentionItems.length) % mentionItems.length);
+                setMentionActive((i) => (i - 1 + mentionItems.length) % mentionItems.length);
                 return;
               }
               if (e.key === "Enter" || e.key === "Tab") {
@@ -802,7 +791,7 @@ function Composer({ room, store, draft: draft2, setDraft: setDraft2 }) {
           peerOpen ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PeerGrantsMenu, { room, store, onClose: () => setPeerOpen(false), patchConfig }) : null
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-composer-trailing", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-composer-send", "aria-label": mode === "task" ? "Create task" : "Send", disabled: !draft2.trim() || busy || offline, onClick: submit, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SendIcon, {}) }) })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-composer-trailing", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-composer-send", "aria-label": mode === "task" ? "Create task" : "Send", disabled: !draft.trim() || busy || offline, onClick: submit, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SendIcon, {}) }) })
     ] })
   ] });
 }
@@ -967,11 +956,11 @@ function EmptyMain({ store }) {
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Paste a collab://join/\u2026 invite" })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-welcome-action", onClick: () => a.setSearchOpen(true), children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-welcome-action", onClick: () => a.openDialog({ kind: "browse" }), children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "Browse public rooms" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Search the relay directory by name or #tag" })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Search the VPS directory by name or #tag" })
         ] })
       ] })
     ] })
@@ -983,8 +972,8 @@ function RoomsMain({ store }) {
   const room = s.rooms.find((r) => r.roomId === s.selected);
   if (!room) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmptyMain, { store });
   const messages = s.messages[room.roomId] || [];
-  const draft2 = drafts[room.roomId] || "";
-  const setDraft2 = (v) => setDrafts((d) => ({ ...d, [room.roomId]: typeof v === "function" ? v(d[room.roomId] || "") : v }));
+  const draft = drafts[room.roomId] || "";
+  const setDraft = (v) => setDrafts((d) => ({ ...d, [room.roomId]: typeof v === "function" ? v(d[room.roomId] || "") : v }));
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-main", "data-collab-main": "", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalBanner, { store }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-workspace", children: [
@@ -1011,7 +1000,7 @@ function RoomsMain({ store }) {
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.StateDot, { state: room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error", size: 8 })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatBody, { messages }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Composer, { room, store, draft: draft2, setDraft: setDraft2 })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Composer, { room, store, draft, setDraft })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         RoomDetail,
@@ -1019,9 +1008,9 @@ function RoomsMain({ store }) {
           room,
           messages,
           store,
-          mention: (id) => setDraft2((d) => `${d}${d && !d.endsWith(" ") ? " " : ""}@${id} `),
+          mention: (id) => setDraft((d) => `${d}${d && !d.endsWith(" ") ? " " : ""}@${id} `),
           assign: (id) => {
-            setDraft2(`@${id} `);
+            setDraft(`@${id} `);
             store.actions.toast(`Switch to task mode, then describe the task for @${id}`);
           }
         }
@@ -1044,26 +1033,7 @@ function CreateDialog({ store }) {
   const [busy, setBusy] = (0, import_react.useState)(false);
   const [lanPeers, setLanPeers] = (0, import_react.useState)([]);
   const ok = f.name.trim() && !busy;
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq) return;
-    const insert = `@${it.id} `;
-    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
-    setDraft(next);
-    const pos = mq.start + insert.length;
-    setCaret(pos);
-    setMentionActive(0);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      }
-    });
-  };
+  const ws = (s.workspaces || []).find((w) => w.id === s.activeWorkspaceId) || (s.workspaces || [])[0];
   const submit = async () => {
     if (!ok) return;
     setBusy(true);
@@ -1097,23 +1067,24 @@ function CreateDialog({ store }) {
       onClose: a.closeDialog,
       title: "Create room",
       closeLabel: "Close",
-      description: "Room is created inside the active workspace (path becomes MCP sandbox). Default transport is the VPS Node relay (62.234.113.56:80) with optional public directory. Cloudflare remains an advanced option. The room key never goes to the relay.",
+      className: "rm-modal-wide",
+      description: ws ? `In workspace \u201C${ws.name}\u201D. Default relay 62.234.113.56:80 \xB7 E2EE \xB7 keys stay local.` : "Bind a workspace first. Default relay 62.234.113.56:80.",
       footer: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: a.closeDialog, children: "Cancel" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "primary", disabled: !ok, onClick: submit, children: busy ? "Creating\u2026" : "Create" })
       ] }),
-      children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-form", onKeyDown: (e) => e.key === "Enter" && e.target.tagName === "INPUT" && submit(), children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Transport", hint: "Default: VPS Node relay at 62.234.113.56:80 (invite-only or public directory). Blank host = embedded local LAN + mDNS. Cloudflare is optional.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-mode-row", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.mode === "lan" ? " is-on" : ""), onClick: () => setF({ ...f, mode: "lan", lanHostPort: f.lanHostPort || "62.234.113.56:80" }), children: "LAN / VPS" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.mode === "relay" ? " is-on" : ""), onClick: () => setF({ ...f, mode: "relay" }), children: "Cloudflare (advanced)" })
-        ] }) }),
+      children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-form rm-form-wide", onKeyDown: (e) => e.key === "Enter" && e.target.tagName === "INPUT" && submit(), children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Name", htmlFor: "rm-create-name", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-name-row", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: f.name || "room", size: 36 }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-name", autoFocus: true, placeholder: "e.g. release-crew", maxLength: 60, value: f.name, onChange: (e) => setF({ ...f, name: e.target.value }) })
         ] }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Description (optional)", htmlFor: "rm-create-desc", hint: "Shown to members and, if public, in search results.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-desc", placeholder: "e.g. Agents that review and ship releases", maxLength: 280, value: f.description, onChange: (e) => setF({ ...f, description: e.target.value }) }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Tags (optional)", htmlFor: "rm-create-tags", hint: "Spaces or commas, up to 8. Used by public room search.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-tags", placeholder: "e.g. review rust", value: f.tags, onChange: (e) => setF({ ...f, tags: e.target.value }) }) }),
-        f.mode === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Field, { label: "Relay host:port", htmlFor: "rm-lan-hp", hint: "Default VPS 62.234.113.56:80 (public directory works). Blank = this machine (LAN/Tailscale + mDNS). Invite: collab://lan/host:port/room#key.", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Transport", hint: "VPS directory works on LAN/VPS. Cloudflare is optional.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-mode-row", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.mode === "lan" ? " is-on" : ""), onClick: () => setF({ ...f, mode: "lan", lanHostPort: f.lanHostPort || "62.234.113.56:80" }), children: "LAN / VPS" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.mode === "relay" ? " is-on" : ""), onClick: () => setF({ ...f, mode: "relay" }), children: "Cloudflare" })
+        ] }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Description", htmlFor: "rm-create-desc", hint: "Shown to members and in public search.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-desc", placeholder: "e.g. Agents that review and ship releases", maxLength: 280, value: f.description, onChange: (e) => setF({ ...f, description: e.target.value }) }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Tags", htmlFor: "rm-create-tags", hint: "Spaces or commas, up to 8.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-tags", placeholder: "e.g. review rust", value: f.tags, onChange: (e) => setF({ ...f, tags: e.target.value }) }) }),
+        f.mode === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-span-2", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Field, { label: "Relay host:port", htmlFor: "rm-lan-hp", hint: "Default 62.234.113.56:80. Blank = this machine + mDNS.", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-lan-hp", placeholder: "62.234.113.56:80 or 100.x.x.x:7421", value: f.lanHostPort, onChange: (e) => setF({ ...f, lanHostPort: e.target.value }) }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-lan-browse", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "outline", onClick: browseLan, children: "Browse mDNS" }),
@@ -1122,15 +1093,15 @@ function CreateDialog({ store }) {
               p.name ? ` \xB7 ${p.name}` : ""
             ] }, p.hostPort))
           ] })
-        ] }) : null,
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-switch-row", children: [
+        ] }) }) : null,
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-span-2 rm-switch-row", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-field-label", children: "List in public directory" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-field-hint", children: f.public ? "Anyone can find this room by name or tag and join it. Its key is published with the listing \u2014 NOT confidential." : "Private: invite only. Nothing about the room is published." })
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-field-hint", children: f.public ? "Anyone can find and join \u2014 key is published with the listing." : "Private: invite only." })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Switch, { checked: f.public, onChange: (v) => setF({ ...f, public: v }), label: "List in public directory" })
         ] }),
-        err ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-error", children: err }) : null
+        err ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-span-2 rm-error", children: err }) : null
       ] })
     }
   );
@@ -1142,26 +1113,6 @@ function JoinDialog({ store }) {
   const [err, setErr] = (0, import_react.useState)(null);
   const [busy, setBusy] = (0, import_react.useState)(false);
   const valid = /^collab:\/\/(join|lan|relay)\/.+#\S+$/.test(invite.trim());
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq) return;
-    const insert = `@${it.id} `;
-    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
-    setDraft(next);
-    const pos = mq.start + insert.length;
-    setCaret(pos);
-    setMentionActive(0);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      }
-    });
-  };
   const submit = async () => {
     if (!valid || busy) return;
     setBusy(true);
@@ -1266,26 +1217,6 @@ function ConfigDialog({ store, d }) {
     a.getConfig(d.roomId).then((c) => setF((x) => ({ ...x, workspacePath: c.workspacePath || "", workspaceLabel: c.workspaceLabel || x.workspaceLabel, model: c.model || "", provider: c.provider || "", reasoningEffort: c.reasoningEffort || "medium", autoRead: c.permissions?.autoRead !== false, autoWrite: !!c.permissions?.autoWrite, autoShell: !!c.permissions?.autoShell, autoNetwork: !!c.permissions?.autoNetwork, mcpEnabled: c.mcpEnabled !== false }))).catch(() => {
     });
   }, [d.roomId]);
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq) return;
-    const insert = `@${it.id} `;
-    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
-    setDraft(next);
-    const pos = mq.start + insert.length;
-    setCaret(pos);
-    setMentionActive(0);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      }
-    });
-  };
   const submit = async () => {
     setBusy(true);
     setErr(null);
@@ -1387,26 +1318,6 @@ function WorkspaceDialog({ store }) {
   const [path, setPath] = (0, import_react.useState)("");
   const [err, setErr] = (0, import_react.useState)(null);
   const [busy, setBusy] = (0, import_react.useState)(false);
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq) return;
-    const insert = `@${it.id} `;
-    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
-    setDraft(next);
-    const pos = mq.start + insert.length;
-    setCaret(pos);
-    setMentionActive(0);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      }
-    });
-  };
   const submit = async () => {
     if (!path.trim()) {
       setErr("Absolute workspace path required");
@@ -1447,6 +1358,78 @@ function WorkspaceDialog({ store }) {
     }
   );
 }
+function BrowseDialog({ store }) {
+  const s = useStore(store);
+  const a = store.actions;
+  const [joining, setJoining] = (0, import_react.useState)(null);
+  const inputRef = (0, import_react.useRef)(null);
+  const activeWs = (s.workspaces || []).find((w) => w.id === s.activeWorkspaceId) || (s.workspaces || [])[0];
+  (0, import_react.useEffect)(() => {
+    a.setSearchOpen(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
+    return () => {
+    };
+  }, []);
+  const join = async (r) => {
+    setJoining(r.roomId);
+    try {
+      await a.join(r.invite, { name: r.name, description: r.description, tags: r.tags, public: true, workspaceId: activeWs?.id });
+    } catch (e) {
+      a.toast(e.message);
+    } finally {
+      setJoining(null);
+    }
+  };
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+    import_dsh_client_ui_primitives.Modal,
+    {
+      open: true,
+      onClose: a.closeDialog,
+      title: "Browse public rooms",
+      closeLabel: "Close",
+      className: "rm-modal-wide",
+      description: "Directory on VPS 62.234.113.56:80. Search by name or #tag, then join into the active workspace.",
+      footer: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: a.closeDialog, children: "Close" }),
+      children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-browse", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-search rm-browse-search", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "input",
+            {
+              ref: inputRef,
+              type: "text",
+              placeholder: "Search rooms or #tags",
+              value: s.search.query,
+              onChange: (e) => a.setQuery(e.target.value),
+              "aria-label": "Search public rooms"
+            }
+          ),
+          s.search.loading ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-browse-status", children: "Searching\u2026" }) : null
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-browse-list", children: [
+          s.search.results.map((r) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-dir-item", "data-dir-room-id": r.roomId, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: r.name, size: 30 }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-dir-item-body", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-room-item-name", children: r.name }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-room-item-meta", children: [
+                r.description || "No description",
+                " \xB7 ",
+                r.members,
+                " online"
+              ] }),
+              (r.tags || []).length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-dir-tags", children: (r.tags || []).map((tg) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-tag", children: [
+                "#",
+                tg
+              ] }, tg)) }) : null
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: r.joined ? "ghost" : "outline", disabled: r.joined || joining === r.roomId || !activeWs, onClick: () => join(r), children: !activeWs ? "Need workspace" : r.joined ? "Joined" : joining === r.roomId ? "\u2026" : "Join" })
+          ] }, r.roomId)),
+          !s.search.loading && !s.search.results.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-empty-hint", children: s.search.error ? `Directory error: ${s.search.error}` : "No public rooms listed yet. Create a room with \u201CList in public directory\u201D on, then refresh here." }) : null
+        ] })
+      ] })
+    }
+  );
+}
 function Overlay({ store }) {
   const s = useStore(store);
   const d = s.dialog;
@@ -1457,6 +1440,7 @@ function Overlay({ store }) {
     d?.kind === "leave" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LeaveDialog, { store, d }) : null,
     d?.kind === "config" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ConfigDialog, { store, d }) : null,
     d?.kind === "workspace" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WorkspaceDialog, { store }) : null,
+    d?.kind === "browse" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BrowseDialog, { store }) : null,
     s.toast ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Toast, { text: s.toast, onDone: store.actions.clearToast, holdMs: 2200 }) : null
   ] });
 }
@@ -1544,7 +1528,7 @@ var import_react = require("react");
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/rooms.css
-var rooms_default = '/* Collab Rooms UI \u2014 original surface inside the dsh shell. Uses only dsh --dsw-* tokens.\n   Independent Rooms surface. Prefix: rm- (rooms). */\n\n.rm-root {\n  --rm-accent: var(--dsw-alias-state-business-primary);\n  --rm-hover: var(--dsw-alias-interactive-bg-hover);\n  --rm-border: var(--dsw-alias-border-l2);\n  --rm-bg: var(--dsw-alias-bg-base);\n  --rm-panel: var(--dsw-alias-bg-module-platform);\n  --rm-label: var(--dsw-alias-label-primary);\n  --rm-muted: var(--dsw-alias-label-secondary);\n  --rm-quiet: var(--dsw-alias-label-tertiary);\n  font: 13px/1.5 var(--dsw-font-family);\n  color: var(--rm-label);\n  box-sizing: border-box;\n}\n.rm-root *, .rm-root *::before, .rm-root *::after { box-sizing: border-box; }\n.rm-root button, .rm-root input, .rm-root textarea { font: inherit; }\n\n/* \u2500\u2500 sidebar (joined rooms + public search) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-side {\n  display: flex; flex-direction: column; height: 100%; min-height: 0;\n  padding: 0 8px 8px 0; gap: 8px;\n}\n.rm-side-toolbar {\n  display: flex; align-items: center; gap: 6px; flex: none; padding: 4px 0 2px;\n}\n.rm-side-title {\n  flex: 1; font-size: 12px; font-weight: 600; letter-spacing: .04em;\n  text-transform: uppercase; color: var(--rm-quiet);\n}\n.rm-icon-btn {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; padding: 0;\n}\n.rm-icon-btn:hover { background: var(--rm-hover); color: var(--rm-label); }\n.rm-search {\n  display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;\n  border: .5px solid var(--rm-border); border-radius: 8px; background: var(--rm-panel);\n}\n.rm-search input {\n  flex: 1; min-width: 0; border: 0; background: transparent; outline: none; color: var(--rm-label); font-size: 13px;\n}\n.rm-search input::placeholder { color: var(--rm-quiet); }\n.rm-side-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }\n.rm-group-label { font-size: 11px; font-weight: 600; color: var(--rm-quiet); padding: 0 4px 4px; text-transform: uppercase; letter-spacing: .03em; }\n.rm-room-list { display: flex; flex-direction: column; gap: 2px; }\n.rm-room-item {\n  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px;\n  border: 0; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; text-align: left;\n}\n.rm-room-item:hover { background: var(--rm-hover); }\n.rm-room-item[aria-current="true"] { background: var(--rm-hover); }\n.rm-room-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }\n.rm-room-item-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-meta { font-size: 11.5px; color: var(--rm-quiet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-trail { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }\n.rm-badge {\n  display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px;\n  border-radius: 999px; font-size: 10.5px; font-weight: 500; background: var(--rm-panel); color: var(--rm-muted);\n  border: .5px solid var(--rm-border);\n}\n.rm-badge-public { color: var(--rm-accent); border-color: color-mix(in srgb, var(--rm-accent) 35%, transparent); background: color-mix(in srgb, var(--rm-accent) 8%, transparent); }\n.rm-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--rm-quiet); }\n.rm-dot-online { background: var(--dsw-alias-state-success-primary, #2bb673); }\n.rm-dot-connecting { background: var(--dsw-alias-state-warn-primary, #e9a23b); }\n.rm-dot-offline { background: var(--dsw-alias-state-error-primary, #e5484d); }\n.rm-empty-hint { padding: 8px 10px; font-size: 12px; color: var(--rm-quiet); line-height: 1.45; }\n.rm-dir-item {\n  display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 10px;\n  border: .5px solid var(--rm-border); background: var(--rm-bg); margin-bottom: 6px;\n}\n.rm-dir-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }\n.rm-dir-tags { display: flex; flex-wrap: wrap; gap: 4px; }\n.rm-tag { font-size: 11px; color: var(--rm-muted); background: var(--rm-hover); border-radius: 4px; padding: 0 5px; }\n.rm-menu {\n  position: fixed; z-index: 1000; min-width: 180px; padding: 4px;\n  border-radius: 10px; background: var(--dsw-alias-bg-layer-1, var(--rm-bg));\n  border: .5px solid var(--rm-border);\n  box-shadow: 0 8px 24px color-mix(in srgb, var(--rm-label) 12%, transparent);\n  display: flex; flex-direction: column;\n}\n.rm-menu button {\n  display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-menu button:hover { background: var(--rm-hover); }\n\n/* \u2500\u2500 main: room workspace \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-main { display: flex; flex: 1; min-height: 0; height: 100%; width: 100%; background: var(--rm-bg); }\n.rm-workspace { display: flex; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat-header {\n  flex: none; display: flex; align-items: center; gap: 10px; height: 48px;\n  padding: 0 16px; border-bottom: .5px solid var(--rm-border);\n}\n.rm-chat-header-title { font-size: 14px; font-weight: 600; }\n.rm-chat-header-sub { font-size: 12px; color: var(--rm-quiet); }\n.rm-messages {\n  flex: 1; min-height: 0; overflow: auto; padding: 16px 18px 8px;\n  display: flex; flex-direction: column; gap: 2px;\n}\n.rm-day {\n  align-self: center; margin: 10px 0 12px; padding: 2px 10px; border-radius: 999px;\n  font-size: 11px; color: var(--rm-quiet); background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n}\n.rm-msg {\n  display: grid; grid-template-columns: 32px 1fr; gap: 0 10px; padding: 4px 6px; border-radius: 8px;\n  max-width: 720px;\n}\n.rm-msg:hover { background: color-mix(in srgb, var(--rm-hover) 60%, transparent); }\n.rm-msg-self { margin-left: auto; grid-template-columns: 1fr; max-width: 640px; }\n.rm-msg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 1px; }\n.rm-msg-author { font-size: 12px; font-weight: 600; color: var(--rm-muted); }\n.rm-msg-time { font-size: 11px; color: var(--rm-quiet); }\n.rm-msg-body { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }\n.rm-msg-self .rm-msg-body {\n  background: var(--dsw-alias-label-primary); color: var(--dsw-alias-label-primary-foreground);\n  padding: 8px 12px; border-radius: 12px 12px 4px 12px; width: fit-content; margin-left: auto;\n}\n.rm-msg-event {\n  grid-template-columns: 1fr; max-width: 560px; margin: 6px 0;\n  padding: 8px 12px; border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-panel);\n}\n.rm-mention { color: var(--rm-accent); font-weight: 500; }\n.rm-msg-self .rm-mention { color: inherit; text-decoration: underline; text-underline-offset: 2px; }\n.rm-task-card { display: flex; flex-direction: column; gap: 4px; }\n.rm-task-head { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--rm-muted); }\n.rm-task-title { font-weight: 600; font-size: 13.5px; }\n.rm-composer {\n  flex: none; display: flex; align-items: flex-end; gap: 8px; padding: 10px 16px 14px;\n  border-top: .5px solid var(--rm-border);\n}\n.rm-composer-box {\n  flex: 1; display: flex; align-items: flex-end; gap: 6px; min-height: 44px;\n  padding: 8px 10px; border: .5px solid var(--rm-border); border-radius: 12px; background: var(--rm-panel);\n}\n.rm-composer-box:focus-within { border-color: color-mix(in srgb, var(--rm-accent) 50%, var(--rm-border)); }\n.rm-composer-box textarea {\n  flex: 1; min-height: 28px; max-height: 120px; border: 0; background: transparent; outline: none;\n  resize: none; color: var(--rm-label); line-height: 1.45;\n}\n.rm-composer-box textarea::placeholder { color: var(--rm-quiet); }\n.rm-composer-mode {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; flex: none;\n}\n.rm-composer-mode:hover, .rm-composer-mode[aria-pressed="true"] {\n  color: var(--rm-accent); background: color-mix(in srgb, var(--rm-accent) 12%, transparent);\n}\n.rm-chat-hint { margin: 48px auto; text-align: center; color: var(--rm-quiet); font-size: 13px; max-width: 360px; line-height: 1.5; }\n\n/* \u2500\u2500 detail column (members / invite / about) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-detail {\n  flex: 0 0 280px; width: 280px; display: flex; flex-direction: column; min-height: 0;\n  border-left: .5px solid var(--rm-border); background: var(--rm-bg); overflow: auto;\n}\n.rm-detail-section { padding: 14px 14px 8px; border-bottom: .5px solid var(--rm-border); }\n.rm-detail-section:last-child { border-bottom: 0; }\n.rm-detail-h {\n  display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;\n  text-transform: uppercase; letter-spacing: .04em; color: var(--rm-quiet); margin-bottom: 8px;\n}\n.rm-member {\n  display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 8px; min-height: 34px;\n}\n.rm-member:hover { background: var(--rm-hover); }\n.rm-member-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }\n.rm-member-actions { display: none; gap: 2px; }\n.rm-member:hover .rm-member-actions, .rm-member:focus-within .rm-member-actions { display: inline-flex; }\n.rm-mini {\n  width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-muted); cursor: pointer; font-size: 12px;\n}\n.rm-mini:hover { background: var(--dsw-alias-interactive-bg-active); color: var(--rm-label); }\n.rm-task-row { display: flex; align-items: center; gap: 6px; padding: 4px; font-size: 12.5px; }\n.rm-task-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-about { display: grid; grid-template-columns: 88px 1fr; gap: 6px 8px; font-size: 12.5px; margin: 0; }\n.rm-about dt { color: var(--rm-quiet); margin: 0; }\n.rm-about dd { margin: 0; min-width: 0; overflow-wrap: anywhere; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }\n.rm-mono { font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace); font-size: 11.5px; }\n.rm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }\n.rm-danger { color: var(--dsw-alias-state-error-primary, #e5484d) !important; }\n.rm-note { font-size: 12px; color: var(--rm-quiet); line-height: 1.45; margin: 0 0 8px; }\n\n/* \u2500\u2500 empty / welcome \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-welcome-wrap {\n  flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px; background: var(--rm-bg);\n}\n.rm-welcome {\n  width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px;\n  padding: 20px; border-radius: 14px; border: .5px solid var(--rm-border); background: var(--rm-panel);\n}\n.rm-welcome h1 { margin: 0; font-size: 16px; font-weight: 600; }\n.rm-welcome p { margin: 0; font-size: 13px; color: var(--rm-muted); line-height: 1.5; }\n.rm-welcome-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }\n.rm-welcome-action {\n  display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 12px;\n  border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-bg);\n  color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-welcome-action:hover { background: var(--rm-hover); }\n.rm-welcome-action b { display: block; font-size: 13px; }\n.rm-welcome-action span { display: block; font-size: 12px; color: var(--rm-quiet); margin-top: 2px; }\n\n/* \u2500\u2500 avatars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-avatar {\n  display: inline-flex; align-items: center; justify-content: center; flex: none;\n  font-weight: 600; letter-spacing: .02em; user-select: none;\n}\n.rm-avatar-wrap { position: relative; display: inline-flex; flex: none; }\n\n/* \u2500\u2500 dialogs (inside dsh Modal) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-form { display: flex; flex-direction: column; gap: 14px; }\n.rm-field { display: flex; flex-direction: column; gap: 6px; }\n.rm-field-label { font-size: 13px; font-weight: 500; }\n.rm-field-hint { font-size: 12px; color: var(--rm-quiet); }\n.rm-name-row { display: flex; align-items: center; gap: 10px; }\n.rm-name-row > :last-child { flex: 1; }\n.rm-switch-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 14px;\n  padding: 10px 12px; border-radius: 10px; background: var(--rm-panel);\n}\n.rm-error { color: var(--dsw-alias-state-error-primary, #e5484d); font-size: 12.5px; }\n.rm-invite {\n  display: block; padding: 10px 12px; border-radius: 8px; background: var(--rm-panel);\n  font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace);\n  font-size: 12px; word-break: break-all; user-select: all;\n}\n\n/* Dual transport + approvals + agent config */\n.rm-mode-row { display: flex; gap: 8px; }\n.rm-mode-btn {\n  flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer; font: inherit;\n}\n.rm-mode-btn.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent); }\n.rm-lan-browse { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }\n.rm-lan-peer {\n  font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer;\n}\n.rm-approvals { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); background: color-mix(in srgb, #f5a524 12%, transparent); }\n.rm-approval { display: flex; gap: 12px; align-items: center; justify-content: space-between; }\n.rm-approval-body { font-size: 13px; }\n.rm-approval-actions { display: flex; gap: 6px; flex-shrink: 0; }\n.rm-input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; font: inherit; }\n\n.rm-ws-bar { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); }\n.rm-ws-chip { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12.5px; }\n.rm-ws-path { font-size: 11px; color: var(--rm-quiet, #8b93a7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item.is-active { background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); }\n\n/* Native-aligned room composer (mirrors dsh conversation control row) */\n.rm-composer-card {\n  box-sizing: border-box;\n  width: 100%;\n  max-width: 920px;\n  margin: 0 auto;\n  border-radius: 16px;\n  background: var(--rm-elev, var(--rm-panel, #12151c));\n  border: 1px solid var(--rm-border, #2a2f3a);\n  box-shadow: 0 1px 2px rgba(0,0,0,.06);\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  padding: 8px 0 6px;\n}\n.rm-composer-grow { position: relative; padding: 0 4px; }\n.rm-composer-grow textarea {\n  box-sizing: border-box; width: 100%; min-height: 36px; max-height: 160px;\n  resize: none; border: none; outline: none; background: transparent;\n  color: inherit; font: inherit; font-size: 14px; line-height: 22px;\n  padding: 4px 12px 0 14px;\n}\n.rm-composer-grow textarea:disabled { opacity: .55; cursor: not-allowed; }\n.rm-composer-row {\n  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;\n  gap: 10px; min-width: 0; padding: 2px 8px 4px;\n}\n.rm-composer-tools, .rm-composer-modes, .rm-composer-trailing {\n  display: flex; align-items: center; min-width: 0; gap: 8px;\n}\n.rm-composer-trailing { flex: none; margin-left: auto; }\n.rm-composer-add {\n  width: 28px; height: 28px; border: none; border-radius: 999px;\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n  color: inherit; cursor: pointer; display: grid; place-items: center;\n}\n.rm-composer-add:hover, .rm-composer-add[aria-pressed="true"] {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 22%, transparent);\n}\n.rm-composer-select {\n  max-width: 220px; height: 28px; border: none; border-radius: 8px;\n  background: transparent; color: var(--rm-quiet, #8b93a7);\n  font: inherit; font-size: 13px; font-weight: 500; line-height: 20px;\n  padding: 0 8px; cursor: pointer; white-space: nowrap;\n}\n.rm-composer-select:hover:not(:disabled) {\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n}\n.rm-composer-select:disabled { opacity: .5; cursor: default; }\n.rm-composer-model-text { display: inline; }\n.rm-composer-model-icon { display: none; font-size: 10px; }\n.rm-composer-effort {\n  margin-left: 6px; font-size: 11px; opacity: .75;\n  text-transform: uppercase; letter-spacing: .02em;\n}\n.rm-composer-send {\n  width: 34px; height: 34px; border: none; border-radius: 999px;\n  background: var(--rm-accent, #5b8cff); color: #fff; cursor: pointer;\n  display: grid; place-items: center; transform: translateY(-2px);\n}\n.rm-composer-send:hover:not(:disabled) { filter: brightness(1.08); }\n.rm-composer-send:disabled { opacity: .4; cursor: default; }\n.rm-composer-popwrap { position: relative; }\n.rm-composer-menu {\n  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 40;\n  min-width: 200px; max-height: 320px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 8px 24px rgba(0,0,0,.28);\n  padding: 6px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-composer-menu-wide { min-width: 280px; max-width: 340px; }\n.rm-composer-menu-label {\n  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;\n  color: var(--rm-quiet, #8b93a7); padding: 6px 8px 2px;\n}\n.rm-composer-menu button[role="menuitem"] {\n  text-align: left; border: none; background: transparent; color: inherit;\n  font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-composer-menu button[role="menuitem"]:hover,\n.rm-composer-menu button[role="menuitem"].is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent);\n}\n.rm-composer-check {\n  display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 8px; cursor: pointer;\n}\n.rm-grant-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 8px;\n  padding: 2px 8px; font-size: 12.5px;\n}\n.rm-grant-row select {\n  font: inherit; font-size: 12px; border-radius: 6px;\n  border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; padding: 2px 6px;\n}\n.rm-peer-grant-block { border-top: 1px solid var(--rm-border, #2a2f3a); padding-top: 4px; margin-top: 4px; }\n.rm-peer-grant-name { font-size: 12px; font-weight: 600; padding: 4px 8px; overflow: hidden; text-overflow: ellipsis; }\n\n/* Hide legacy tight composer if still referenced */\n.rm-composer { display: none; }\n\n.rm-composer-grow { position: relative; }\n.rm-mention-menu {\n  position: absolute; left: 8px; right: 8px; bottom: calc(100% + 6px); z-index: 50;\n  max-height: 240px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 10px 28px rgba(0,0,0,.32);\n  padding: 4px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-mention-item {\n  display: flex; align-items: center; gap: 8px; text-align: left;\n  border: none; background: transparent; color: inherit; font: inherit;\n  padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-mention-item:hover, .rm-mention-item.is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 18%, transparent);\n}\n.rm-mention-item-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }\n.rm-mention-item-name { font-size: 13px; font-weight: 600; }\n.rm-mention-item-meta { font-size: 11px; color: var(--rm-quiet, #8b93a7); }\n';
+var rooms_default = '/* Collab Rooms UI \u2014 original surface inside the dsh shell. Uses only dsh --dsw-* tokens.\n   Independent Rooms surface. Prefix: rm- (rooms). */\n\n.rm-root {\n  --rm-accent: var(--dsw-alias-state-business-primary);\n  --rm-hover: var(--dsw-alias-interactive-bg-hover);\n  --rm-border: var(--dsw-alias-border-l2);\n  --rm-bg: var(--dsw-alias-bg-base);\n  --rm-panel: var(--dsw-alias-bg-module-platform);\n  --rm-label: var(--dsw-alias-label-primary);\n  --rm-muted: var(--dsw-alias-label-secondary);\n  --rm-quiet: var(--dsw-alias-label-tertiary);\n  font: 13px/1.5 var(--dsw-font-family);\n  color: var(--rm-label);\n  box-sizing: border-box;\n}\n.rm-root *, .rm-root *::before, .rm-root *::after { box-sizing: border-box; }\n.rm-root button, .rm-root input, .rm-root textarea { font: inherit; }\n\n/* \u2500\u2500 sidebar (joined rooms + public search) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-side {\n  display: flex; flex-direction: column; height: 100%; min-height: 0;\n  padding: 0 8px 8px 0; gap: 8px;\n}\n.rm-side-toolbar {\n  display: flex; align-items: center; gap: 6px; flex: none; padding: 4px 0 2px;\n}\n.rm-side-title {\n  flex: 1; font-size: 12px; font-weight: 600; letter-spacing: .04em;\n  text-transform: uppercase; color: var(--rm-quiet);\n}\n.rm-icon-btn {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; padding: 0;\n}\n.rm-icon-btn:hover { background: var(--rm-hover); color: var(--rm-label); }\n.rm-search {\n  display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;\n  border: .5px solid var(--rm-border); border-radius: 8px; background: var(--rm-panel);\n}\n.rm-search input {\n  flex: 1; min-width: 0; border: 0; background: transparent; outline: none; color: var(--rm-label); font-size: 13px;\n}\n.rm-search input::placeholder { color: var(--rm-quiet); }\n.rm-side-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }\n.rm-group-label { font-size: 11px; font-weight: 600; color: var(--rm-quiet); padding: 0 4px 4px; text-transform: uppercase; letter-spacing: .03em; }\n.rm-room-list { display: flex; flex-direction: column; gap: 2px; }\n.rm-room-item {\n  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px;\n  border: 0; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; text-align: left;\n}\n.rm-room-item:hover { background: var(--rm-hover); }\n.rm-room-item[aria-current="true"] { background: var(--rm-hover); }\n.rm-room-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }\n.rm-room-item-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-meta { font-size: 11.5px; color: var(--rm-quiet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-trail { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }\n.rm-badge {\n  display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px;\n  border-radius: 999px; font-size: 10.5px; font-weight: 500; background: var(--rm-panel); color: var(--rm-muted);\n  border: .5px solid var(--rm-border);\n}\n.rm-badge-public { color: var(--rm-accent); border-color: color-mix(in srgb, var(--rm-accent) 35%, transparent); background: color-mix(in srgb, var(--rm-accent) 8%, transparent); }\n.rm-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--rm-quiet); }\n.rm-dot-online { background: var(--dsw-alias-state-success-primary, #2bb673); }\n.rm-dot-connecting { background: var(--dsw-alias-state-warn-primary, #e9a23b); }\n.rm-dot-offline { background: var(--dsw-alias-state-error-primary, #e5484d); }\n.rm-empty-hint { padding: 8px 10px; font-size: 12px; color: var(--rm-quiet); line-height: 1.45; }\n.rm-dir-item {\n  display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 10px;\n  border: .5px solid var(--rm-border); background: var(--rm-bg); margin-bottom: 6px;\n}\n.rm-dir-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }\n.rm-dir-tags { display: flex; flex-wrap: wrap; gap: 4px; }\n.rm-tag { font-size: 11px; color: var(--rm-muted); background: var(--rm-hover); border-radius: 4px; padding: 0 5px; }\n.rm-menu {\n  position: fixed; z-index: 1000; min-width: 180px; padding: 4px;\n  border-radius: 10px; background: var(--dsw-alias-bg-layer-1, var(--rm-bg));\n  border: .5px solid var(--rm-border);\n  box-shadow: 0 8px 24px color-mix(in srgb, var(--rm-label) 12%, transparent);\n  display: flex; flex-direction: column;\n}\n.rm-menu button {\n  display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-menu button:hover { background: var(--rm-hover); }\n\n/* \u2500\u2500 main: room workspace \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-main { display: flex; flex: 1; min-height: 0; height: 100%; width: 100%; background: var(--rm-bg); }\n.rm-workspace { display: flex; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat-header {\n  flex: none; display: flex; align-items: center; gap: 10px; height: 48px;\n  padding: 0 16px; border-bottom: .5px solid var(--rm-border);\n}\n.rm-chat-header-title { font-size: 14px; font-weight: 600; }\n.rm-chat-header-sub { font-size: 12px; color: var(--rm-quiet); }\n.rm-messages {\n  flex: 1; min-height: 0; overflow: auto; padding: 16px 18px 8px;\n  display: flex; flex-direction: column; gap: 2px;\n}\n.rm-day {\n  align-self: center; margin: 10px 0 12px; padding: 2px 10px; border-radius: 999px;\n  font-size: 11px; color: var(--rm-quiet); background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n}\n.rm-msg {\n  display: grid; grid-template-columns: 32px 1fr; gap: 0 10px; padding: 4px 6px; border-radius: 8px;\n  max-width: 720px;\n}\n.rm-msg:hover { background: color-mix(in srgb, var(--rm-hover) 60%, transparent); }\n.rm-msg-self { margin-left: auto; grid-template-columns: 1fr; max-width: 640px; }\n.rm-msg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 1px; }\n.rm-msg-author { font-size: 12px; font-weight: 600; color: var(--rm-muted); }\n.rm-msg-time { font-size: 11px; color: var(--rm-quiet); }\n.rm-msg-body { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }\n.rm-msg-self .rm-msg-body {\n  background: var(--dsw-alias-label-primary); color: var(--dsw-alias-label-primary-foreground);\n  padding: 8px 12px; border-radius: 12px 12px 4px 12px; width: fit-content; margin-left: auto;\n}\n.rm-msg-event {\n  grid-template-columns: 1fr; max-width: 560px; margin: 6px 0;\n  padding: 8px 12px; border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-panel);\n}\n.rm-mention { color: var(--rm-accent); font-weight: 500; }\n.rm-msg-self .rm-mention { color: inherit; text-decoration: underline; text-underline-offset: 2px; }\n.rm-task-card { display: flex; flex-direction: column; gap: 4px; }\n.rm-task-head { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--rm-muted); }\n.rm-task-title { font-weight: 600; font-size: 13.5px; }\n.rm-composer {\n  flex: none; display: flex; align-items: flex-end; gap: 8px; padding: 10px 16px 14px;\n  border-top: .5px solid var(--rm-border);\n}\n.rm-composer-box {\n  flex: 1; display: flex; align-items: flex-end; gap: 6px; min-height: 44px;\n  padding: 8px 10px; border: .5px solid var(--rm-border); border-radius: 12px; background: var(--rm-panel);\n}\n.rm-composer-box:focus-within { border-color: color-mix(in srgb, var(--rm-accent) 50%, var(--rm-border)); }\n.rm-composer-box textarea {\n  flex: 1; min-height: 28px; max-height: 120px; border: 0; background: transparent; outline: none;\n  resize: none; color: var(--rm-label); line-height: 1.45;\n}\n.rm-composer-box textarea::placeholder { color: var(--rm-quiet); }\n.rm-composer-mode {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; flex: none;\n}\n.rm-composer-mode:hover, .rm-composer-mode[aria-pressed="true"] {\n  color: var(--rm-accent); background: color-mix(in srgb, var(--rm-accent) 12%, transparent);\n}\n.rm-chat-hint { margin: 48px auto; text-align: center; color: var(--rm-quiet); font-size: 13px; max-width: 360px; line-height: 1.5; }\n\n/* \u2500\u2500 detail column (members / invite / about) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-detail {\n  flex: 0 0 280px; width: 280px; display: flex; flex-direction: column; min-height: 0;\n  border-left: .5px solid var(--rm-border); background: var(--rm-bg); overflow: auto;\n}\n.rm-detail-section { padding: 14px 14px 8px; border-bottom: .5px solid var(--rm-border); }\n.rm-detail-section:last-child { border-bottom: 0; }\n.rm-detail-h {\n  display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;\n  text-transform: uppercase; letter-spacing: .04em; color: var(--rm-quiet); margin-bottom: 8px;\n}\n.rm-member {\n  display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 8px; min-height: 34px;\n}\n.rm-member:hover { background: var(--rm-hover); }\n.rm-member-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }\n.rm-member-actions { display: none; gap: 2px; }\n.rm-member:hover .rm-member-actions, .rm-member:focus-within .rm-member-actions { display: inline-flex; }\n.rm-mini {\n  width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-muted); cursor: pointer; font-size: 12px;\n}\n.rm-mini:hover { background: var(--dsw-alias-interactive-bg-active); color: var(--rm-label); }\n.rm-task-row { display: flex; align-items: center; gap: 6px; padding: 4px; font-size: 12.5px; }\n.rm-task-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-about { display: grid; grid-template-columns: 88px 1fr; gap: 6px 8px; font-size: 12.5px; margin: 0; }\n.rm-about dt { color: var(--rm-quiet); margin: 0; }\n.rm-about dd { margin: 0; min-width: 0; overflow-wrap: anywhere; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }\n.rm-mono { font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace); font-size: 11.5px; }\n.rm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }\n.rm-danger { color: var(--dsw-alias-state-error-primary, #e5484d) !important; }\n.rm-note { font-size: 12px; color: var(--rm-quiet); line-height: 1.45; margin: 0 0 8px; }\n\n/* \u2500\u2500 empty / welcome \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-welcome-wrap {\n  flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px; background: var(--rm-bg);\n}\n.rm-welcome {\n  width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px;\n  padding: 20px; border-radius: 14px; border: .5px solid var(--rm-border); background: var(--rm-panel);\n}\n.rm-welcome h1 { margin: 0; font-size: 16px; font-weight: 600; }\n.rm-welcome p { margin: 0; font-size: 13px; color: var(--rm-muted); line-height: 1.5; }\n.rm-welcome-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }\n.rm-welcome-action {\n  display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 12px;\n  border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-bg);\n  color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-welcome-action:hover { background: var(--rm-hover); }\n.rm-welcome-action b { display: block; font-size: 13px; }\n.rm-welcome-action span { display: block; font-size: 12px; color: var(--rm-quiet); margin-top: 2px; }\n\n/* \u2500\u2500 avatars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-avatar {\n  display: inline-flex; align-items: center; justify-content: center; flex: none;\n  font-weight: 600; letter-spacing: .02em; user-select: none;\n}\n.rm-avatar-wrap { position: relative; display: inline-flex; flex: none; }\n\n/* \u2500\u2500 dialogs (inside dsh Modal) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-form { display: flex; flex-direction: column; gap: 14px; }\n.rm-field { display: flex; flex-direction: column; gap: 6px; }\n.rm-field-label { font-size: 13px; font-weight: 500; }\n.rm-field-hint { font-size: 12px; color: var(--rm-quiet); }\n.rm-name-row { display: flex; align-items: center; gap: 10px; }\n.rm-name-row > :last-child { flex: 1; }\n.rm-switch-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 14px;\n  padding: 10px 12px; border-radius: 10px; background: var(--rm-panel);\n}\n.rm-error { color: var(--dsw-alias-state-error-primary, #e5484d); font-size: 12.5px; }\n.rm-invite {\n  display: block; padding: 10px 12px; border-radius: 8px; background: var(--rm-panel);\n  font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace);\n  font-size: 12px; word-break: break-all; user-select: all;\n}\n\n/* Dual transport + approvals + agent config */\n.rm-mode-row { display: flex; gap: 8px; }\n.rm-mode-btn {\n  flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer; font: inherit;\n}\n.rm-mode-btn.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent); }\n.rm-lan-browse { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }\n.rm-lan-peer {\n  font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer;\n}\n.rm-approvals { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); background: color-mix(in srgb, #f5a524 12%, transparent); }\n.rm-approval { display: flex; gap: 12px; align-items: center; justify-content: space-between; }\n.rm-approval-body { font-size: 13px; }\n.rm-approval-actions { display: flex; gap: 6px; flex-shrink: 0; }\n.rm-input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; font: inherit; }\n\n.rm-ws-bar { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); }\n.rm-ws-chip { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12.5px; }\n.rm-ws-path { font-size: 11px; color: var(--rm-quiet, #8b93a7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item.is-active { background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); }\n\n/* Native-aligned room composer (mirrors dsh conversation control row) */\n.rm-composer-card {\n  box-sizing: border-box;\n  width: 100%;\n  max-width: 920px;\n  margin: 0 auto;\n  border-radius: 16px;\n  background: var(--rm-elev, var(--rm-panel, #12151c));\n  border: 1px solid var(--rm-border, #2a2f3a);\n  box-shadow: 0 1px 2px rgba(0,0,0,.06);\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  padding: 8px 0 6px;\n}\n.rm-composer-grow { position: relative; padding: 0 4px; }\n.rm-composer-grow textarea {\n  box-sizing: border-box; width: 100%; min-height: 36px; max-height: 160px;\n  resize: none; border: none; outline: none; background: transparent;\n  color: inherit; font: inherit; font-size: 14px; line-height: 22px;\n  padding: 4px 12px 0 14px;\n}\n.rm-composer-grow textarea:disabled { opacity: .55; cursor: not-allowed; }\n.rm-composer-row {\n  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;\n  gap: 10px; min-width: 0; padding: 2px 8px 4px;\n}\n.rm-composer-tools, .rm-composer-modes, .rm-composer-trailing {\n  display: flex; align-items: center; min-width: 0; gap: 8px;\n}\n.rm-composer-trailing { flex: none; margin-left: auto; }\n.rm-composer-add {\n  width: 28px; height: 28px; border: none; border-radius: 999px;\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n  color: inherit; cursor: pointer; display: grid; place-items: center;\n}\n.rm-composer-add:hover, .rm-composer-add[aria-pressed="true"] {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 22%, transparent);\n}\n.rm-composer-select {\n  max-width: 220px; height: 28px; border: none; border-radius: 8px;\n  background: transparent; color: var(--rm-quiet, #8b93a7);\n  font: inherit; font-size: 13px; font-weight: 500; line-height: 20px;\n  padding: 0 8px; cursor: pointer; white-space: nowrap;\n}\n.rm-composer-select:hover:not(:disabled) {\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n}\n.rm-composer-select:disabled { opacity: .5; cursor: default; }\n.rm-composer-model-text { display: inline; }\n.rm-composer-model-icon { display: none; font-size: 10px; }\n.rm-composer-effort {\n  margin-left: 6px; font-size: 11px; opacity: .75;\n  text-transform: uppercase; letter-spacing: .02em;\n}\n.rm-composer-send {\n  width: 34px; height: 34px; border: none; border-radius: 999px;\n  background: var(--rm-accent, #5b8cff); color: #fff; cursor: pointer;\n  display: grid; place-items: center; transform: translateY(-2px);\n}\n.rm-composer-send:hover:not(:disabled) { filter: brightness(1.08); }\n.rm-composer-send:disabled { opacity: .4; cursor: default; }\n.rm-composer-popwrap { position: relative; }\n.rm-composer-menu {\n  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 40;\n  min-width: 200px; max-height: 320px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 8px 24px rgba(0,0,0,.28);\n  padding: 6px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-composer-menu-wide { min-width: 280px; max-width: 340px; }\n.rm-composer-menu-label {\n  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;\n  color: var(--rm-quiet, #8b93a7); padding: 6px 8px 2px;\n}\n.rm-composer-menu button[role="menuitem"] {\n  text-align: left; border: none; background: transparent; color: inherit;\n  font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-composer-menu button[role="menuitem"]:hover,\n.rm-composer-menu button[role="menuitem"].is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent);\n}\n.rm-composer-check {\n  display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 8px; cursor: pointer;\n}\n.rm-grant-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 8px;\n  padding: 2px 8px; font-size: 12.5px;\n}\n.rm-grant-row select {\n  font: inherit; font-size: 12px; border-radius: 6px;\n  border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; padding: 2px 6px;\n}\n.rm-peer-grant-block { border-top: 1px solid var(--rm-border, #2a2f3a); padding-top: 4px; margin-top: 4px; }\n.rm-peer-grant-name { font-size: 12px; font-weight: 600; padding: 4px 8px; overflow: hidden; text-overflow: ellipsis; }\n\n/* Hide legacy tight composer if still referenced */\n.rm-composer { display: none; }\n\n.rm-composer-grow { position: relative; }\n.rm-mention-menu {\n  position: absolute; left: 8px; right: 8px; bottom: calc(100% + 6px); z-index: 50;\n  max-height: 240px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 10px 28px rgba(0,0,0,.32);\n  padding: 4px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-mention-item {\n  display: flex; align-items: center; gap: 8px; text-align: left;\n  border: none; background: transparent; color: inherit; font: inherit;\n  padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-mention-item:hover, .rm-mention-item.is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 18%, transparent);\n}\n.rm-mention-item-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }\n.rm-mention-item-name { font-size: 13px; font-weight: 600; }\n.rm-mention-item-meta { font-size: 11px; color: var(--rm-quiet, #8b93a7); }\n\n\n/* New Room shortcut under workspace (mirrors New Session affordance) */\n.rm-new-room {\n  display: flex; align-items: center; justify-content: center; gap: 6px;\n  width: 100%; height: 36px; margin-top: 8px;\n  border: .5px solid var(--rm-border); border-radius: 10px;\n  background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n  color: var(--rm-label); cursor: pointer; font-weight: 500; font-size: 13.5px;\n}\n.rm-new-room:hover { background: var(--dsw-alias-button-floating-hover, var(--rm-hover)); }\n.rm-new-room svg { flex: none; }\n\n/* Wide / landscape create + browse modals (overrides default 380px Modal card) */\n.rm-modal-wide {\n  width: min(720px, calc(100vw - 48px)) !important;\n  max-height: min(640px, calc(100vh - 48px));\n}\n.rm-form-wide {\n  display: grid;\n  grid-template-columns: 1fr 1fr;\n  gap: 12px 18px;\n  align-items: start;\n}\n.rm-form-wide .rm-span-2 { grid-column: 1 / -1; }\n.rm-browse { display: flex; flex-direction: column; gap: 12px; min-height: 280px; max-height: 420px; }\n.rm-browse-search { flex: none; }\n.rm-browse-status { font-size: 11.5px; color: var(--rm-quiet); white-space: nowrap; }\n.rm-browse-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }\n@media (max-width: 640px) {\n  .rm-form-wide { grid-template-columns: 1fr; }\n  .rm-modal-wide { width: min(420px, calc(100vw - 32px)) !important; }\n}\n';
 
 // src/client/store.js
 var API = "/api/collab";
@@ -1622,7 +1606,13 @@ function createRoomsStore() {
       if (text) p.set("q", text);
       if (tag) p.set("tag", tag);
       const r = await call(`/directory?${p}`);
-      set((s) => s.search.query === query ? { search: { ...s.search, results: r.rooms, loading: false } } : {});
+      const rooms = Array.isArray(r.rooms) ? r.rooms.map((x) => ({
+        ...x,
+        tags: Array.isArray(x.tags) ? x.tags : [],
+        members: typeof x.members === "number" ? x.members : 0,
+        description: x.description || ""
+      })) : [];
+      set((s) => s.search.query === query ? { search: { ...s.search, results: rooms, loading: false, error: null } } : {});
     } catch (e) {
       set((s) => ({ search: { ...s.search, loading: false, error: e.message } }));
     }
@@ -1798,9 +1788,9 @@ function RoomsSidebar({ store, ensurePanel }) {
   const s = useStore(store);
   const a = store.actions;
   const [menu, setMenu] = (0, import_react.useState)(null);
-  const [searching, setSearching] = (0, import_react.useState)(false);
   const [joining, setJoining] = (0, import_react.useState)(null);
   const inputRef = (0, import_react.useRef)(null);
+  const searching = !!s.search.open;
   const activeWs = (s.workspaces || []).find((w) => w.id === s.activeWorkspaceId) || (s.workspaces || [])[0] || null;
   (0, import_react.useEffect)(() => {
     if (!menu) return;
@@ -1840,10 +1830,7 @@ function RoomsSidebar({ store, ensurePanel }) {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-side", "data-collab-sidebar": "", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-side-toolbar", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-side-title", children: "DSH Room" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", "aria-label": searching ? "Close search" : "Search rooms", "aria-pressed": searching, onClick: () => {
-        setSearching(!searching);
-        a.setSearchOpen(!searching);
-      }, children: searching ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CloseIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", "aria-label": searching ? "Close search" : "Search rooms", "aria-pressed": searching, onClick: () => a.setSearchOpen(!searching), children: searching ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CloseIcon, {}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         "button",
         {
@@ -1885,8 +1872,7 @@ function RoomsSidebar({ store, ensurePanel }) {
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", role: "menuitem", onClick: () => {
           setMenu(null);
-          setSearching(true);
-          a.setSearchOpen(true);
+          a.openDialog({ kind: "browse" });
         }, children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlobeIcon, {}),
           "Browse public rooms"
@@ -1898,7 +1884,14 @@ function RoomsSidebar({ store, ensurePanel }) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FolderIcon, {}),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: activeWs.name })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-ws-path", title: activeWs.path, children: activeWs.path })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-ws-path", title: activeWs.path, children: activeWs.path }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-new-room", "data-rm-new-room": "", onClick: () => {
+        a.openDialog({ kind: "create" });
+        ensurePanel();
+      }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlusIcon, {}),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "New Room" })
+      ] })
     ] }),
     searching ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-search", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}),
@@ -1974,7 +1967,7 @@ function RoomsSidebar({ store, ensurePanel }) {
               r.members,
               " online"
             ] }),
-            r.tags.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-dir-tags", children: r.tags.map((tg) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-tag", children: [
+            (r.tags || []).length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-dir-tags", children: (r.tags || []).map((tg) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-tag", children: [
               "#",
               tg
             ] }, tg)) }) : null
@@ -2095,23 +2088,23 @@ function MentionMenu({ items, active, onPick, onHover }) {
     it.id
   )) });
 }
-function Composer({ room, store, draft: draft2, setDraft: setDraft2 }) {
+function Composer({ room, store, draft, setDraft }) {
   const a = store.actions;
   const [mode, setMode] = (0, import_react.useState)("chat");
   const [busy, setBusy] = (0, import_react.useState)(false);
   const [modelOpen, setModelOpen] = (0, import_react.useState)(false);
   const [permOpen, setPermOpen] = (0, import_react.useState)(false);
   const [peerOpen, setPeerOpen] = (0, import_react.useState)(false);
-  const [mentionActive, setMentionActive2] = (0, import_react.useState)(0);
-  const [caret, setCaret2] = (0, import_react.useState)(0);
+  const [mentionActive, setMentionActive] = (0, import_react.useState)(0);
+  const [caret, setCaret] = (0, import_react.useState)(0);
   const [mentionDismissed, setMentionDismissed] = (0, import_react.useState)(false);
-  const taRef2 = (0, import_react.useRef)(null);
+  const taRef = (0, import_react.useRef)(null);
   const offline = room.status !== "online";
-  const mqRaw = mentionQueryAt(draft2, caret);
-  const mq2 = mentionDismissed ? null : mqRaw;
+  const mqRaw = mentionQueryAt(draft, caret);
+  const mq = mentionDismissed ? null : mqRaw;
   const mentionItems = (() => {
-    if (!mq2) return [];
-    const q = mq2.query.toLowerCase();
+    if (!mq) return [];
+    const q = mq.query.toLowerCase();
     const members = (room.members || []).filter((m) => !m.self);
     const known = members.map((m) => ({
       id: m.agentId,
@@ -2135,7 +2128,7 @@ function Composer({ room, store, draft: draft2, setDraft: setDraft2 }) {
     return bits.length ? `Auto \xB7 ${bits.join("+")}` : "Ask to run";
   })();
   (0, import_react.useEffect)(() => {
-    setMentionActive2(0);
+    setMentionActive(0);
     setMentionDismissed(false);
   }, [mqRaw && mqRaw.query, mqRaw && mqRaw.start]);
   const MODELS = ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"];
@@ -2158,28 +2151,8 @@ function Composer({ room, store, draft: draft2, setDraft: setDraft2 }) {
       a.toast(e.message);
     }
   };
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret2(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq2) return;
-    const insert = `@${it.id} `;
-    const next = draft2.slice(0, mq2.start) + insert + draft2.slice(mq2.end);
-    setDraft2(next);
-    const pos = mq2.start + insert.length;
-    setCaret2(pos);
-    setMentionActive2(0);
-    requestAnimationFrame(() => {
-      const el = taRef2.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      }
-    });
-  };
   const submit = async () => {
-    const text = draft2.trim();
+    const text = draft.trim();
     if (!text || busy) return;
     setBusy(true);
     try {
@@ -2188,7 +2161,7 @@ function Composer({ room, store, draft: draft2, setDraft: setDraft2 }) {
         await a.task(room.roomId, m ? text.slice(m[0].length) : text, m ? m[1] : void 0);
         setMode("chat");
       } else await a.send(room.roomId, text);
-      setDraft2("");
+      setDraft("");
     } catch (e) {
       a.toast(e.message);
     } finally {
@@ -2197,33 +2170,33 @@ function Composer({ room, store, draft: draft2, setDraft: setDraft2 }) {
   };
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-composer-card", "data-rm-composer": "", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-composer-grow", children: [
-      mq2 && mentionItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MentionMenu, { items: mentionItems, active: mentionActive, onHover: setMentionActive2, onPick: insertMention }) : null,
+      mq && mentionItems.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MentionMenu, { items: mentionItems, active: mentionActive, onHover: setMentionActive, onPick: insertMention }) : null,
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         "textarea",
         {
-          ref: taRef2,
+          ref: taRef,
           rows: 1,
           disabled: offline,
           "aria-label": "Message the room",
           placeholder: offline ? "Room is offline" : mode === "task" ? "Task: @assignee title (optional assignee)" : `Message ${room.name} \xB7 @agent or @all`,
-          value: draft2,
+          value: draft,
           onChange: (e) => {
-            setDraft2(e.target.value);
+            setDraft(e.target.value);
             syncCaret(e.target);
           },
           onClick: (e) => syncCaret(e.target),
           onKeyUp: (e) => syncCaret(e.target),
           onSelect: (e) => syncCaret(e.target),
           onKeyDown: (e) => {
-            if (mq2 && mentionItems.length) {
+            if (mq && mentionItems.length) {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
-                setMentionActive2((i) => (i + 1) % mentionItems.length);
+                setMentionActive((i) => (i + 1) % mentionItems.length);
                 return;
               }
               if (e.key === "ArrowUp") {
                 e.preventDefault();
-                setMentionActive2((i) => (i - 1 + mentionItems.length) % mentionItems.length);
+                setMentionActive((i) => (i - 1 + mentionItems.length) % mentionItems.length);
                 return;
               }
               if (e.key === "Enter" || e.key === "Tab") {
@@ -2309,7 +2282,7 @@ function Composer({ room, store, draft: draft2, setDraft: setDraft2 }) {
           peerOpen ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PeerGrantsMenu, { room, store, onClose: () => setPeerOpen(false), patchConfig }) : null
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-composer-trailing", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-composer-send", "aria-label": mode === "task" ? "Create task" : "Send", disabled: !draft2.trim() || busy || offline, onClick: submit, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SendIcon, {}) }) })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-composer-trailing", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-composer-send", "aria-label": mode === "task" ? "Create task" : "Send", disabled: !draft.trim() || busy || offline, onClick: submit, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SendIcon, {}) }) })
     ] })
   ] });
 }
@@ -2474,11 +2447,11 @@ function EmptyMain({ store }) {
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Paste a collab://join/\u2026 invite" })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-welcome-action", onClick: () => a.setSearchOpen(true), children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-welcome-action", onClick: () => a.openDialog({ kind: "browse" }), children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "Browse public rooms" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Search the relay directory by name or #tag" })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Search the VPS directory by name or #tag" })
         ] })
       ] })
     ] })
@@ -2490,8 +2463,8 @@ function RoomsMain({ store }) {
   const room = s.rooms.find((r) => r.roomId === s.selected);
   if (!room) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmptyMain, { store });
   const messages = s.messages[room.roomId] || [];
-  const draft2 = drafts[room.roomId] || "";
-  const setDraft2 = (v) => setDrafts((d) => ({ ...d, [room.roomId]: typeof v === "function" ? v(d[room.roomId] || "") : v }));
+  const draft = drafts[room.roomId] || "";
+  const setDraft = (v) => setDrafts((d) => ({ ...d, [room.roomId]: typeof v === "function" ? v(d[room.roomId] || "") : v }));
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-main", "data-collab-main": "", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalBanner, { store }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-workspace", children: [
@@ -2518,7 +2491,7 @@ function RoomsMain({ store }) {
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.StateDot, { state: room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error", size: 8 })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatBody, { messages }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Composer, { room, store, draft: draft2, setDraft: setDraft2 })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Composer, { room, store, draft, setDraft })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
         RoomDetail,
@@ -2526,9 +2499,9 @@ function RoomsMain({ store }) {
           room,
           messages,
           store,
-          mention: (id) => setDraft2((d) => `${d}${d && !d.endsWith(" ") ? " " : ""}@${id} `),
+          mention: (id) => setDraft((d) => `${d}${d && !d.endsWith(" ") ? " " : ""}@${id} `),
           assign: (id) => {
-            setDraft2(`@${id} `);
+            setDraft(`@${id} `);
             store.actions.toast(`Switch to task mode, then describe the task for @${id}`);
           }
         }
@@ -2551,26 +2524,7 @@ function CreateDialog({ store }) {
   const [busy, setBusy] = (0, import_react.useState)(false);
   const [lanPeers, setLanPeers] = (0, import_react.useState)([]);
   const ok = f.name.trim() && !busy;
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq) return;
-    const insert = `@${it.id} `;
-    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
-    setDraft(next);
-    const pos = mq.start + insert.length;
-    setCaret(pos);
-    setMentionActive(0);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      }
-    });
-  };
+  const ws = (s.workspaces || []).find((w) => w.id === s.activeWorkspaceId) || (s.workspaces || [])[0];
   const submit = async () => {
     if (!ok) return;
     setBusy(true);
@@ -2604,23 +2558,24 @@ function CreateDialog({ store }) {
       onClose: a.closeDialog,
       title: "Create room",
       closeLabel: "Close",
-      description: "Room is created inside the active workspace (path becomes MCP sandbox). Default transport is the VPS Node relay (62.234.113.56:80) with optional public directory. Cloudflare remains an advanced option. The room key never goes to the relay.",
+      className: "rm-modal-wide",
+      description: ws ? `In workspace \u201C${ws.name}\u201D. Default relay 62.234.113.56:80 \xB7 E2EE \xB7 keys stay local.` : "Bind a workspace first. Default relay 62.234.113.56:80.",
       footer: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: a.closeDialog, children: "Cancel" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "primary", disabled: !ok, onClick: submit, children: busy ? "Creating\u2026" : "Create" })
       ] }),
-      children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-form", onKeyDown: (e) => e.key === "Enter" && e.target.tagName === "INPUT" && submit(), children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Transport", hint: "Default: VPS Node relay at 62.234.113.56:80 (invite-only or public directory). Blank host = embedded local LAN + mDNS. Cloudflare is optional.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-mode-row", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.mode === "lan" ? " is-on" : ""), onClick: () => setF({ ...f, mode: "lan", lanHostPort: f.lanHostPort || "62.234.113.56:80" }), children: "LAN / VPS" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.mode === "relay" ? " is-on" : ""), onClick: () => setF({ ...f, mode: "relay" }), children: "Cloudflare (advanced)" })
-        ] }) }),
+      children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-form rm-form-wide", onKeyDown: (e) => e.key === "Enter" && e.target.tagName === "INPUT" && submit(), children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Name", htmlFor: "rm-create-name", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-name-row", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: f.name || "room", size: 36 }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-name", autoFocus: true, placeholder: "e.g. release-crew", maxLength: 60, value: f.name, onChange: (e) => setF({ ...f, name: e.target.value }) })
         ] }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Description (optional)", htmlFor: "rm-create-desc", hint: "Shown to members and, if public, in search results.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-desc", placeholder: "e.g. Agents that review and ship releases", maxLength: 280, value: f.description, onChange: (e) => setF({ ...f, description: e.target.value }) }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Tags (optional)", htmlFor: "rm-create-tags", hint: "Spaces or commas, up to 8. Used by public room search.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-tags", placeholder: "e.g. review rust", value: f.tags, onChange: (e) => setF({ ...f, tags: e.target.value }) }) }),
-        f.mode === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Field, { label: "Relay host:port", htmlFor: "rm-lan-hp", hint: "Default VPS 62.234.113.56:80 (public directory works). Blank = this machine (LAN/Tailscale + mDNS). Invite: collab://lan/host:port/room#key.", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Transport", hint: "VPS directory works on LAN/VPS. Cloudflare is optional.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-mode-row", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.mode === "lan" ? " is-on" : ""), onClick: () => setF({ ...f, mode: "lan", lanHostPort: f.lanHostPort || "62.234.113.56:80" }), children: "LAN / VPS" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.mode === "relay" ? " is-on" : ""), onClick: () => setF({ ...f, mode: "relay" }), children: "Cloudflare" })
+        ] }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Description", htmlFor: "rm-create-desc", hint: "Shown to members and in public search.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-desc", placeholder: "e.g. Agents that review and ship releases", maxLength: 280, value: f.description, onChange: (e) => setF({ ...f, description: e.target.value }) }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Tags", htmlFor: "rm-create-tags", hint: "Spaces or commas, up to 8.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-tags", placeholder: "e.g. review rust", value: f.tags, onChange: (e) => setF({ ...f, tags: e.target.value }) }) }),
+        f.mode === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-span-2", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Field, { label: "Relay host:port", htmlFor: "rm-lan-hp", hint: "Default 62.234.113.56:80. Blank = this machine + mDNS.", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-lan-hp", placeholder: "62.234.113.56:80 or 100.x.x.x:7421", value: f.lanHostPort, onChange: (e) => setF({ ...f, lanHostPort: e.target.value }) }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-lan-browse", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "outline", onClick: browseLan, children: "Browse mDNS" }),
@@ -2629,15 +2584,15 @@ function CreateDialog({ store }) {
               p.name ? ` \xB7 ${p.name}` : ""
             ] }, p.hostPort))
           ] })
-        ] }) : null,
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-switch-row", children: [
+        ] }) }) : null,
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-span-2 rm-switch-row", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-field-label", children: "List in public directory" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-field-hint", children: f.public ? "Anyone can find this room by name or tag and join it. Its key is published with the listing \u2014 NOT confidential." : "Private: invite only. Nothing about the room is published." })
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-field-hint", children: f.public ? "Anyone can find and join \u2014 key is published with the listing." : "Private: invite only." })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Switch, { checked: f.public, onChange: (v) => setF({ ...f, public: v }), label: "List in public directory" })
         ] }),
-        err ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-error", children: err }) : null
+        err ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-span-2 rm-error", children: err }) : null
       ] })
     }
   );
@@ -2649,26 +2604,6 @@ function JoinDialog({ store }) {
   const [err, setErr] = (0, import_react.useState)(null);
   const [busy, setBusy] = (0, import_react.useState)(false);
   const valid = /^collab:\/\/(join|lan|relay)\/.+#\S+$/.test(invite.trim());
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq) return;
-    const insert = `@${it.id} `;
-    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
-    setDraft(next);
-    const pos = mq.start + insert.length;
-    setCaret(pos);
-    setMentionActive(0);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      }
-    });
-  };
   const submit = async () => {
     if (!valid || busy) return;
     setBusy(true);
@@ -2773,26 +2708,6 @@ function ConfigDialog({ store, d }) {
     a.getConfig(d.roomId).then((c) => setF((x) => ({ ...x, workspacePath: c.workspacePath || "", workspaceLabel: c.workspaceLabel || x.workspaceLabel, model: c.model || "", provider: c.provider || "", reasoningEffort: c.reasoningEffort || "medium", autoRead: c.permissions?.autoRead !== false, autoWrite: !!c.permissions?.autoWrite, autoShell: !!c.permissions?.autoShell, autoNetwork: !!c.permissions?.autoNetwork, mcpEnabled: c.mcpEnabled !== false }))).catch(() => {
     });
   }, [d.roomId]);
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq) return;
-    const insert = `@${it.id} `;
-    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
-    setDraft(next);
-    const pos = mq.start + insert.length;
-    setCaret(pos);
-    setMentionActive(0);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      }
-    });
-  };
   const submit = async () => {
     setBusy(true);
     setErr(null);
@@ -2894,26 +2809,6 @@ function WorkspaceDialog({ store }) {
   const [path, setPath] = (0, import_react.useState)("");
   const [err, setErr] = (0, import_react.useState)(null);
   const [busy, setBusy] = (0, import_react.useState)(false);
-  const syncCaret = (el) => {
-    if (!el) return;
-    setCaret(el.selectionStart ?? el.value.length);
-  };
-  const insertMention = (it) => {
-    if (!mq) return;
-    const insert = `@${it.id} `;
-    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
-    setDraft(next);
-    const pos = mq.start + insert.length;
-    setCaret(pos);
-    setMentionActive(0);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (el) {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-      }
-    });
-  };
   const submit = async () => {
     if (!path.trim()) {
       setErr("Absolute workspace path required");
@@ -2954,6 +2849,78 @@ function WorkspaceDialog({ store }) {
     }
   );
 }
+function BrowseDialog({ store }) {
+  const s = useStore(store);
+  const a = store.actions;
+  const [joining, setJoining] = (0, import_react.useState)(null);
+  const inputRef = (0, import_react.useRef)(null);
+  const activeWs = (s.workspaces || []).find((w) => w.id === s.activeWorkspaceId) || (s.workspaces || [])[0];
+  (0, import_react.useEffect)(() => {
+    a.setSearchOpen(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
+    return () => {
+    };
+  }, []);
+  const join = async (r) => {
+    setJoining(r.roomId);
+    try {
+      await a.join(r.invite, { name: r.name, description: r.description, tags: r.tags, public: true, workspaceId: activeWs?.id });
+    } catch (e) {
+      a.toast(e.message);
+    } finally {
+      setJoining(null);
+    }
+  };
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+    import_dsh_client_ui_primitives.Modal,
+    {
+      open: true,
+      onClose: a.closeDialog,
+      title: "Browse public rooms",
+      closeLabel: "Close",
+      className: "rm-modal-wide",
+      description: "Directory on VPS 62.234.113.56:80. Search by name or #tag, then join into the active workspace.",
+      footer: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: a.closeDialog, children: "Close" }),
+      children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-browse", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-search rm-browse-search", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "input",
+            {
+              ref: inputRef,
+              type: "text",
+              placeholder: "Search rooms or #tags",
+              value: s.search.query,
+              onChange: (e) => a.setQuery(e.target.value),
+              "aria-label": "Search public rooms"
+            }
+          ),
+          s.search.loading ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-browse-status", children: "Searching\u2026" }) : null
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-browse-list", children: [
+          s.search.results.map((r) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-dir-item", "data-dir-room-id": r.roomId, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: r.name, size: 30 }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-dir-item-body", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-room-item-name", children: r.name }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-room-item-meta", children: [
+                r.description || "No description",
+                " \xB7 ",
+                r.members,
+                " online"
+              ] }),
+              (r.tags || []).length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-dir-tags", children: (r.tags || []).map((tg) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-tag", children: [
+                "#",
+                tg
+              ] }, tg)) }) : null
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: r.joined ? "ghost" : "outline", disabled: r.joined || joining === r.roomId || !activeWs, onClick: () => join(r), children: !activeWs ? "Need workspace" : r.joined ? "Joined" : joining === r.roomId ? "\u2026" : "Join" })
+          ] }, r.roomId)),
+          !s.search.loading && !s.search.results.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-empty-hint", children: s.search.error ? `Directory error: ${s.search.error}` : "No public rooms listed yet. Create a room with \u201CList in public directory\u201D on, then refresh here." }) : null
+        ] })
+      ] })
+    }
+  );
+}
 function Overlay({ store }) {
   const s = useStore(store);
   const d = s.dialog;
@@ -2964,6 +2931,7 @@ function Overlay({ store }) {
     d?.kind === "leave" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LeaveDialog, { store, d }) : null,
     d?.kind === "config" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ConfigDialog, { store, d }) : null,
     d?.kind === "workspace" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WorkspaceDialog, { store }) : null,
+    d?.kind === "browse" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BrowseDialog, { store }) : null,
     s.toast ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Toast, { text: s.toast, onDone: store.actions.clearToast, holdMs: 2200 }) : null
   ] });
 }

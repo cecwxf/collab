@@ -370,3 +370,36 @@
 .rm-mention-item-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .rm-mention-item-name { font-size: 13px; font-weight: 600; }
 .rm-mention-item-meta { font-size: 11px; color: var(--rm-quiet, #8b93a7); }
+
+
+/* New Room shortcut under workspace (mirrors New Session affordance) */
+.rm-new-room {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; height: 36px; margin-top: 8px;
+  border: .5px solid var(--rm-border); border-radius: 10px;
+  background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));
+  color: var(--rm-label); cursor: pointer; font-weight: 500; font-size: 13.5px;
+}
+.rm-new-room:hover { background: var(--dsw-alias-button-floating-hover, var(--rm-hover)); }
+.rm-new-room svg { flex: none; }
+
+/* Wide / landscape create + browse modals (overrides default 380px Modal card) */
+.rm-modal-wide {
+  width: min(720px, calc(100vw - 48px)) !important;
+  max-height: min(640px, calc(100vh - 48px));
+}
+.rm-form-wide {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 18px;
+  align-items: start;
+}
+.rm-form-wide .rm-span-2 { grid-column: 1 / -1; }
+.rm-browse { display: flex; flex-direction: column; gap: 12px; min-height: 280px; max-height: 420px; }
+.rm-browse-search { flex: none; }
+.rm-browse-status { font-size: 11.5px; color: var(--rm-quiet); white-space: nowrap; }
+.rm-browse-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 640px) {
+  .rm-form-wide { grid-template-columns: 1fr; }
+  .rm-modal-wide { width: min(420px, calc(100vw - 32px)) !important; }
+}
