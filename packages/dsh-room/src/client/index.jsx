@@ -258,6 +258,37 @@ function ChatBody({ messages }) {
   );
 }
 
+
+/** Active @query at caret: { start, end, query } or null */
+function mentionQueryAt(text, caret) {
+  const before = text.slice(0, caret);
+  const m = /(^|[\s([{])@([A-Za-z0-9._:-]*)$/.exec(before);
+  if (!m) return null;
+  const at = before.lastIndexOf("@");
+  return { start: at, end: caret, query: m[2] || "" };
+}
+
+function MentionMenu({ items, active, onPick, onHover }) {
+  if (!items.length) return null;
+  return (
+    <div className="rm-mention-menu" role="listbox" aria-label="Mention someone">
+      {items.map((it, i) => (
+        <button key={it.id} type="button" role="option" aria-selected={i === active}
+          className={"rm-mention-item" + (i === active ? " is-active" : "")}
+          onMouseEnter={() => onHover(i)}
+          onMouseDown={(e) => { e.preventDefault(); onPick(it); }}>
+          <Avatar name={it.id === "all" ? "all" : it.id} size={22} />
+          <span className="rm-mention-item-body">
+            <span className="rm-mention-item-name">@{it.id}</span>
+            <span className="rm-mention-item-meta">{it.hint}</span>
+          </span>
+          {it.online === false ? <Tag tone="quiet">offline</Tag> : null}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Composer({ room, store, draft, setDraft }) {
   const a = store.actions;
   const [mode, setMode] = useState("chat");
@@ -265,7 +296,26 @@ function Composer({ room, store, draft, setDraft }) {
   const [modelOpen, setModelOpen] = useState(false);
   const [permOpen, setPermOpen] = useState(false);
   const [peerOpen, setPeerOpen] = useState(false);
+  const [mentionActive, setMentionActive] = useState(0);
+  const [caret, setCaret] = useState(0);
+  const [mentionDismissed, setMentionDismissed] = useState(false);
+  const taRef = useRef(null);
   const offline = room.status !== "online";
+  const mqRaw = mentionQueryAt(draft, caret);
+  const mq = mentionDismissed ? null : mqRaw;
+  const mentionItems = (() => {
+    if (!mq) return [];
+    const q = mq.query.toLowerCase();
+    const members = (room.members || []).filter((m) => !m.self);
+    const known = members.map((m) => ({
+      id: m.agentId,
+      hint: m.online === false ? "member · offline" : "member · wake",
+      online: m.online !== false,
+    }));
+    const all = { id: "all", hint: "Everyone · wake all members", online: true };
+    const list = [all, ...known];
+    return list.filter((it) => !q || it.id.toLowerCase().startsWith(q) || ("@" + it.id).toLowerCase().startsWith("@" + q));
+  })();
   const mc = room.memberConfig || {};
   const modelLabel = mc.model || "Default model";
   const effort = mc.reasoningEffort || "medium";
@@ -278,6 +328,7 @@ function Composer({ room, store, draft, setDraft }) {
     if (p.autoNetwork) bits.push("net");
     return bits.length ? `Auto · ${bits.join("+")}` : "Ask to run";
   })();
+  useEffect(() => { setMentionActive(0); setMentionDismissed(false); }, [mqRaw && mqRaw.query, mqRaw && mqRaw.start]);
   const MODELS = ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"];
   const EFFORTS = ["low", "medium", "high", "max"];
 
@@ -298,6 +349,23 @@ function Composer({ room, store, draft, setDraft }) {
     } catch (e) { a.toast(e.message); }
   };
 
+  const syncCaret = (el) => {
+    if (!el) return;
+    setCaret(el.selectionStart ?? el.value.length);
+  };
+  const insertMention = (it) => {
+    if (!mq) return;
+    const insert = `@${it.id} `;
+    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
+    setDraft(next);
+    const pos = mq.start + insert.length;
+    setCaret(pos);
+    setMentionActive(0);
+    requestAnimationFrame(() => {
+      const el = taRef.current;
+      if (el) { el.focus(); el.setSelectionRange(pos, pos); }
+    });
+  };
   const submit = async () => {
     const text = draft.trim();
     if (!text || busy) return;
@@ -316,10 +384,29 @@ function Composer({ room, store, draft, setDraft }) {
   return (
     <div className="rm-composer-card" data-rm-composer="">
       <div className="rm-composer-grow">
-        <textarea rows={1} disabled={offline} aria-label="Message the room"
-          placeholder={offline ? "Room is offline" : mode === "task" ? "Task: @assignee title (optional assignee)" : `Message ${room.name} · @agent wakes it`}
-          value={draft} onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void submit(); } }} />
+        {mq && mentionItems.length ? (
+          <MentionMenu items={mentionItems} active={mentionActive} onHover={setMentionActive} onPick={insertMention} />
+        ) : null}
+        <textarea ref={taRef} rows={1} disabled={offline} aria-label="Message the room"
+          placeholder={offline ? "Room is offline" : mode === "task" ? "Task: @assignee title (optional assignee)" : `Message ${room.name} · @agent or @all`}
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value); syncCaret(e.target); }}
+          onClick={(e) => syncCaret(e.target)}
+          onKeyUp={(e) => syncCaret(e.target)}
+          onSelect={(e) => syncCaret(e.target)}
+          onKeyDown={(e) => {
+            if (mq && mentionItems.length) {
+              if (e.key === "ArrowDown") { e.preventDefault(); setMentionActive((i) => (i + 1) % mentionItems.length); return; }
+              if (e.key === "ArrowUp") { e.preventDefault(); setMentionActive((i) => (i - 1 + mentionItems.length) % mentionItems.length); return; }
+              if (e.key === "Enter" || e.key === "Tab") {
+                e.preventDefault();
+                insertMention(mentionItems[mentionActive] || mentionItems[0]);
+                return;
+              }
+              if (e.key === "Escape") { e.preventDefault(); setMentionDismissed(true); return; }
+            }
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void submit(); }
+          }} />
       </div>
       <div className="rm-composer-row">
         <div className="rm-composer-tools">
@@ -568,6 +655,23 @@ function CreateDialog({ store }) {
   const [busy, setBusy] = useState(false);
   const [lanPeers, setLanPeers] = useState([]);
   const ok = f.name.trim() && !busy;
+  const syncCaret = (el) => {
+    if (!el) return;
+    setCaret(el.selectionStart ?? el.value.length);
+  };
+  const insertMention = (it) => {
+    if (!mq) return;
+    const insert = `@${it.id} `;
+    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
+    setDraft(next);
+    const pos = mq.start + insert.length;
+    setCaret(pos);
+    setMentionActive(0);
+    requestAnimationFrame(() => {
+      const el = taRef.current;
+      if (el) { el.focus(); el.setSelectionRange(pos, pos); }
+    });
+  };
   const submit = async () => {
     if (!ok) return;
     setBusy(true); setErr(null);
@@ -634,6 +738,23 @@ function JoinDialog({ store }) {
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const valid = /^collab:\/\/(join|lan|relay)\/.+#\S+$/.test(invite.trim());
+  const syncCaret = (el) => {
+    if (!el) return;
+    setCaret(el.selectionStart ?? el.value.length);
+  };
+  const insertMention = (it) => {
+    if (!mq) return;
+    const insert = `@${it.id} `;
+    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
+    setDraft(next);
+    const pos = mq.start + insert.length;
+    setCaret(pos);
+    setMentionActive(0);
+    requestAnimationFrame(() => {
+      const el = taRef.current;
+      if (el) { el.focus(); el.setSelectionRange(pos, pos); }
+    });
+  };
   const submit = async () => {
     if (!valid || busy) return;
     setBusy(true); setErr(null);
@@ -695,6 +816,23 @@ function ConfigDialog({ store, d }) {
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { a.getConfig(d.roomId).then((c) => setF((x) => ({ ...x, workspacePath: c.workspacePath || "", workspaceLabel: c.workspaceLabel || x.workspaceLabel, model: c.model || "", provider: c.provider || "", reasoningEffort: c.reasoningEffort || "medium", autoRead: c.permissions?.autoRead !== false, autoWrite: !!c.permissions?.autoWrite, autoShell: !!c.permissions?.autoShell, autoNetwork: !!c.permissions?.autoNetwork, mcpEnabled: c.mcpEnabled !== false }))).catch(() => {}); }, [d.roomId]);
+  const syncCaret = (el) => {
+    if (!el) return;
+    setCaret(el.selectionStart ?? el.value.length);
+  };
+  const insertMention = (it) => {
+    if (!mq) return;
+    const insert = `@${it.id} `;
+    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
+    setDraft(next);
+    const pos = mq.start + insert.length;
+    setCaret(pos);
+    setMentionActive(0);
+    requestAnimationFrame(() => {
+      const el = taRef.current;
+      if (el) { el.focus(); el.setSelectionRange(pos, pos); }
+    });
+  };
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
@@ -763,6 +901,23 @@ function WorkspaceDialog({ store }) {
   const [path, setPath] = useState("");
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  const syncCaret = (el) => {
+    if (!el) return;
+    setCaret(el.selectionStart ?? el.value.length);
+  };
+  const insertMention = (it) => {
+    if (!mq) return;
+    const insert = `@${it.id} `;
+    const next = draft.slice(0, mq.start) + insert + draft.slice(mq.end);
+    setDraft(next);
+    const pos = mq.start + insert.length;
+    setCaret(pos);
+    setMentionActive(0);
+    requestAnimationFrame(() => {
+      const el = taRef.current;
+      if (el) { el.focus(); el.setSelectionRange(pos, pos); }
+    });
+  };
   const submit = async () => {
     if (!path.trim()) { setErr("Absolute workspace path required"); return; }
     setBusy(true); setErr(null);

@@ -37,7 +37,7 @@ export const HELP = [
   "  /collab rooms               rooms you are in;  /collab use <name|roomId>  switch the active room",
   "  /collab invite              print the invite again to copy/share",
   "  /collab members             who is in the room right now",
-  "  /collab say <text>          send to the room; @agentId in the text wakes that agent",
+  "  /collab say <text>          send to the room; @agentId wakes that agent; @all wakes everyone",
   "  /collab task [@agent] <title> [-- details]   create a task (assignee is woken)",
   "  /collab log [n]             last n room messages (default 20)",
   "  /collab leave               leave the room and forget it on this machine",

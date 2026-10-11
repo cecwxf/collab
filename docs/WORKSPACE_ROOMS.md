@@ -9,4 +9,4 @@ Presence: peers stay listed as online for ~45s across reconnect/hibernation blip
 
 ## Room composer (native-aligned)
 
-Bottom bar mirrors DeepSeek Harness chat controls: **model + reasoning**, **auto-permissions**, and **Peer MCP** limits (per-peer read/write/exec/delete on this workspace). Send sits on the trailing edge like stock dsh.
+Bottom bar mirrors DeepSeek Harness chat controls: **model + reasoning**, **auto-permissions**, and **Peer MCP** limits (per-peer read/write/exec/delete on this workspace). Send sits on the trailing edge like stock dsh. Typing `@` opens mention picks (members + `@all` to wake everyone).

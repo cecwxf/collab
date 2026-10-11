@@ -48,7 +48,8 @@ export function shouldAutoReply(
   if (payload.sender === selfId) return false;
   if (payload.kind === "chat") {
     const mentions = (payload as { mentions?: string[] }).mentions ?? [];
-    return mentions.includes(selfId);
+    // "@all" wakes every member (broadcast wake)
+    return mentions.includes(selfId) || mentions.includes("all");
   }
   if (mode === "mention-or-task" && payload.kind === "task.create") {
     const t = payload as { assignee?: string };
