@@ -44,13 +44,7 @@
   "dsh": {
     "manifestVersion": 1,
     "bundle": {
-      "patch": [
-        "./cordis.patch.yml"
-      ]
-    },
-    "client": {
-      "platform": "web",
-      "inject": []
+      "patch": "./cordis.patch.yml"
     }
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 {
   "name": "@cecwxf/dsh-room",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "DSH Room — DeepSeek Harness plugin for accountless E2EE Collab rooms (sidebar: DSH Room)",
   "type": "module",
   "license": "MIT",
@@ -51,13 +51,7 @@
   "dsh": {
     "manifestVersion": 1,
     "bundle": {
-      "patch": [
-        "./cordis.patch.yml"
-      ]
-    },
-    "client": {
-      "platform": "web",
-      "inject": []
+      "patch": "./cordis.patch.yml"
     }
   },
   "dependencies": {
