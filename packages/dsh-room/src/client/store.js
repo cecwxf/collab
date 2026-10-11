@@ -11,7 +11,7 @@ const post = (path, body) => call(path, { method: "POST", body: JSON.stringify(b
 
 export function createRoomsStore() {
   let snap = {
-    self: null, relayUrl: "", lanRelayPort: null, rooms: [], activeRoomId: null, connected: false,
+    self: null, relayUrl: "", lanRelayPort: null, workspaces: [], activeWorkspaceId: null, rooms: [], activeRoomId: null, connected: false,
     selected: null, messages: {}, dialog: null, toast: null, approvals: [],
     search: { open: false, query: "", results: [], loading: false, error: null },
   };
@@ -87,13 +87,13 @@ export function createRoomsStore() {
       searchTimer = setTimeout(() => void runSearch(query), 300);
     },
     async create(form) {
-      const r = await post("/rooms", form);
+      const r = await post("/rooms", { ...form, workspaceId: form.workspaceId || snap.activeWorkspaceId });
       set({ selected: r.roomId, dialog: { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } });
       void loadMessages(r.roomId);
       return r;
     },
     async join(invite, info) {
-      const r = await post("/join", { invite, ...(info || {}) });
+      const r = await post("/join", { invite, workspaceId: snap.activeWorkspaceId, ...(info || {}) });
       set((s) => ({ selected: r.roomId, dialog: null, search: { ...s.search, results: s.search.results.map((x) => (x.roomId === r.roomId ? { ...x, joined: true } : x)) } }));
       void loadMessages(r.roomId);
       toast(`Joined ${r.name}`);
@@ -108,6 +108,17 @@ export function createRoomsStore() {
     async task(roomId, title, assignee, body) { return post(`/rooms/${encodeURIComponent(roomId)}/task`, { title, assignee, body }); },
     async invite(roomId) { return (await call(`/rooms/${encodeURIComponent(roomId)}/invite`)).invite; },
     async browseLan() { return call("/lan/browse"); },
+    async ensureWorkspace(form) {
+      const w = await post("/workspaces", form);
+      set((s) => ({ activeWorkspaceId: w.id, workspaces: s.workspaces.some((x) => x.id === w.id) ? s.workspaces.map((x) => (x.id === w.id ? w : x)) : [w, ...s.workspaces] }));
+      return w;
+    },
+    async setActiveWorkspace(id) {
+      const w = await post("/workspaces/active", { id });
+      set({ activeWorkspaceId: id, selected: null });
+      return w;
+    },
+
     async getConfig(roomId) { return call(`/rooms/${encodeURIComponent(roomId)}/config`); },
     async saveConfig(roomId, patch) { return post(`/rooms/${encodeURIComponent(roomId)}/config`, patch); },
     async decideApproval(requestId, decision) { return post("/approvals/decide", { requestId, decision }); },

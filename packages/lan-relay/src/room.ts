@@ -150,6 +150,8 @@ export class LanRoom {
     this.socks.delete(s);
     try { s.ws.close(); } catch { /* */ }
     if (s.joined && s.agentId) {
+      // Another socket for the same agent (reconnect) — skip left.
+      if (this.members().some((m) => m.agentId === s.agentId)) return;
       const peers = this.members();
       this.broadcast({ v: 1, type: "ctrl", method: "peer_update", roomId: this.roomId, peers, event: "left", agentId: s.agentId });
     }

@@ -24,6 +24,8 @@ import { WsTransport } from "./ws-transport.js";
 
 export type PayloadHandler = (payload: CollabPayload, meta: { seq: number; from: string }) => void;
 export type PeerHandler = (peers: PeerInfo[], event?: { type: "joined" | "left"; agentId: string }) => void;
+export type ConnectionStatus = "connected" | "connecting" | "disconnected";
+export type StatusHandler = (status: ConnectionStatus, detail?: string) => void;
 
 export interface CollabClientOptions {
   identity: Identity;
@@ -64,6 +66,7 @@ export class CollabClient {
   private seq = 0;
   private payloadHandlers: PayloadHandler[] = [];
   private peerHandlers: PeerHandler[] = [];
+  private statusHandlers: StatusHandler[] = [];
   private waiters: Waiter[] = [];
   private joined = false;
   private disposed = false;
@@ -88,7 +91,9 @@ export class CollabClient {
     this.transport.onFrame((f) => this.onFrame(f));
     this.transport.onClose(() => {
       this.joined = false;
+      this.setConnStatus("disconnected", "ws_closed");
       if (this.reconnect && !this.disposed) {
+        this.setConnStatus("connecting", "reconnect");
         void this.reconnectLoop();
       }
     });
@@ -150,6 +155,23 @@ export class CollabClient {
 
   getPeers(): PeerInfo[] {
     return [...this.peers];
+  }
+
+  onStatus(handler: StatusHandler): () => void {
+    this.statusHandlers.push(handler);
+    return () => {
+      this.statusHandlers = this.statusHandlers.filter((h) => h !== handler);
+    };
+  }
+
+  private setConnStatus(status: ConnectionStatus, detail?: string) {
+    for (const h of this.statusHandlers) {
+      try {
+        h(status, detail);
+      } catch {
+        /* */
+      }
+    }
   }
 
   getSeq(): number {
@@ -231,6 +253,7 @@ export class CollabClient {
     this.joined = true;
     this.peers = joined.peers;
     this.seq = joined.seq;
+    this.setConnStatus("connected");
     for (const h of this.peerHandlers) h(this.peers);
 
     // catch up
@@ -459,7 +482,7 @@ export class CollabClient {
       } catch {
         /* ignore */
       }
-    }, 30_000);
+    }, 15_000);
   }
 
   private stopPing(): void {
@@ -468,14 +491,21 @@ export class CollabClient {
   }
 
   private async reconnectLoop(): Promise<void> {
-    let delay = 500;
+    let delay = 400;
     while (!this.disposed && !this.joined) {
       try {
+        this.setConnStatus("connecting", "reconnect");
         await sleep(delay);
         await this.join();
+        // Re-announce so peers refresh presence after a blip
+        try {
+          await this.publish({ kind: "presence", state: "online" });
+        } catch {
+          /* optional */
+        }
         return;
       } catch {
-        delay = Math.min(delay * 2, 15_000);
+        delay = Math.min(delay * 2, 10_000);
       }
     }
   }

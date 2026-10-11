@@ -245,3 +245,8 @@
 .rm-approval-body { font-size: 13px; }
 .rm-approval-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .rm-input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; font: inherit; }
+
+.rm-ws-bar { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); }
+.rm-ws-chip { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12.5px; }
+.rm-ws-path { font-size: 11px; color: var(--rm-quiet, #8b93a7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-room-item.is-active { background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); }

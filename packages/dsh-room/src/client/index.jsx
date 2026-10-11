@@ -62,59 +62,84 @@ function RoomsSidebar({ store, ensurePanel }) {
   const s = useStore(store);
   const a = store.actions;
   const [menu, setMenu] = useState(null);
+  const [searching, setSearching] = useState(false);
   const [joining, setJoining] = useState(null);
   const inputRef = useRef(null);
-  const searching = s.search.open;
-  const q = s.search.query.trim().toLowerCase();
-  const mine = q
-    ? s.rooms.filter((r) => [r.name, r.description, ...(r.tags || [])].some((v) => (v || "").toLowerCase().includes(q.replace(/^#/, ""))))
-    : s.rooms;
+  const activeWs = (s.workspaces || []).find((w) => w.id === s.activeWorkspaceId) || (s.workspaces || [])[0] || null;
 
   useEffect(() => {
     if (!menu) return;
-    const close = (e) => { if (!(e.target.closest && e.target.closest(".rm-menu, [data-rm-new]"))) setMenu(null); };
-    const esc = (e) => e.key === "Escape" && setMenu(null);
-    document.addEventListener("pointerdown", close, true);
-    document.addEventListener("keydown", esc);
-    return () => { document.removeEventListener("pointerdown", close, true); document.removeEventListener("keydown", esc); };
+    const close = () => setMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
   }, [menu]);
   useEffect(() => { if (searching && inputRef.current) inputRef.current.focus(); }, [searching]);
 
+  const q = (s.search.query || "").trim().toLowerCase();
+  const mine = (s.rooms || []).filter((r) => {
+    if (activeWs && r.workspaceId && r.workspaceId !== activeWs.id) return false;
+    if (!q) return true;
+    return r.name.toLowerCase().includes(q) || (r.description || "").toLowerCase().includes(q) || (r.tags || []).some((t) => ("#" + t).includes(q));
+  });
+
   const join = async (r) => {
     setJoining(r.roomId);
-    try { await a.join(r.invite, { name: r.name, description: r.description, tags: r.tags, public: true }); ensurePanel(); }
+    try { await a.join(r.invite, { name: r.name, description: r.description, tags: r.tags, public: true, workspaceId: activeWs?.id }); ensurePanel(); }
     catch (e) { a.toast(e.message); }
     finally { setJoining(null); }
   };
 
+  // No workspace yet — bind one first
+  if (!activeWs) {
+    return (
+      <div className="rm-root rm-side" data-collab-sidebar="">
+        <div className="rm-side-toolbar"><span className="rm-side-title">Workspaces</span></div>
+        <div className="rm-side-scroll">
+          <div className="rm-empty-hint">Bind a local workspace first. Rooms you create inherit its path (MCP sandbox + agent cwd).</div>
+          <Button size="sm" variant="primary" onClick={() => a.openDialog({ kind: "workspace" })}>Add workspace</Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rm-root rm-side" data-collab-sidebar="">
       <div className="rm-side-toolbar">
-        <span className="rm-side-title">Rooms</span>
-        <button type="button" className="rm-icon-btn" aria-label={searching ? "Close search" : "Search rooms"} aria-pressed={searching} onClick={() => a.setSearchOpen(!searching)}>
+        <span className="rm-side-title">DSH Room</span>
+        <button type="button" className="rm-icon-btn" aria-label={searching ? "Close search" : "Search rooms"} aria-pressed={searching} onClick={() => { setSearching(!searching); a.setSearchOpen(!searching); }}>
           {searching ? <CloseIcon /> : <SearchIcon />}
         </button>
-        <button type="button" className="rm-icon-btn" data-rm-new="" aria-label="New room" aria-haspopup="menu" aria-expanded={!!menu}
-          onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMenu(menu ? null : { top: r.bottom + 4, left: Math.max(8, r.right - 180) }); }}>
+        <button type="button" className="rm-icon-btn" data-rm-new="" aria-label="New" aria-haspopup="menu" aria-expanded={!!menu}
+          onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setMenu(menu ? null : { top: r.bottom + 4, left: Math.max(8, r.right - 200) }); }}>
           <PlusIcon />
         </button>
         {menu ? (
-          <div className="rm-root rm-menu" role="menu" style={{ top: menu.top, left: menu.left }}>
-            <button type="button" role="menuitem" onClick={() => { setMenu(null); a.openDialog({ kind: "create" }); }}><PlusIcon />Create room</button>
+          <div className="rm-root rm-menu" role="menu" style={{ top: menu.top, left: menu.left }} onClick={(e) => e.stopPropagation()}>
+            <button type="button" role="menuitem" onClick={() => { setMenu(null); a.openDialog({ kind: "create" }); }}><PlusIcon />Create room in workspace</button>
             <button type="button" role="menuitem" onClick={() => { setMenu(null); a.openDialog({ kind: "join" }); }}><LinkIcon />Join by invite</button>
-            <button type="button" role="menuitem" onClick={() => { setMenu(null); a.setSearchOpen(true); }}><GlobeIcon />Browse public rooms</button>
+            <button type="button" role="menuitem" onClick={() => { setMenu(null); a.openDialog({ kind: "workspace" }); }}><FolderIcon />Add / switch workspace</button>
+            <button type="button" role="menuitem" onClick={() => { setMenu(null); setSearching(true); a.setSearchOpen(true); }}><GlobeIcon />Browse public rooms</button>
           </div>
         ) : null}
       </div>
+
+      <div className="rm-ws-bar">
+        <button type="button" className="rm-ws-chip" onClick={() => a.openDialog({ kind: "workspace" })} title={activeWs.path}>
+          <FolderIcon /><span>{activeWs.name}</span>
+        </button>
+        <span className="rm-ws-path" title={activeWs.path}>{activeWs.path}</span>
+      </div>
+
       {searching ? (
         <div className="rm-search">
           <SearchIcon />
           <input ref={inputRef} type="text" placeholder="Search rooms or #tags" value={s.search.query} onChange={(e) => a.setQuery(e.target.value)} onKeyDown={(e) => e.key === "Escape" && a.setSearchOpen(false)} aria-label="Search rooms" />
         </div>
       ) : null}
+
       <div className="rm-side-scroll">
         <div>
-          <div className="rm-group-label">Joined</div>
+          <div className="rm-group-label">Rooms in {activeWs.name}</div>
           <div className="rm-room-list">
             {mine.map((r) => (
               <button key={r.roomId} type="button" className="rm-room-item" aria-current={r.roomId === s.selected ? "true" : undefined} data-room-id={r.roomId}
@@ -130,9 +155,23 @@ function RoomsSidebar({ store, ensurePanel }) {
                 </span>
               </button>
             ))}
-            {!mine.length ? <div className="rm-empty-hint">{s.rooms.length ? "No joined room matches." : "No rooms yet. Create one, join by invite, or search public rooms."}</div> : null}
+            {!mine.length ? <div className="rm-empty-hint">No rooms in this workspace yet. Create one or join by invite — peers should check out the same project.</div> : null}
           </div>
         </div>
+        {(s.workspaces || []).length > 1 ? (
+          <div>
+            <div className="rm-group-label">Workspaces</div>
+            {(s.workspaces || []).map((w) => (
+              <button key={w.id} type="button" className={"rm-room-item" + (w.id === activeWs.id ? " is-active" : "")} onClick={() => a.setActiveWorkspace(w.id)}>
+                <FolderIcon />
+                <span className="rm-room-item-body">
+                  <span className="rm-room-item-name">{w.name}</span>
+                  <span className="rm-room-item-meta">{w.path}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : null}
         {searching ? (
           <div>
             <div className="rm-group-label">Public directory {s.search.loading ? "· searching…" : ""}</div>
@@ -142,7 +181,7 @@ function RoomsSidebar({ store, ensurePanel }) {
                 <div className="rm-dir-item-body">
                   <div className="rm-room-item-name">{r.name}</div>
                   <div className="rm-room-item-meta">{r.description || "No description"} · {r.members} online</div>
-                  {r.tags.length ? <div className="rm-dir-tags">{r.tags.map((t) => <span key={t} className="rm-tag">#{t}</span>)}</div> : null}
+                  {r.tags.length ? <div className="rm-dir-tags">{r.tags.map((tg) => <span key={tg} className="rm-tag">#{tg}</span>)}</div> : null}
                 </div>
                 <Button size="sm" variant={r.joined ? "ghost" : "outline"} disabled={r.joined || joining === r.roomId} onClick={() => join(r)}>
                   {r.joined ? "Joined" : joining === r.roomId ? "…" : "Join"}
@@ -150,7 +189,7 @@ function RoomsSidebar({ store, ensurePanel }) {
               </div>
             ))}
             {!s.search.loading && !s.search.results.length ? <div className="rm-empty-hint">{s.search.error ? `Directory error: ${s.search.error}` : "No public rooms match."}</div> : null}
-            <div className="rm-empty-hint">Public rooms publish their invite key in the directory — they are not confidential.</div>
+            <div className="rm-empty-hint">Joining attaches the room to workspace “{activeWs.name}”. Point your local path at the same project.</div>
           </div>
         ) : null}
       </div>
@@ -273,7 +312,7 @@ function RoomDetail({ room, messages, store, mention, assign }) {
         <div className="rm-detail-h"><PeopleIcon />Members · {room.members.length}</div>
         {room.members.map((m) => (
           <div key={m.agentId} className="rm-member" data-agent-id={m.agentId}>
-            <span className="rm-avatar-wrap"><Avatar name={m.agentId} size={26} /><span className="rm-dot rm-dot-online" style={{ position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" }} /></span>
+            <span className="rm-avatar-wrap"><Avatar name={m.agentId} size={26} /><span className={"rm-dot rm-dot-" + (m.online === false ? "offline" : "online")} style={{ position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" }} /></span>
             <span className="rm-member-name">{m.agentId}</span>
             {m.self ? <Tag tone="quiet">you</Tag> : (
               <span className="rm-member-actions">
@@ -308,6 +347,7 @@ function RoomDetail({ room, messages, store, mention, assign }) {
         <dl className="rm-about">
           <dt>Visibility</dt><dd>{room.public ? <><GlobeIcon /> Public</> : <><LockIcon /> Private</>}</dd>
           <dt>Transport</dt><dd>{room.transport === "lan" ? "LAN / mDNS" : "Relay (Cloudflare)"}</dd>
+          {room.memberConfig?.workspaceLabel ? <><dt>Workspace</dt><dd>{room.memberConfig.workspaceLabel}</dd></> : null}
           {room.description ? <><dt>Description</dt><dd>{room.description}</dd></> : null}
           {room.tags?.length ? <><dt>Tags</dt><dd>{room.tags.map((t) => "#" + t).join(" ")}</dd></> : null}
           <dt>Room id</dt><dd className="rm-mono">{room.roomId}</dd>
@@ -329,11 +369,14 @@ function EmptyMain({ store }) {
     <div className="rm-root rm-welcome-wrap" data-collab-main="">
       <div className="rm-welcome">
         <div className="rm-badge">Collab · E2EE · no accounts</div>
-        <h1>Rooms for multi-agent collaboration</h1>
-        <p>A room is one-to-many: every member sees every message. An @mention or a task wakes the agent it names. Rooms are private (invite only) unless you list them in the public directory.</p>
+        <h1>Workspaces, then rooms</h1>
+        <p>Bind a local workspace (project folder), then create rooms inside it. Peers join those rooms and point their agent at the same project. @mention or tasks wake agents. Relay or LAN transport; E2EE; optional public directory.</p>
         <div className="rm-welcome-actions">
+          <button type="button" className="rm-welcome-action" onClick={() => a.openDialog({ kind: "workspace" })}>
+            <FolderIcon /><span><b>Bind workspace</b><span>Local project path shared by agents in rooms</span></span>
+          </button>
           <button type="button" className="rm-welcome-action" onClick={() => a.openDialog({ kind: "create" })}>
-            <PlusIcon /><span><b>Create room</b><span>Private by default; optionally list it publicly</span></span>
+            <PlusIcon /><span><b>Create room</b><span>In the active workspace · Relay or LAN</span></span>
           </button>
           <button type="button" className="rm-welcome-action" onClick={() => a.openDialog({ kind: "join" })}>
             <LinkIcon /><span><b>Join by invite</b><span>Paste a collab://join/… invite</span></span>
@@ -365,7 +408,7 @@ function RoomsMain({ store }) {
             <Avatar name={room.name} size={28} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="rm-chat-header-title">{room.name}</div>
-              <div className="rm-chat-header-sub">{room.members.length} online · {room.public ? "public" : "private"}</div>
+              <div className="rm-chat-header-sub">{room.members.filter((m) => m.online !== false).length} online · {room.public ? "public" : "private"}{room.status !== "online" ? ` · room ${room.status}` : ""}</div>
             </div>
             {room.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}{room.transport === "lan" ? <span className="rm-badge">LAN</span> : null}
             <StateDot state={room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error"} size={8} />
@@ -408,7 +451,7 @@ function CreateDialog({ store }) {
   };
   return (
     <Modal open onClose={a.closeDialog} title="Create room" closeLabel="Close"
-      description="Pick Relay (Cloudflare) or LAN (local relay + Tailscale/mDNS). The room key never goes to the relay."
+      description="Room is created inside the active workspace (path becomes MCP sandbox). Pick Relay or LAN. The room key never goes to the relay."
       footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={!ok} onClick={submit}>{busy ? "Creating…" : "Create"}</Button></>}>
       <div className="rm-root rm-form" onKeyDown={(e) => e.key === "Enter" && e.target.tagName === "INPUT" && submit()}>
         <Field label="Transport" hint="Relay uses the public CF Durable Object. LAN starts a local relay on this machine and advertises via mDNS (_collab._tcp).">
@@ -466,7 +509,7 @@ function JoinDialog({ store }) {
   };
   return (
     <Modal open onClose={a.closeDialog} title="Join room" closeLabel="Close"
-      description="Paste an invite another agent shared. It contains the room key, which never leaves your machine except inside the invite."
+      description="Paste an invite. The room attaches to your active workspace — set the local path to your checkout of the same project before collaborating via MCP."
       footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={!valid || busy} onClick={submit}>{busy ? "Joining…" : "Join"}</Button></>}>
       <div className="rm-root rm-form">
         <Input autoFocus aria-label="Invite" placeholder="collab://join/… or collab://lan/<host>:<port>/<roomId>#…" value={invite} onChange={(e) => setInvite(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
@@ -580,6 +623,49 @@ function ApprovalBanner({ store }) {
   );
 }
 
+
+function WorkspaceDialog({ store }) {
+  const a = store.actions;
+  const s = useStore(store);
+  const [name, setName] = useState("");
+  const [path, setPath] = useState("");
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!path.trim()) { setErr("Absolute workspace path required"); return; }
+    setBusy(true); setErr(null);
+    try {
+      await a.ensureWorkspace({ name: name.trim() || undefined, path: path.trim() });
+      a.closeDialog();
+      a.toast("Workspace ready — create a room to collaborate");
+    } catch (e) { setErr(e.message); setBusy(false); }
+  };
+  return (
+    <Modal open onClose={a.closeDialog} title="Workspace" closeLabel="Close"
+      description="Pick the local project folder agents share. Rooms created next inherit this path (MCP + agent cwd). Peers map the same logical project to their own checkout."
+      footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={busy || !path.trim()} onClick={submit}>{busy ? "Saving…" : "Use workspace"}</Button></>}>
+      <div className="rm-root rm-form">
+        {(s.workspaces || []).length ? (
+          <Field label="Switch to existing">
+            <div className="rm-lan-browse">
+              {(s.workspaces || []).map((w) => (
+                <button key={w.id} type="button" className="rm-lan-peer" onClick={async () => { await a.setActiveWorkspace(w.id); a.closeDialog(); }}>{w.name}</button>
+              ))}
+            </div>
+          </Field>
+        ) : null}
+        <Field label="Name" htmlFor="rm-ws-name" hint="Shown in the sidebar.">
+          <Input id="rm-ws-name" placeholder="e.g. collab" value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Local path" htmlFor="rm-ws-path" hint="Absolute path on this machine.">
+          <Input id="rm-ws-path" autoFocus placeholder="/Users/you/code/my-app" value={path} onChange={(e) => setPath(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
+        </Field>
+        {err ? <div className="rm-error">{err}</div> : null}
+      </div>
+    </Modal>
+  );
+}
+
 function Overlay({ store }) {
   const s = useStore(store);
   const d = s.dialog;
@@ -590,6 +676,7 @@ function Overlay({ store }) {
       {d?.kind === "invite" ? <InviteDialog store={store} d={d} /> : null}
       {d?.kind === "leave" ? <LeaveDialog store={store} d={d} /> : null}
       {d?.kind === "config" ? <ConfigDialog store={store} d={d} /> : null}
+      {d?.kind === "workspace" ? <WorkspaceDialog store={store} /> : null}
       {s.toast ? <Toast text={s.toast} onDone={store.actions.clearToast} holdMs={2200} /> : null}
     </>
   );

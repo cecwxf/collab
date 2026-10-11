@@ -107,6 +107,17 @@ export class CollabRoom implements DurableObject {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
     this.state.acceptWebSocket(server);
+    // Keep hibernated sockets alive: CF answers ping without waking the DO isolate.
+    try {
+      this.state.setWebSocketAutoResponse(
+        new WebSocketRequestResponsePair(
+          JSON.stringify({ v: 1, type: "ctrl", method: "ping" }) + "\n",
+          JSON.stringify({ v: 1, type: "ctrl", method: "pong", ts: 0 }) + "\n",
+        ),
+      );
+    } catch {
+      /* older runtime */
+    }
     this.setState(server, { roomId, joined: false });
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -161,8 +172,11 @@ export class CollabRoom implements DurableObject {
   private markLeft(ws: WebSocket): void {
     const s = this.getState(ws);
     if (!s.joined || !s.agentId) return;
+    const agentId = s.agentId;
     this.setState(ws, { ...s, joined: false });
-    this.broadcastPeerUpdate(s.roomId, s.agentId, "left", ws);
+    // Replaced / raced reconnect: another live socket still holds this agent — do not announce left.
+    if (this.members().some((m) => m.s.agentId === agentId)) return;
+    this.broadcastPeerUpdate(s.roomId, agentId, "left", ws);
   }
 
   private send(ws: WebSocket, obj: unknown): void {

@@ -68,13 +68,13 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
       if (method === "GET" && path === "/directory") return sendJson(res, 200, { rooms: await bridge.search(str(url.searchParams.get("q")), str(url.searchParams.get("tag"))) });
       if (method === "POST" && path === "/rooms") {
         const b = await readJson(req);
-        return sendJson(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "lan" ? "lan" : "relay", lanHostPort: str(b.lanHostPort) }));
+        return sendJson(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "lan" ? "lan" : "relay", lanHostPort: str(b.lanHostPort), workspaceId: str(b.workspaceId) }));
       }
       if (method === "POST" && path === "/join") {
         const b = await readJson(req);
         const invite = str(b.invite);
         if (!invite || !/^collab:\/\/(join|lan|relay)\//.test(invite) || !/#\S+$/.test(invite)) throw new HttpError(400, "invite must be collab://join/…, collab://lan/…, or collab://relay/… with #key");
-        return sendJson(res, 200, await bridge.joinInvite(invite, { name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true }));
+        return sendJson(res, 200, await bridge.joinInvite(invite, { name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, workspaceId: str(b.workspaceId) }));
       }
       const m = /^\/rooms\/([^/]+)\/(messages|invite|leave|send|task|active)$/.exec(path);
       if (m) {
@@ -97,6 +97,21 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
             return sendJson(res, 200, await bridge.createTask(roomId, title, str(b.body), str(b.assignee)));
           }
         }
+      }
+            if (method === "GET" && path === "/workspaces") return sendJson(res, 200, { workspaces: bridge.listWorkspaces(), activeWorkspaceId: bridge.activeWorkspaceId });
+      if (method === "POST" && path === "/workspaces") {
+        const b = await readJson(req);
+        return sendJson(res, 200, await bridge.ensureWorkspace({ name: str(b.name), path: str(b.path), id: str(b.id) }));
+      }
+      if (method === "POST" && path === "/workspaces/active") {
+        const b = await readJson(req);
+        const id = str(b.id);
+        if (!id) throw new HttpError(400, "id required");
+        return sendJson(res, 200, bridge.setActiveWorkspace(id));
+      }
+      const wsDel = /^\/workspaces\/([^/]+)$/.exec(path);
+      if (wsDel && method === "POST" && url.searchParams.get("op") === "delete") {
+        return sendJson(res, 200, await bridge.removeWorkspace(decodeURIComponent(wsDel[1]!)));
       }
       if (method === "GET" && path === "/lan/browse") return sendJson(res, 200, { peers: await bridge.browseLan(Number(url.searchParams.get("timeout") || 2500)) });
       if (method === "GET" && path === "/approvals") return sendJson(res, 200, { approvals: bridge.approvals.list() });

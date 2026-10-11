@@ -31,7 +31,7 @@ import type {
   ToolDefinition,
   UserMessage,
 } from "./adapter.js";
-import { loadState, saveState, type RoomMeta } from "./state.js";
+import { loadState, saveState, createWorkspaceMeta, type RoomMeta, type WorkspaceMeta } from "./state.js";
 import { extractMentions } from "./commands.js";
 
 const SUMMARY_MAX = 120;
@@ -107,7 +107,7 @@ export type RoomStatus = "connecting" | "online" | "offline";
 export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId" | "memberConfig"> {
   status: RoomStatus;
   error?: string;
-  members: { agentId: string; self: boolean }[];
+  members: { agentId: string; self: boolean; online?: boolean }[];
   last?: { from: string; text: string; ts: number };
   sessionTitle: string;
   bound: boolean;
@@ -132,6 +132,9 @@ class RoomConn {
   private ids = new Set<string>();
   wakeTimes: number[] = [];
   heartbeat?: ReturnType<typeof setInterval>;
+  /** agentId → last time we saw them in a peer_update / joined list (ms). Grace keeps UI "online" across reconnect blips. */
+  lastSeenPeers = new Map<string, number>();
+  presenceTimer?: ReturnType<typeof setInterval>;
   constructor(public meta: RoomMeta) {}
   add(m: RoomMessage): boolean {
     if (this.ids.has(m.id)) return false;
@@ -155,6 +158,8 @@ export interface CreateRoomOptions {
   mode?: "relay" | "lan";
   /** For LAN: host:port override (default discovered/local listen). */
   lanHostPort?: string;
+  /** Workspace that owns this room (defaults to active). */
+  workspaceId?: string;
 }
 
 /**
@@ -165,6 +170,8 @@ export interface CreateRoomOptions {
 export class CollabBridge {
   identity: Identity | null = null;
   rooms = new Map<string, RoomConn>();
+  workspaces = new Map<string, WorkspaceMeta>();
+  activeWorkspaceId: string | null = null;
   activeRoomId: string | null = null;
   private sessions = new Map<string, Promise<AgentHandle>>();
   private listeners = new Set<(e: BridgeEvent) => void>();
@@ -217,20 +224,28 @@ export class CollabBridge {
     this.ready ??= (async () => {
       await this.self();
       const st = await loadState(this.config.statePath);
+      for (const w of st?.workspaces ?? []) this.workspaces.set(w.id, w);
+      // Ensure at least one workspace from config.workspacePath
+      if (!this.workspaces.size) {
+        const ws = createWorkspaceMeta("Default", this.config.workspacePath);
+        this.workspaces.set(ws.id, ws);
+      }
+      this.activeWorkspaceId = st?.activeWorkspaceId ?? [...this.workspaces.keys()][0] ?? null;
       const metas = st?.rooms ?? [];
       if (this.config.invite && !metas.some((m) => this.config.invite!.includes(`/join/${encodeURIComponent(m.roomId)}#`) || this.config.invite!.includes(`/join/${m.roomId}#`))) {
         const { roomId } = CollabClient.parseInvite(this.config.invite);
-        metas.push({ roomId, invite: this.config.invite, name: roomId, description: "", tags: [], public: false, owner: false, joinedAt: Date.now() });
+        const wsId = this.activeWorkspaceId!;
+        metas.push({ roomId, invite: this.config.invite, name: roomId, description: "", tags: [], public: false, owner: false, joinedAt: Date.now(), workspaceId: wsId });
       }
       this.activeRoomId = st?.activeRoomId ?? metas[0]?.roomId ?? null;
       await Promise.all(metas.map((m) => this.open(m).catch((e) => this.log("error", `rejoin ${m.roomId} failed: ${(e as Error).message}`))));
-      if (metas.length) await this.persist();
+      await this.persist();
     })();
     return this.ready;
   }
 
   async persist() {
-    await saveState(this.config.statePath, { version: 2, activeRoomId: this.activeRoomId, rooms: [...this.rooms.values()].map((r) => r.meta) });
+    await saveState(this.config.statePath, { version: 3, activeWorkspaceId: this.activeWorkspaceId, activeRoomId: this.activeRoomId, workspaces: [...this.workspaces.values()], rooms: [...this.rooms.values()].map((r) => r.meta) });
   }
 
   // ── room lifecycle ───────────────────────────────────────────────────────
@@ -276,13 +291,39 @@ export class CollabBridge {
     });
     client.onPayload((p, meta) => void this.onPayload(conn, p, meta.from, meta.seq));
     client.onPeers((peers, ev) => {
+      const now = Date.now();
+      for (const peer of peers) conn.lastSeenPeers.set(peer.agentId, now);
+      if (ev?.type === "joined") conn.lastSeenPeers.set(ev.agentId, now);
+      // On "left", do NOT delete immediately — grace window in view() keeps them online briefly.
       if (ev) this.log("info", `room ${roomId}: peer ${ev.type} ${ev.agentId} (${peers.length} in room)`);
       this.emit({ type: "rooms" });
+    });
+    client.onStatus((status, detail) => {
+      if (status === "connected") {
+        conn.status = "online";
+        conn.error = undefined;
+      } else if (status === "connecting") {
+        conn.status = "connecting";
+        conn.error = detail;
+      } else {
+        conn.status = "offline";
+        conn.error = detail ?? "disconnected";
+      }
+      this.emit({ type: "rooms" });
+      this.log("info", `room ${roomId} connection ${status}${detail ? ` (${detail})` : ""}`);
     });
     await client.join();
     conn.client = client;
     conn.status = "online";
     conn.error = undefined;
+    // Refresh presence map with current peers + self
+    const now = Date.now();
+    for (const peer of client.getPeers()) conn.lastSeenPeers.set(peer.agentId, now);
+    conn.lastSeenPeers.set(identity.agentId, now);
+    if (!conn.presenceTimer) {
+      conn.presenceTimer = setInterval(() => this.emit({ type: "rooms" }), 5_000);
+      (conn.presenceTimer as { unref?: () => void }).unref?.();
+    }
     this.log("info", `joined room ${roomId} as ${identity.agentId} via ${wsUrl} (${parsed.mode})`);
     try {
       for (const p of await client.history(0)) {
@@ -299,6 +340,57 @@ export class CollabBridge {
       this.log("warn", `announce member.config failed: ${(e as Error).message}`);
     }
     this.emit({ type: "rooms" });
+  }
+
+
+  // ── workspaces ───────────────────────────────────────────────────────────
+  listWorkspaces() {
+    return [...this.workspaces.values()].sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  async ensureWorkspace(opts: { name?: string; path?: string; id?: string }): Promise<WorkspaceMeta> {
+    if (opts.id && this.workspaces.has(opts.id)) {
+      this.activeWorkspaceId = opts.id;
+      await this.persist();
+      this.emit({ type: "rooms" });
+      return this.workspaces.get(opts.id)!;
+    }
+    const path = (opts.path ?? this.config.workspacePath).trim();
+    if (!path.startsWith("/") && !/^[A-Za-z]:[\\/]/.test(path)) throw new Error("workspace path must be absolute");
+    const existing = [...this.workspaces.values()].find((w) => w.path === path);
+    if (existing) {
+      this.activeWorkspaceId = existing.id;
+      if (opts.name?.trim()) existing.name = opts.name.trim().slice(0, 60);
+      await this.persist();
+      this.emit({ type: "rooms" });
+      return existing;
+    }
+    const ws = createWorkspaceMeta(opts.name ?? "", path);
+    this.workspaces.set(ws.id, ws);
+    this.activeWorkspaceId = ws.id;
+    await mkdir(path, { recursive: true }).catch(() => {});
+    await this.persist();
+    this.emit({ type: "rooms" });
+    return ws;
+  }
+
+  setActiveWorkspace(id: string) {
+    if (!this.workspaces.has(id)) throw new Error("unknown workspace");
+    this.activeWorkspaceId = id;
+    void this.persist();
+    this.emit({ type: "rooms" });
+    return this.workspaces.get(id)!;
+  }
+
+  async removeWorkspace(id: string) {
+    if ([...this.rooms.values()].some((r) => r.meta.workspaceId === id)) {
+      throw new Error("workspace still has rooms — leave them first");
+    }
+    this.workspaces.delete(id);
+    if (this.activeWorkspaceId === id) this.activeWorkspaceId = [...this.workspaces.keys()][0] ?? null;
+    await this.persist();
+    this.emit({ type: "rooms" });
+    return { ok: true };
   }
 
   /** Ensure embedded LAN relay is listening; returns host:port for invites. */
@@ -356,7 +448,14 @@ export class CollabBridge {
       owner: true,
       joinedAt: Date.now(),
       transport: mode,
-      memberConfig: defaultMemberConfig(this.config.workspacePath),
+      workspaceId: (opts.workspaceId && this.workspaces.has(opts.workspaceId) ? opts.workspaceId : this.activeWorkspaceId) ?? undefined,
+      memberConfig: (() => {
+        const wsId = (opts.workspaceId && this.workspaces.has(opts.workspaceId) ? opts.workspaceId : this.activeWorkspaceId) ?? undefined;
+        const ws = wsId ? this.workspaces.get(wsId) : undefined;
+        const cfg = defaultMemberConfig(ws?.path ?? this.config.workspacePath);
+        if (ws) { cfg.workspaceLabel = ws.name; cfg.workspacePath = ws.path; }
+        return cfg;
+      })(),
     };
     const conn = await this.open(meta);
     this.activeRoomId = meta.roomId;
@@ -371,10 +470,14 @@ export class CollabBridge {
   }
 
   /** Join by invite. `info` carries directory metadata when joining from search results. */
-  async joinInvite(invite: string, info: Partial<Pick<RoomMeta, "name" | "description" | "tags" | "public">> = {}, bindTo?: AgentLike) {
+  async joinInvite(invite: string, info: Partial<Pick<RoomMeta, "name" | "description" | "tags" | "public" | "workspaceId">> = {}, bindTo?: AgentLike) {
     const { roomId } = CollabClient.parseInvite(invite.trim());
     let conn = this.rooms.get(roomId);
     if (!conn) {
+      const wsId = info.workspaceId ?? this.activeWorkspaceId ?? undefined;
+      const ws = wsId ? this.workspaces.get(wsId) : undefined;
+      const memberConfig = defaultMemberConfig(ws?.path ?? this.config.workspacePath);
+      if (ws) { memberConfig.workspacePath = ws.path; memberConfig.workspaceLabel = ws.name; }
       conn = await this.open({
         roomId,
         invite: invite.trim(),
@@ -384,6 +487,8 @@ export class CollabBridge {
         public: info.public === true,
         owner: false,
         joinedAt: Date.now(),
+        workspaceId: wsId,
+        memberConfig,
       });
     } else if (conn.status === "offline") {
       await this.connect(conn);
@@ -399,6 +504,7 @@ export class CollabBridge {
     if (!conn) return { ok: true, left: false };
     this.rooms.delete(roomId);
     if (conn.heartbeat) clearInterval(conn.heartbeat);
+      if (conn.presenceTimer) clearInterval(conn.presenceTimer);
     if (conn.meta.owner && conn.meta.public) {
       await this.directory.unlist(await this.self(), roomId).catch((e) => this.log("warn", `unlist failed: ${(e as Error).message}`));
     }
@@ -487,15 +593,28 @@ export class CollabBridge {
   // ── views ────────────────────────────────────────────────────────────────
   view(conn: RoomConn): RoomView {
     const self = this.identity?.agentId ?? "";
-    const peers = conn.client?.getPeers().map((p) => p.agentId) ?? [];
-    if (self && conn.status === "online" && !peers.includes(self)) peers.unshift(self);
+    const PEER_GRACE_MS = 45_000;
+    const now = Date.now();
+    const live = new Set((conn.client?.getPeers() ?? []).map((p) => p.agentId));
+    if (self && (conn.status === "online" || conn.status === "connecting")) live.add(self);
+    // Keep recently-seen peers through reconnect blips
+    for (const [id, ts] of conn.lastSeenPeers) {
+      if (now - ts <= PEER_GRACE_MS) live.add(id);
+      else conn.lastSeenPeers.delete(id);
+    }
+    if (self) conn.lastSeenPeers.set(self, now);
+    const peers = [...live];
     const last = [...conn.messages].reverse().find((m) => m.kind === "chat" || m.kind === "task.create" || m.kind === "task.update");
     const { invite: _i, sessionId, ...meta } = conn.meta;
     return {
       ...meta,
       status: conn.status,
       error: conn.error,
-      members: peers.map((agentId) => ({ agentId, self: agentId === self })),
+      members: peers.map((agentId) => ({
+        agentId,
+        self: agentId === self,
+        online: (conn.client?.getPeers() ?? []).some((p) => p.agentId === agentId) || agentId === self,
+      })),
       last: last && { from: last.from, text: last.text, ts: last.ts },
       sessionTitle: `collab:${conn.meta.roomId}`,
       bound: !!sessionId,
@@ -509,7 +628,9 @@ export class CollabBridge {
       self: this.identity?.agentId ?? null,
       relayUrl: this.config.relayUrl,
       lanRelayPort: this.lanRelay?.port ?? null,
+      activeWorkspaceId: this.activeWorkspaceId,
       activeRoomId: this.activeRoomId,
+      workspaces: this.listWorkspaces(),
       approvals: this.approvals.list(),
       rooms: [...this.rooms.values()].sort((a, b) => (b.messages.at(-1)?.ts ?? b.meta.joinedAt) - (a.messages.at(-1)?.ts ?? a.meta.joinedAt)).map((r) => this.view(r)),
     };
@@ -812,6 +933,7 @@ export class CollabBridge {
     this.listeners.clear();
     for (const conn of this.rooms.values()) {
       if (conn.heartbeat) clearInterval(conn.heartbeat);
+      if (conn.presenceTimer) clearInterval(conn.presenceTimer);
       await conn.client?.dispose().catch(() => {});
     }
     this.rooms.clear();
