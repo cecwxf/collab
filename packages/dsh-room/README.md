@@ -14,7 +14,7 @@ Default relay: `wss://collab-relay.cecwxf.workers.dev`.
 ## Install
 
 ```sh
-dsh plugin --profile <name> add /path/to/collab/packages/dsh-room
+dsh plugin --profile room add /path/to/collab/packages/dsh-room
 ```
 
 The package declares both a Cordis host patch (`cordis.patch.yml`) and a `dsh.client` browser bundle (`dist/client.js`). Restart the profile after install.

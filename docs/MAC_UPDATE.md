@@ -1,26 +1,39 @@
-# Updating the Mac mini collab / dsh room plugin
+# Updating the Mac mini dsh room profile
 
-Package id: `@collab/dsh-room`. Sidebar: **DSH Room**. Prefer “dsh room” over “deepseek room”.
+Package id: `@collab/dsh-room`. Sidebar: **DSH Room**. Launch command: **`dsh room`** (profile name = subcommand).
 
-## From the box (Tailscale userspace + OpenSSH in ~/.local/bin)
+## Exact Mac launch
 
 ```sh
-export PATH="$HOME/.local/bin:$PATH"
-SOCK=$HOME/.local/tailscale/tailscaled.sock
-ssh -o "ProxyCommand=tailscale --socket=$SOCK nc %h %p" cecwxf@100.73.167.125 '…'
+# login shell so fnm/dsh are on PATH
+zsh -li -c 'dsh room --no-open --host 127.0.0.1 --port 3091'
+# or with DeepSeek key from your env (never print it):
+# DEEPSEEK_API_KEY="$ANTHROPIC_AUTH_TOKEN" dsh room --no-open --host 127.0.0.1 --port 3091
 ```
 
-## On the Mac
+Restart helper: `~/collab-e2e/restart-mac-dsh.sh` (uses `dsh room`).
+
+## Profile migration (collab → room)
 
 ```sh
-cd ~/collab-e2e   # cecwxf/collab checkout (or linked packages)
-git fetch origin && git checkout master && git pull --ff-only
-npm install && npm run build -w @collab/dsh-room
-# dsh is usually under a profile PATH — use the same launcher you already use for collab
-dsh plugin --profile collab add ./packages/dsh-room
+# stop old process
+pkill -f 'bin/dsh collab --no-open' || true
+# rename profile directory
+mv ~/.dsh/profiles/collab ~/.dsh/profiles/room
+dsh plugin --profile room add /Users/cecwxf/collab-e2e/collab/packages/dsh-room
 bash ~/collab-e2e/restart-mac-dsh.sh
 ```
 
-## Restoring openssh-client on the Debian box
+## Pull latest plugin
 
-Apt may have no candidate. Extract `ssh`/`scp` from the Debian `.deb` with Python `lzma` + `tarfile` into `~/.local/bin` (see prior agent notes). `ssh -V` should report OpenSSH_10.
+```sh
+cd ~/collab-e2e/collab
+git fetch origin && git checkout master && git pull --ff-only
+npm install && npm run build -w @collab/dsh-room
+dsh plugin --profile room add ./packages/dsh-room
+bash ~/collab-e2e/restart-mac-dsh.sh
+```
+
+## Box notes
+
+OpenSSH in `~/.local/bin`; Tailscale userspace SOCKS for `ssh` to the Mac when needed.

@@ -6,6 +6,13 @@
 
 ## DSH Room UI (dsh)
 
+Launch the dedicated profile (profile name = CLI subcommand):
+
+```sh
+dsh room --no-open --host 127.0.0.1 --port 3091
+```
+
+
 Install `packages/dsh-room` into a dsh profile. In the web UI, open **DSH Room** in the left rail to create / join / search rooms, chat, @mention agents, and manage tasks. Membership is stored in `~/.collab/state.json` (mode 600) — no manual yml invite paste. Public rooms may be listed in the relay directory (not confidential). See `packages/dsh-room/README.md`.
 
 ## Dual transport · member config · MCP
