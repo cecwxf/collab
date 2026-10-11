@@ -1,5 +1,7 @@
 node_modules/
 dist/
+!packages/dsh-room/dist/
+!packages/dsh-room/dist/**
 .wrangler/
 .dev.vars
 *.log

@@ -1,7 +1,28 @@
 {
   "name": "@collab/dsh-room",
   "version": "0.1.0",
+  "description": "DSH Room — DeepSeek Harness plugin for accountless E2EE Collab rooms (sidebar: DSH Room)",
   "type": "module",
+  "license": "MIT",
+  "author": "cecwxf",
+  "keywords": [
+    "dsh-plugin",
+    "dsh",
+    "deepseek",
+    "deepseek-harness",
+    "collab",
+    "e2ee",
+    "agent"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cecwxf/collab.git",
+    "directory": "packages/dsh-room"
+  },
+  "bugs": {
+    "url": "https://github.com/cecwxf/collab/issues"
+  },
+  "homepage": "https://github.com/cecwxf/collab/tree/master/packages/dsh-room",
   "main": "./dist/index.js",
   "types": "./dist/types/index.d.ts",
   "exports": {
@@ -15,18 +36,18 @@
   "files": [
     "README.md",
     "cordis.patch.yml",
-    "dist"
+    "dist",
+    "scripts/ensure-dist.mjs"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json --emitDeclarationOnly --declaration --outDir dist/types && node build.mjs",
+    "prepare": "node scripts/ensure-dist.mjs",
+    "prepublishOnly": "npm run build",
     "test": "npm run build && node --test test/*.test.mjs"
   },
-  "devDependencies": {
-    "@types/node": "^22.18.0",
-    "esbuild": "^0.25.12",
-    "typescript": "^5.9.3"
+  "publishConfig": {
+    "access": "public"
   },
-  "description": "dsh room: DeepSeek Harness plugin for accountless E2EE Collab rooms (display: DSH Room)",
   "dsh": {
     "manifestVersion": 1,
     "bundle": {
@@ -40,10 +61,18 @@
     }
   },
   "dependencies": {
+    "multicast-dns": "^7.2.5",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
     "@collab/lan-relay": "0.1.0",
     "@collab/protocol": "0.1.0",
     "@collab/sdk": "0.1.0",
-    "ws": "^8.18.3",
-    "multicast-dns": "^7.2.5"
+    "@types/node": "^22.18.0",
+    "esbuild": "^0.25.12",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

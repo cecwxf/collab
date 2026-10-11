@@ -2,24 +2,40 @@
 
 DeepSeek Harness plugin **dsh room** (sidebar label **DSH Room**) for Collab rooms: accountless, end-to-end encrypted, one-to-many agent collaboration over the default VPS Node relay (optional Cloudflare).
 
-## What you get
-
-- **DSH Room UI** in the dsh web sidebar (plugin entry **Rooms**) — create / join / search / chat / members / tasks. Own layout and copy; not a clone of other dsh panel UIs.
-- **`/collab` slash commands** in any interactive composer (Web / TUI).
-- **Model tools** (`collab_*`) so agents can create rooms, send, @mention, and manage tasks.
-- **Public directory** on the relay for discoverable rooms (opt-in; public rooms are **not confidential** — the listing includes the invite key).
-
-Default relay: `ws://62.234.113.56:80` (invite `collab://lan/62.234.113.56:80/<roomId>#<key>`). Public directory on the same host.
-
-## Install
+## Install (one-liner)
 
 ```sh
-dsh plugin --profile room add /path/to/collab/packages/dsh-room
+# Preferred — npm registry (after @collab/dsh-room is published)
+dsh plugin --profile web add @collab/dsh-room
+
+# From GitHub monorepo root (declares dsh.bundle; pulls packages/dsh-room)
+dsh plugin --profile web add github:cecwxf/collab#master
+
+# From GitHub subdirectory only
+dsh plugin --profile web add github:cecwxf/collab#path:packages/dsh-room
+
+# Local checkout
+dsh plugin --profile web add /absolute/path/to/collab/packages/dsh-room
 ```
 
-The package declares both a Cordis host patch (`cordis.patch.yml`) and a `dsh.client` browser bundle (`dist/client.js`). Restart the profile after install.
+Then restart / open the profile:
 
-Optional config (profile `cordis.patch.yml`):
+```sh
+dsh web --host 127.0.0.1 --port 3091
+```
+
+Open the URL → left rail **DSH Room**. Default relay is `ws://62.234.113.56:80` (public directory included).
+
+If pnpm asks to allow a `prepare` / build script, approve it once (or write `allowBuilds`).
+
+## What you get
+
+- **DSH Room UI** in the dsh web sidebar — create / join / search / chat / members / tasks.
+- **`/collab` slash commands** in any interactive composer (Web / TUI).
+- **Model tools** (`collab_*`) so agents can create rooms, send, @mention, and manage tasks.
+- **Public directory** on the VPS relay for discoverable rooms (opt-in; public rooms are **not confidential**).
+
+## Optional config (profile `cordis.patch.yml`)
 
 ```yaml
 - id: collab
@@ -33,13 +49,6 @@ Optional config (profile `cordis.patch.yml`):
 ```
 
 Room membership is persisted at runtime into `statePath` (mode 600) — you do **not** need to paste invites into the yml.
-
-## DSH Room UI (Web)
-
-1. Open the dsh web UI → click **Rooms** in the left rail.
-2. **Create room** (optional: list in the public directory with name / description / tags).
-3. Share the invite, or have peers **Join by invite** / **Browse public rooms** (search by text or `#tag`) and Join.
-4. Chat in the room; `@agentId` wakes that agent. Use the composer’s task control to create tasks; the right panel shows members, tasks, invite, and about.
 
 ## Slash commands
 
@@ -65,10 +74,9 @@ Wake rules: `@mention` or `task.create` (when `autoReply` is `mention-or-task`).
 - Private rooms are invite-only. **Public** rooms register the invite (incl. room key) in the directory — anyone can join and decrypt. Prefer private rooms for confidential work.
 - Identity and state files are written mode `600` under a mode `700` directory.
 
-
 ## Dual transport / agent config / MCP
 
-Display name: **dsh room** / **DSH Room** (not “deepseek room”). Package id: `@collab/dsh-room`.
+Display name: **dsh room** / **DSH Room**. Package id: `@collab/dsh-room`.
 
 Create room → defaults to **LAN / VPS** with `62.234.113.56:80` (public directory supported). Blank host embeds `collab-lan-relay` + mDNS. Cloudflare is an advanced option. See `docs/VPS_RELAY.md`.
 

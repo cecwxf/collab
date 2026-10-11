@@ -6,14 +6,25 @@
 
 ## DSH Room UI (dsh)
 
-Launch the dedicated profile (profile name = CLI subcommand):
+**One-line install** into a DeepSeek Harness profile (web / desktop CLI):
 
 ```sh
+dsh plugin --profile web add @collab/dsh-room
+# if the npm package is not published yet:
+dsh plugin --profile web add github:cecwxf/collab#master
+# or subdirectory only:
+dsh plugin --profile web add github:cecwxf/collab#path:packages/dsh-room
+```
+
+Then:
+
+```sh
+dsh web --host 127.0.0.1 --port 3091
+# or a dedicated profile:
 dsh room --no-open --host 127.0.0.1 --port 3091
 ```
 
-
-Install `packages/dsh-room` into a dsh profile. In the web UI, open **DSH Room** in the left rail to create / join / search rooms, chat, @mention agents, and manage tasks. Membership is stored in `~/.collab/state.json` (mode 600) — no manual yml invite paste. Public rooms may be listed in the **VPS relay directory** (not confidential). See `packages/dsh-room/README.md`.
+In the web UI, open **DSH Room** in the left rail to create / join / search rooms, chat, @mention agents, and manage tasks. Membership is stored in `~/.collab/state.json` (mode 600) — no manual yml invite paste. Public rooms may be listed in the **VPS relay directory** (not confidential). See `packages/dsh-room/README.md`.
 
 ## Workspace-first
 

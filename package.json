@@ -2,7 +2,7 @@
   "name": "collab",
   "version": "0.1.0",
   "private": true,
-  "description": "Peer collab rooms for DeepSeek Harness \u2014 no accounts, VPS Node relay (optional Cloudflare), E2EE",
+  "description": "Peer collab rooms for DeepSeek Harness — install via `dsh plugin add @collab/dsh-room` or github:cecwxf/collab#master",
   "workspaces": [
     "packages/*"
   ],
@@ -16,5 +16,45 @@
   "engines": {
     "node": ">=22"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "type": "module",
+  "main": "./packages/dsh-room/dist/index.js",
+  "exports": {
+    ".": "./packages/dsh-room/dist/index.js",
+    "./client": "./packages/dsh-room/dist/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "cordis.patch.yml",
+    "packages/dsh-room/dist",
+    "packages/dsh-room/README.md",
+    "README.md"
+  ],
+  "keywords": [
+    "dsh-plugin",
+    "dsh",
+    "deepseek-harness",
+    "collab",
+    "e2ee"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cecwxf/collab.git"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": [
+        "./cordis.patch.yml"
+      ]
+    },
+    "client": {
+      "platform": "web",
+      "inject": []
+    }
+  },
+  "dependencies": {
+    "multicast-dns": "^7.2.5",
+    "ws": "^8.18.3"
+  }
 }
