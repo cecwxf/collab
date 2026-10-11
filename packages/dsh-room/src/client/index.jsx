@@ -19,6 +19,9 @@ const Svg = ({ size = 16, children }) => (
 export const RoomsIcon = ({ size }) => (
   <Svg size={size}><rect x="2.5" y="3" width="11" height="10" rx="2" /><path d="M5.5 6.5h5M5.5 9.5h3.5" /></Svg>
 );
+const FolderIcon = ({ size }) => (
+  <Svg size={size}><path d="M2.5 4.5h4l1.5 1.5H13.5v7.5H2.5z" /></Svg>
+);
 const SearchIcon = () => <Svg><circle cx="7" cy="7" r="4.25" /><path d="m10.2 10.2 3.3 3.3" /></Svg>;
 const PlusIcon = () => <Svg><path d="M8 3v10M3 8h10" /></Svg>;
 const CloseIcon = () => <Svg size={14}><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" /></Svg>;
@@ -59,6 +62,7 @@ function renderMentions(text) {
 function PanelIcon({ size }) { return <RoomsIcon size={size} />; }
 
 function RoomsSidebar({ store, ensurePanel }) {
+  const s = useStore(store);
   const a = store.actions;
   const [menu, setMenu] = useState(null);
   const [searching, setSearching] = useState(false);
@@ -585,6 +589,7 @@ function RoomDetail({ room, messages, store, mention, assign }) {
 }
 
 function EmptyMain({ store }) {
+  const s = useStore(store);
   const a = store.actions;
   return (
     <div className="rm-root rm-welcome-wrap" data-collab-main="">
@@ -612,6 +617,7 @@ function EmptyMain({ store }) {
 }
 
 function RoomsMain({ store }) {
+  const s = useStore(store);
   // approvals rendered in ActiveRoom
   const [drafts, setDrafts] = useState({});
   const room = s.rooms.find((r) => r.roomId === s.selected);
@@ -649,6 +655,7 @@ function Field({ label, hint, children, htmlFor }) {
 }
 
 function CreateDialog({ store }) {
+  const s = useStore(store);
   const a = store.actions;
   const [f, setF] = useState({ name: "", description: "", tags: "", public: false, mode: "relay", lanHostPort: "" });
   const [err, setErr] = useState(null);
@@ -733,6 +740,7 @@ function CreateDialog({ store }) {
 }
 
 function JoinDialog({ store }) {
+  const s = useStore(store);
   const a = store.actions;
   const [invite, setInvite] = useState("");
   const [err, setErr] = useState(null);
@@ -775,6 +783,7 @@ function JoinDialog({ store }) {
 }
 
 function InviteDialog({ store, d }) {
+  const s = useStore(store);
   const a = store.actions;
   const [copied, setCopied] = useState(false);
   return (
@@ -792,6 +801,7 @@ function InviteDialog({ store, d }) {
 }
 
 function LeaveDialog({ store, d }) {
+  const s = useStore(store);
   const a = store.actions;
   const [busy, setBusy] = useState(false);
   return (
@@ -803,6 +813,7 @@ function LeaveDialog({ store, d }) {
 
 
 function ConfigDialog({ store, d }) {
+  const s = useStore(store);
   const a = store.actions;
   const room = (store.getSnapshot().rooms || []).find((r) => r.roomId === d.roomId);
   const mc = room?.memberConfig || {};
@@ -873,6 +884,7 @@ function ConfigDialog({ store, d }) {
 }
 
 function ApprovalBanner({ store }) {
+  const s = useStore(store);
   const list = s.approvals || [];
   if (!list.length) return null;
   const a = store.actions;
@@ -896,6 +908,7 @@ function ApprovalBanner({ store }) {
 
 
 function WorkspaceDialog({ store }) {
+  const s = useStore(store);
   const a = store.actions;
   const [name, setName] = useState("");
   const [path, setPath] = useState("");
