@@ -4,18 +4,24 @@
  */
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { generateIdentity, loadOrCreateIdentity, b64uEncode, DEFAULT_RELAY_URL } from "@collab/protocol";
+import { generateIdentity, loadOrCreateIdentity, b64uEncode, DEFAULT_RELAY_URL, inviteWsUrl, parseInviteUri } from "@collab/protocol";
 import { CollabClient, RoomHub, WsTransport } from "@collab/sdk";
 
 function usage(): never {
   console.log(`collab — Collab v1 CLI
 
 Usage:
-  collab create-room
+  collab create-room [--mode relay|lan] [--lan-host <host:port>] [--name <label>]
   collab join --invite <uri> [--relay <wss://...>] [--identity <path>]
   collab send --invite <uri> --text <msg> [--mention <agentId>] [--relay ...]
   collab peers --invite <uri> [--relay ...]
   collab smoke-local
+  collab lan-relay [--port 7421]   (alias: run @collab/lan-relay)
+
+Invite modes:
+  collab://join/<roomId>#<key>              relay (default URL)
+  collab://relay/<host>/join/<roomId>#<key> explicit relay host
+  collab://lan/<host>:<port>/<roomId>#<key> LAN relay
 
 Env:
   COLLAB_RELAY   relay base (default wss://collab-relay.cecwxf.workers.dev)
@@ -42,11 +48,17 @@ async function main(): Promise<void> {
   const flags = parseFlags(argv.slice(1));
 
   if (cmd === "create-room") {
-    const room = CollabClient.createRoom();
+    const mode = flags.mode === "lan" ? "lan" as const : "relay" as const;
+    const room = CollabClient.createRoom({
+      mode,
+      lanHostPort: flags["lan-host"],
+      name: flags.name,
+    });
     console.log(JSON.stringify({
       roomId: room.roomId,
       roomKey: room.roomKeyB64,
       uri: room.uri,
+      mode: room.mode,
     }, null, 2));
     return;
   }
@@ -62,9 +74,12 @@ async function main(): Promise<void> {
       console.error("--invite required");
       process.exit(2);
     }
-    const parsed = CollabClient.parseInvite(invite);
+    const parsed = parseInviteUri(invite);
     const id = await loadOrCreateIdentity(identityPath(flags.identity));
-    const url = relayUrl(parsed.roomId, flags.relay);
+    // --relay overrides only for relay-mode invites; LAN uses invite host:port
+    const url = flags.relay && parsed.mode === "relay"
+      ? relayUrl(parsed.roomId, flags.relay)
+      : inviteWsUrl(parsed);
 
     const client = new CollabClient({
       identity: id,

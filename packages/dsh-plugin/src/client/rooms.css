@@ -227,3 +227,21 @@
   font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace);
   font-size: 12px; word-break: break-all; user-select: all;
 }
+
+/* Dual transport + approvals + agent config */
+.rm-mode-row { display: flex; gap: 8px; }
+.rm-mode-btn {
+  flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rm-border, #2a2f3a);
+  background: transparent; color: inherit; cursor: pointer; font: inherit;
+}
+.rm-mode-btn.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent); }
+.rm-lan-browse { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+.rm-lan-peer {
+  font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a);
+  background: transparent; color: inherit; cursor: pointer;
+}
+.rm-approvals { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); background: color-mix(in srgb, #f5a524 12%, transparent); }
+.rm-approval { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.rm-approval-body { font-size: 13px; }
+.rm-approval-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.rm-input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; font: inherit; }

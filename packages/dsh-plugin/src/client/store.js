@@ -11,8 +11,8 @@ const post = (path, body) => call(path, { method: "POST", body: JSON.stringify(b
 
 export function createRoomsStore() {
   let snap = {
-    self: null, relayUrl: "", rooms: [], activeRoomId: null, connected: false,
-    selected: null, messages: {}, dialog: null, toast: null,
+    self: null, relayUrl: "", lanRelayPort: null, rooms: [], activeRoomId: null, connected: false,
+    selected: null, messages: {}, dialog: null, toast: null, approvals: [],
     search: { open: false, query: "", results: [], loading: false, error: null },
   };
   const subs = new Set();
@@ -107,6 +107,11 @@ export function createRoomsStore() {
     async send(roomId, text) { return post(`/rooms/${encodeURIComponent(roomId)}/send`, { text }); },
     async task(roomId, title, assignee, body) { return post(`/rooms/${encodeURIComponent(roomId)}/task`, { title, assignee, body }); },
     async invite(roomId) { return (await call(`/rooms/${encodeURIComponent(roomId)}/invite`)).invite; },
+    async browseLan() { return call("/lan/browse"); },
+    async getConfig(roomId) { return call(`/rooms/${encodeURIComponent(roomId)}/config`); },
+    async saveConfig(roomId, patch) { return post(`/rooms/${encodeURIComponent(roomId)}/config`, patch); },
+    async decideApproval(requestId, decision) { return post("/approvals/decide", { requestId, decision }); },
+    async mcp(roomId, tool, args, target) { return post(`/rooms/${encodeURIComponent(roomId)}/mcp`, { tool, args, target }); },
   };
 
   return {

@@ -94,3 +94,12 @@ Rooms are private (invite-only) by default. A room owner may publish a listing t
 - `DELETE /directory/rooms/:roomId` — unlist (owner signature)
 
 Listings expire unless re-published within 15 minutes (client heartbeat every 5 minutes). **A public listing carries the room invite (including the room key), so public rooms are not confidential.**
+
+
+## Invite URI modes (v1 dual transport)
+
+- `collab://join/<roomId>#<roomKey>` — default Cloudflare relay
+- `collab://relay/<host>/join/<roomId>#<roomKey>` — explicit relay host
+- `collab://lan/<host>:<port>/<roomId>#<roomKey>` — LAN relay (`ws://host:port/ws/<roomId>`)
+
+New E2EE payload kinds: `member.config`, `approval.request`, `approval.response`, `mcp.call`, `mcp.result`.

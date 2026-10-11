@@ -125,7 +125,7 @@ function RoomsSidebar({ store, ensurePanel }) {
                   <span className="rm-room-item-meta">{r.last ? `${r.last.from}: ${r.last.text}` : (r.description || (r.public ? "Public room" : "Private · invite only"))}</span>
                 </span>
                 <span className="rm-room-item-trail">
-                  {r.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}
+                  {r.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}{r.transport === "lan" ? <span className="rm-badge">LAN</span> : null}
                   {r.last ? <span style={{ fontSize: 10.5, color: "var(--rm-quiet)" }}>{fmtTime(r.last.ts)}</span> : null}
                 </span>
               </button>
@@ -307,6 +307,7 @@ function RoomDetail({ room, messages, store, mention, assign }) {
         <div className="rm-detail-h">About</div>
         <dl className="rm-about">
           <dt>Visibility</dt><dd>{room.public ? <><GlobeIcon /> Public</> : <><LockIcon /> Private</>}</dd>
+          <dt>Transport</dt><dd>{room.transport === "lan" ? "LAN / mDNS" : "Relay (Cloudflare)"}</dd>
           {room.description ? <><dt>Description</dt><dd>{room.description}</dd></> : null}
           {room.tags?.length ? <><dt>Tags</dt><dd>{room.tags.map((t) => "#" + t).join(" ")}</dd></> : null}
           <dt>Room id</dt><dd className="rm-mono">{room.roomId}</dd>
@@ -314,6 +315,7 @@ function RoomDetail({ room, messages, store, mention, assign }) {
           <dt>Encryption</dt><dd>E2EE (AES-GCM); relay sees ciphertext only</dd>
         </dl>
         <div className="rm-actions">
+          <Button size="sm" variant="outline" onClick={() => a.openDialog({ kind: "config", roomId: room.roomId })}>Agent config</Button>
           <Button size="sm" variant="ghost" className="rm-danger" onClick={() => a.openDialog({ kind: "leave", roomId: room.roomId, name: room.name })}>Leave room</Button>
         </div>
       </div>
@@ -346,6 +348,7 @@ function EmptyMain({ store }) {
 }
 
 function RoomsMain({ store }) {
+  // approvals rendered in ActiveRoom
   const s = useStore(store);
   const [drafts, setDrafts] = useState({});
   const room = s.rooms.find((r) => r.roomId === s.selected);
@@ -355,6 +358,7 @@ function RoomsMain({ store }) {
   const setDraft = (v) => setDrafts((d) => ({ ...d, [room.roomId]: typeof v === "function" ? v(d[room.roomId] || "") : v }));
   return (
     <div className="rm-root rm-main" data-collab-main="">
+      <ApprovalBanner store={store} />
       <div className="rm-workspace">
         <section className="rm-chat">
           <header className="rm-chat-header">
@@ -363,7 +367,7 @@ function RoomsMain({ store }) {
               <div className="rm-chat-header-title">{room.name}</div>
               <div className="rm-chat-header-sub">{room.members.length} online · {room.public ? "public" : "private"}</div>
             </div>
-            {room.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}
+            {room.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}{room.transport === "lan" ? <span className="rm-badge">LAN</span> : null}
             <StateDot state={room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error"} size={8} />
           </header>
           <ChatBody messages={messages} />
@@ -383,21 +387,36 @@ function Field({ label, hint, children, htmlFor }) {
 
 function CreateDialog({ store }) {
   const a = store.actions;
-  const [f, setF] = useState({ name: "", description: "", tags: "", public: false });
+  const [f, setF] = useState({ name: "", description: "", tags: "", public: false, mode: "relay", lanHostPort: "" });
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [lanPeers, setLanPeers] = useState([]);
   const ok = f.name.trim() && !busy;
   const submit = async () => {
     if (!ok) return;
     setBusy(true); setErr(null);
-    try { await a.create({ name: f.name.trim(), description: f.description.trim(), tags: f.tags, public: f.public }); }
-    catch (e) { setErr(e.message); setBusy(false); }
+    try {
+      await a.create({
+        name: f.name.trim(), description: f.description.trim(), tags: f.tags,
+        public: f.mode === "relay" && f.public, mode: f.mode,
+        lanHostPort: f.mode === "lan" && f.lanHostPort.trim() ? f.lanHostPort.trim() : undefined,
+      });
+    } catch (e) { setErr(e.message); setBusy(false); }
+  };
+  const browseLan = async () => {
+    try { const r = await a.browseLan(); setLanPeers(r.peers || []); } catch (e) { setErr(e.message); }
   };
   return (
     <Modal open onClose={a.closeDialog} title="Create room" closeLabel="Close"
-      description="Name appears in room lists. The room id and encryption key are generated. Description and tags are optional."
+      description="Pick Relay (Cloudflare) or LAN (local relay + Tailscale/mDNS). The room key never goes to the relay."
       footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={!ok} onClick={submit}>{busy ? "Creating…" : "Create"}</Button></>}>
       <div className="rm-root rm-form" onKeyDown={(e) => e.key === "Enter" && e.target.tagName === "INPUT" && submit()}>
+        <Field label="Transport" hint="Relay uses the public CF Durable Object. LAN starts a local relay on this machine and advertises via mDNS (_collab._tcp).">
+          <div className="rm-mode-row">
+            <button type="button" className={"rm-mode-btn" + (f.mode === "relay" ? " is-on" : "")} onClick={() => setF({ ...f, mode: "relay" })}>Relay</button>
+            <button type="button" className={"rm-mode-btn" + (f.mode === "lan" ? " is-on" : "")} onClick={() => setF({ ...f, mode: "lan", public: false })}>LAN</button>
+          </div>
+        </Field>
         <Field label="Name" htmlFor="rm-create-name">
           <div className="rm-name-row"><Avatar name={f.name || "room"} size={36} /><Input id="rm-create-name" autoFocus placeholder="e.g. release-crew" maxLength={60} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
         </Field>
@@ -407,15 +426,26 @@ function CreateDialog({ store }) {
         <Field label="Tags (optional)" htmlFor="rm-create-tags" hint="Spaces or commas, up to 8. Used by public room search.">
           <Input id="rm-create-tags" placeholder="e.g. review rust" value={f.tags} onChange={(e) => setF({ ...f, tags: e.target.value })} />
         </Field>
-        <div className="rm-switch-row">
-          <div>
-            <div className="rm-field-label">List in public directory</div>
-            <div className="rm-field-hint">{f.public
-              ? "Anyone can find this room by name or tag and join it. Its key is published with the listing — NOT confidential."
-              : "Private: invite only. Nothing about the room is published."}</div>
+        {f.mode === "lan" ? (
+          <Field label="LAN host:port (optional)" htmlFor="rm-lan-hp" hint="Leave blank to use this machine's LAN/Tailscale IP and embedded relay. Or pick a discovered peer.">
+            <Input id="rm-lan-hp" placeholder="100.x.x.x:7421" value={f.lanHostPort} onChange={(e) => setF({ ...f, lanHostPort: e.target.value })} />
+            <div className="rm-lan-browse"><Button size="sm" variant="outline" onClick={browseLan}>Browse mDNS</Button>
+              {lanPeers.map((p) => (
+                <button key={p.hostPort} type="button" className="rm-lan-peer" onClick={() => setF({ ...f, lanHostPort: p.hostPort })}>{p.hostPort}{p.name ? ` · ${p.name}` : ""}</button>
+              ))}
+            </div>
+          </Field>
+        ) : (
+          <div className="rm-switch-row">
+            <div>
+              <div className="rm-field-label">List in public directory</div>
+              <div className="rm-field-hint">{f.public
+                ? "Anyone can find this room by name or tag and join it. Its key is published with the listing — NOT confidential."
+                : "Private: invite only. Nothing about the room is published."}</div>
+            </div>
+            <Switch checked={f.public} onChange={(v) => setF({ ...f, public: v })} label="List in public directory" />
           </div>
-          <Switch checked={f.public} onChange={(v) => setF({ ...f, public: v })} label="List in public directory" />
-        </div>
+        )}
         {err ? <div className="rm-error">{err}</div> : null}
       </div>
     </Modal>
@@ -427,7 +457,7 @@ function JoinDialog({ store }) {
   const [invite, setInvite] = useState("");
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
-  const valid = /^collab:\/\/join\/[^#\s]+#\S+$/.test(invite.trim());
+  const valid = /^collab:\/\/(join|lan|relay)\/.+#\S+$/.test(invite.trim());
   const submit = async () => {
     if (!valid || busy) return;
     setBusy(true); setErr(null);
@@ -439,8 +469,8 @@ function JoinDialog({ store }) {
       description="Paste an invite another agent shared. It contains the room key, which never leaves your machine except inside the invite."
       footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={!valid || busy} onClick={submit}>{busy ? "Joining…" : "Join"}</Button></>}>
       <div className="rm-root rm-form">
-        <Input autoFocus aria-label="Invite" placeholder="collab://join/<roomId>#<roomKey>" value={invite} onChange={(e) => setInvite(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
-        {invite && !valid ? <div className="rm-field-hint">Invites look like collab://join/&lt;roomId&gt;#&lt;roomKey&gt;</div> : null}
+        <Input autoFocus aria-label="Invite" placeholder="collab://join/… or collab://lan/<host>:<port>/<roomId>#…" value={invite} onChange={(e) => setInvite(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} />
+        {invite && !valid ? <div className="rm-field-hint">Invites: collab://join/…#key, collab://lan/host:port/room#key, or collab://relay/host/join/room#key</div> : null}
         {err ? <div className="rm-error">{err}</div> : null}
       </div>
     </Modal>
@@ -474,6 +504,82 @@ function LeaveDialog({ store, d }) {
   );
 }
 
+
+function ConfigDialog({ store, d }) {
+  const a = store.actions;
+  const room = (store.getSnapshot().rooms || []).find((r) => r.roomId === d.roomId);
+  const mc = room?.memberConfig || {};
+  const [f, setF] = useState({
+    model: mc.model || "", provider: mc.provider || "", reasoningEffort: mc.reasoningEffort || "medium",
+    workspacePath: "", workspaceLabel: mc.workspaceLabel || "",
+    autoRead: mc.permissions?.autoRead !== false, autoWrite: !!mc.permissions?.autoWrite,
+    autoShell: !!mc.permissions?.autoShell, autoNetwork: !!mc.permissions?.autoNetwork,
+    mcpEnabled: mc.mcpEnabled !== false,
+  });
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { a.getConfig(d.roomId).then((c) => setF((x) => ({ ...x, workspacePath: c.workspacePath || "", workspaceLabel: c.workspaceLabel || x.workspaceLabel, model: c.model || "", provider: c.provider || "", reasoningEffort: c.reasoningEffort || "medium", autoRead: c.permissions?.autoRead !== false, autoWrite: !!c.permissions?.autoWrite, autoShell: !!c.permissions?.autoShell, autoNetwork: !!c.permissions?.autoNetwork, mcpEnabled: c.mcpEnabled !== false }))).catch(() => {}); }, [d.roomId]);
+  const submit = async () => {
+    setBusy(true); setErr(null);
+    try {
+      await a.saveConfig(d.roomId, {
+        model: f.model || undefined, provider: f.provider || undefined, reasoningEffort: f.reasoningEffort,
+        workspacePath: f.workspacePath || undefined, workspaceLabel: f.workspaceLabel || undefined, mcpEnabled: f.mcpEnabled,
+        permissions: { autoRead: f.autoRead, autoWrite: f.autoWrite, autoShell: f.autoShell, autoNetwork: f.autoNetwork },
+      });
+      a.closeDialog(); a.toast("Agent config saved (announced to room; no API keys shared)");
+    } catch (e) { setErr(e.message); setBusy(false); }
+  };
+  return (
+    <Modal open onClose={a.closeDialog} title="Room agent config" closeLabel="Close"
+      description="Local to this member. Peers see model, effort, workspace label, permissions, and MCP tools — never API keys."
+      footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={busy} onClick={submit}>{busy ? "Saving…" : "Save"}</Button></>}>
+      <div className="rm-root rm-form">
+        <Field label="Model" htmlFor="rm-cfg-model"><Input id="rm-cfg-model" value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })} placeholder="e.g. deepseek-chat" /></Field>
+        <Field label="Provider" htmlFor="rm-cfg-prov"><Input id="rm-cfg-prov" value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value })} placeholder="e.g. deepseek" /></Field>
+        <Field label="Reasoning effort">
+          <select className="rm-input" value={f.reasoningEffort} onChange={(e) => setF({ ...f, reasoningEffort: e.target.value })}>
+            {["low","medium","high","max"].map((x) => <option key={x} value={x}>{x}</option>)}
+          </select>
+        </Field>
+        <Field label="Workspace path" htmlFor="rm-cfg-ws" hint="Absolute path on this machine. Peers only see the label.">
+          <Input id="rm-cfg-ws" value={f.workspacePath} onChange={(e) => setF({ ...f, workspacePath: e.target.value })} />
+        </Field>
+        <Field label="Workspace label" htmlFor="rm-cfg-wsl"><Input id="rm-cfg-wsl" value={f.workspaceLabel} onChange={(e) => setF({ ...f, workspaceLabel: e.target.value })} /></Field>
+        <div className="rm-switch-row"><div><div className="rm-field-label">Expose MCP workspace</div><div className="rm-field-hint">Same-room peers can call workspace_* tools over E2EE.</div></div><Switch checked={f.mcpEnabled} onChange={(v) => setF({ ...f, mcpEnabled: v })} label="MCP" /></div>
+        <div className="rm-switch-row"><div><div className="rm-field-label">Auto-allow reads</div></div><Switch checked={f.autoRead} onChange={(v) => setF({ ...f, autoRead: v })} label="autoRead" /></div>
+        <div className="rm-switch-row"><div><div className="rm-field-label">Auto-allow writes</div><div className="rm-field-hint">Off → approval UI for write/mkdir/delete.</div></div><Switch checked={f.autoWrite} onChange={(v) => setF({ ...f, autoWrite: v })} label="autoWrite" /></div>
+        <div className="rm-switch-row"><div><div className="rm-field-label">Auto-allow shell</div></div><Switch checked={f.autoShell} onChange={(v) => setF({ ...f, autoShell: v })} label="autoShell" /></div>
+        <div className="rm-switch-row"><div><div className="rm-field-label">Auto-allow network</div></div><Switch checked={f.autoNetwork} onChange={(v) => setF({ ...f, autoNetwork: v })} label="autoNetwork" /></div>
+        {err ? <div className="rm-error">{err}</div> : null}
+      </div>
+    </Modal>
+  );
+}
+
+function ApprovalBanner({ store }) {
+  const s = useStore(store);
+  const list = s.approvals || [];
+  if (!list.length) return null;
+  const a = store.actions;
+  return (
+    <div className="rm-approvals">
+      {list.map((p) => (
+        <div key={p.requestId} className="rm-approval">
+          <div className="rm-approval-body">
+            <b>Approval needed</b> · {p.action} · {p.summary}
+            <div className="rm-field-hint">from {p.from}{p.detail ? ` — ${p.detail}` : ""}</div>
+          </div>
+          <div className="rm-approval-actions">
+            <Button size="sm" variant="outline" onClick={() => a.decideApproval(p.requestId, "deny")}>Deny</Button>
+            <Button size="sm" variant="primary" onClick={() => a.decideApproval(p.requestId, "allow")}>Allow</Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Overlay({ store }) {
   const s = useStore(store);
   const d = s.dialog;
@@ -483,6 +589,7 @@ function Overlay({ store }) {
       {d?.kind === "join" ? <JoinDialog store={store} /> : null}
       {d?.kind === "invite" ? <InviteDialog store={store} d={d} /> : null}
       {d?.kind === "leave" ? <LeaveDialog store={store} d={d} /> : null}
+      {d?.kind === "config" ? <ConfigDialog store={store} d={d} /> : null}
       {s.toast ? <Toast text={s.toast} onDone={store.actions.clearToast} holdMs={2200} /> : null}
     </>
   );

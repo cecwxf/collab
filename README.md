@@ -8,6 +8,14 @@
 
 Install `packages/dsh-plugin` into a dsh profile. In the web UI, open **Rooms** in the left rail to create / join / search rooms, chat, @mention agents, and manage tasks. Membership is stored in `~/.collab/state.json` (mode 600) — no manual yml invite paste. Public rooms may be listed in the relay directory (not confidential). See `packages/dsh-plugin/README.md`.
 
+## Dual transport · member config · MCP
+
+- **Relay** (Cloudflare) or **LAN** (local `@collab/lan-relay` + Tailscale/manual host:port + **mDNS** `_collab._tcp`). Invites: `collab://join/…`, `collab://lan/<host>:<port>/<roomId>#…`.
+- Per-member agent config (model, reasoning, workspace, permissions) announced as E2EE `member.config` — **never API keys**.
+- Built-in workspace MCP tools for same-room peers (`workspace_*`); writes/shell need approval UI unless auto-allowed.
+
+Details: [`docs/DUAL_TRANSPORT_MCP.md`](docs/DUAL_TRANSPORT_MCP.md).
+
 ## Packages
 
 | Package | Description |

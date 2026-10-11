@@ -68,12 +68,12 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
       if (method === "GET" && path === "/directory") return sendJson(res, 200, { rooms: await bridge.search(str(url.searchParams.get("q")), str(url.searchParams.get("tag"))) });
       if (method === "POST" && path === "/rooms") {
         const b = await readJson(req);
-        return sendJson(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true }));
+        return sendJson(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "lan" ? "lan" : "relay", lanHostPort: str(b.lanHostPort) }));
       }
       if (method === "POST" && path === "/join") {
         const b = await readJson(req);
         const invite = str(b.invite);
-        if (!invite || !/^collab:\/\/join\/[^#\s]+#\S+$/.test(invite)) throw new HttpError(400, "invite must look like collab://join/<roomId>#<roomKey>");
+        if (!invite || !/^collab:\/\/(join|lan|relay)\//.test(invite) || !/#\S+$/.test(invite)) throw new HttpError(400, "invite must be collab://join/…, collab://lan/…, or collab://relay/… with #key");
         return sendJson(res, 200, await bridge.joinInvite(invite, { name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true }));
       }
       const m = /^\/rooms\/([^/]+)\/(messages|invite|leave|send|task|active)$/.exec(path);
@@ -96,6 +96,40 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
             if (!title) throw new HttpError(400, "title required");
             return sendJson(res, 200, await bridge.createTask(roomId, title, str(b.body), str(b.assignee)));
           }
+        }
+      }
+      if (method === "GET" && path === "/lan/browse") return sendJson(res, 200, { peers: await bridge.browseLan(Number(url.searchParams.get("timeout") || 2500)) });
+      if (method === "GET" && path === "/approvals") return sendJson(res, 200, { approvals: bridge.approvals.list() });
+      if (method === "POST" && path === "/approvals/decide") {
+        const b = await readJson(req);
+        const id = str(b.requestId);
+        const decision = b.decision === "allow" || b.decision === "deny" ? b.decision : null;
+        if (!id || !decision) throw new HttpError(400, "requestId and decision=allow|deny required");
+        return sendJson(res, 200, await bridge.decideApproval(id, decision));
+      }
+      const cfgM = /^\/rooms\/([^/]+)\/(config|mcp)$/.exec(path);
+      if (cfgM) {
+        const roomId = decodeURIComponent(cfgM[1]!);
+        const action = cfgM[2]!;
+        if (method === "GET" && action === "config") return sendJson(res, 200, bridge.getMemberConfig(roomId));
+        if (method === "POST" && action === "config") {
+          const b = await readJson(req);
+          const patch: Record<string, unknown> = {};
+          for (const k of ["model", "provider", "reasoningEffort", "workspacePath", "workspaceLabel", "mcpEnabled"] as const) {
+            if (k in b) patch[k] = b[k];
+          }
+          if (b.permissions && typeof b.permissions === "object") patch.permissions = b.permissions;
+          return sendJson(res, 200, await bridge.updateMemberConfig(roomId, patch as any));
+        }
+        if (method === "GET" && action === "mcp") return sendJson(res, 200, { tools: (await import("./mcp-workspace.js")).MCP_TOOL_DEFS });
+        if (method === "POST" && action === "mcp") {
+          const b = await readJson(req);
+          const tool = str(b.tool);
+          if (!tool) throw new HttpError(400, "tool required");
+          if (str(b.target)) {
+            return sendJson(res, 200, await bridge.mcpCallPeer(roomId, str(b.target)!, tool, (b.args as Record<string, unknown>) || {}));
+          }
+          return sendJson(res, 200, { ok: true, result: await bridge.callLocalMcp(roomId, tool, (b.args as Record<string, unknown>) || {}) });
         }
       }
       throw new HttpError(404, `no route ${method} ${API}${path}`);

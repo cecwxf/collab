@@ -8,3 +8,5 @@ coverage/
 *.tsbuildinfo
 .collab/
 packages/dsh-plugin/test/.commands.bundle.mjs
+
+packages/dsh-plugin/test/.mcp-build/

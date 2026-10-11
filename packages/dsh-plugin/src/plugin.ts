@@ -8,11 +8,19 @@ import {
   loadOrCreateIdentity,
   newMessageId,
   normalizeTags,
+  inviteWsUrl,
+  parseInviteUri,
   type CollabPayload,
   type DirectoryEntry,
   type Identity,
+  type MemberConfigPayload,
+  type McpCallPayload,
 } from "@collab/protocol";
 import { CollabClient, WsTransport } from "@collab/sdk";
+import { LanRelayServer, browseLanRelays } from "@collab/lan-relay";
+import { ApprovalQueue } from "./approval-queue.js";
+import { WorkspaceMcp } from "./mcp-workspace.js";
+import { defaultMemberConfig, publicMemberConfig, type RoomMemberConfig } from "./member-config.js";
 import type {
   AgentHandle,
   AgentLike,
@@ -85,7 +93,7 @@ export interface RoomMessage {
 }
 
 function toMessage(p: CollabPayload, self: string, seq?: number): RoomMessage | null {
-  if (p.kind === "presence" || p.kind === "hello" || p.kind === "stream.delta") return null;
+  if (p.kind === "presence" || p.kind === "hello" || p.kind === "stream.delta" || p.kind === "member.config") return null;
   const m: RoomMessage = { id: p.messageId, seq, from: p.sender, self: p.sender === self, kind: p.kind, text: describePayload(p), ts: p.ts, replyTo: p.replyTo };
   if (p.kind === "chat") m.mentions = p.mentions;
   if (p.kind === "task.create") Object.assign(m, { taskId: p.taskId, title: p.title, assignee: p.assignee, status: "open" });
@@ -96,13 +104,17 @@ function toMessage(p: CollabPayload, self: string, seq?: number): RoomMessage | 
 
 export type RoomStatus = "connecting" | "online" | "offline";
 
-export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId"> {
+export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId" | "memberConfig"> {
   status: RoomStatus;
   error?: string;
   members: { agentId: string; self: boolean }[];
   last?: { from: string; text: string; ts: number };
   sessionTitle: string;
   bound: boolean;
+  transport?: "relay" | "lan";
+  /** Public member config (no secrets / no absolute path). */
+  memberConfig?: ReturnType<typeof publicMemberConfig> | null;
+  peerConfigs?: Record<string, ReturnType<typeof publicMemberConfig>>;
 }
 
 export interface BridgeEvent {
@@ -139,6 +151,10 @@ export interface CreateRoomOptions {
   description?: string;
   tags?: string[] | string;
   public?: boolean;
+  /** Dual transport: default relay. LAN starts/uses embedded lan-relay. */
+  mode?: "relay" | "lan";
+  /** For LAN: host:port override (default discovered/local listen). */
+  lanHostPort?: string;
 }
 
 /**
@@ -156,6 +172,11 @@ export class CollabBridge {
   private abort = new AbortController();
   readonly directory: DirectoryClient;
   private ready: Promise<void> | null = null;
+  readonly approvals = new ApprovalQueue();
+  /** peer agentId → last announced public member config */
+  peerConfigs = new Map<string, Map<string, ReturnType<typeof publicMemberConfig>>>();
+  private lanRelay: LanRelayServer | null = null;
+  private mcpByRoom = new Map<string, WorkspaceMcp>();
 
   constructor(
     private ctx: HostContext,
@@ -163,6 +184,7 @@ export class CollabBridge {
     fetchImpl?: typeof fetch,
   ) {
     this.directory = new DirectoryClient(config.relayUrl, fetchImpl);
+    this.approvals.subscribe(() => this.emit({ type: "rooms" }));
   }
 
   log(level: "info" | "warn" | "error", ...a: unknown[]) {
@@ -232,16 +254,25 @@ export class CollabBridge {
 
   private async connect(conn: RoomConn) {
     const identity = await this.self();
-    const { roomId, roomKeyB64 } = CollabClient.parseInvite(conn.meta.invite);
-    const base = this.config.relayUrl.replace(/\/$/, "");
+    const parsed = parseInviteUri(conn.meta.invite);
+    const roomId = parsed.roomId;
+    const roomKeyB64 = parsed.roomKeyB64;
+    conn.meta.transport = parsed.mode;
+    const wsUrl = inviteWsUrl(parsed);
+    // Ensure member config + MCP for this room
+    if (!conn.meta.memberConfig) {
+      conn.meta.memberConfig = defaultMemberConfig(this.config.workspacePath);
+    }
+    this.mcpByRoom.set(roomId, new WorkspaceMcp(conn.meta.memberConfig, this.approvals, roomId));
+    const caps = ["collab.v1", "dsh", "mcp.v1", "member.config"];
     const client = new CollabClient({
       identity,
       roomId,
       roomKey: roomKeyB64,
-      transport: new WsTransport(`${base}/ws/${encodeURIComponent(roomId)}`),
+      transport: new WsTransport(wsUrl),
       autoReply: this.config.autoReply,
       reconnect: true,
-      capabilities: ["collab.v1", "dsh"],
+      capabilities: caps,
     });
     client.onPayload((p, meta) => void this.onPayload(conn, p, meta.from, meta.seq));
     client.onPeers((peers, ev) => {
@@ -252,7 +283,7 @@ export class CollabBridge {
     conn.client = client;
     conn.status = "online";
     conn.error = undefined;
-    this.log("info", `joined room ${roomId} as ${identity.agentId} via ${base}`);
+    this.log("info", `joined room ${roomId} as ${identity.agentId} via ${wsUrl} (${parsed.mode})`);
     try {
       for (const p of await client.history(0)) {
         const m = toMessage(p, identity.agentId);
@@ -261,12 +292,59 @@ export class CollabBridge {
     } catch (e) {
       this.log("warn", `history for ${roomId} failed: ${(e as Error).message}`);
     }
+    // Announce local member config (no secrets)
+    try {
+      await this.announceMemberConfig(conn);
+    } catch (e) {
+      this.log("warn", `announce member.config failed: ${(e as Error).message}`);
+    }
     this.emit({ type: "rooms" });
+  }
+
+  /** Ensure embedded LAN relay is listening; returns host:port for invites. */
+  async ensureLanRelay(): Promise<string> {
+    if (!this.lanRelay) {
+      this.lanRelay = new LanRelayServer({ port: 7421, host: "0.0.0.0", name: this.config.agentName ?? "collab-dsh", mdns: true });
+      try {
+        await this.lanRelay.listen();
+      } catch {
+        this.lanRelay = new LanRelayServer({ port: 0, host: "0.0.0.0", name: this.config.agentName ?? "collab-dsh", mdns: true });
+        await this.lanRelay.listen();
+      }
+      this.log("info", `LAN relay listening on port ${this.lanRelay.port}`);
+    }
+    // Prefer Tailscale/LAN IP if we can guess; else localhost (peers must override via invite host).
+    const { networkInterfaces } = await import("node:os");
+    let host = "127.0.0.1";
+    for (const list of Object.values(networkInterfaces())) {
+      for (const a of list ?? []) {
+        if (a.family === "IPv4" && !a.internal) {
+          // Prefer Tailscale CGNAT 100.x
+          if (a.address.startsWith("100.")) { host = a.address; break; }
+          if (host === "127.0.0.1") host = a.address;
+        }
+      }
+      if (host.startsWith("100.")) break;
+    }
+    return `${host}:${this.lanRelay.port}`;
+  }
+
+  async browseLan(timeoutMs = 2500) {
+    return browseLanRelays({ timeoutMs });
   }
 
   /** Create a room (private unless opts.public) and join it. */
   async createRoom(opts: CreateRoomOptions = {}, bindTo?: AgentLike) {
-    const room = CollabClient.createRoom();
+    const mode = opts.mode === "lan" ? "lan" : "relay";
+    // Public directory is relay-only (listings go to CF Directory DO).
+    const isPublic = mode === "relay" && opts.public === true;
+    let room;
+    if (mode === "lan") {
+      const lanHostPort = opts.lanHostPort ?? (await this.ensureLanRelay());
+      room = CollabClient.createRoom({ mode: "lan", lanHostPort, name: opts.name });
+    } else {
+      room = CollabClient.createRoom({ mode: "relay", name: opts.name });
+    }
     const tags = normalizeTags(typeof opts.tags === "string" ? opts.tags.split(/[\s,]+/) : opts.tags);
     const meta: RoomMeta = {
       roomId: room.roomId,
@@ -274,9 +352,11 @@ export class CollabBridge {
       name: (opts.name ?? "").trim().slice(0, 60) || `room-${room.roomId.slice(0, 6)}`,
       description: (opts.description ?? "").trim().slice(0, 280),
       tags,
-      public: opts.public === true,
+      public: isPublic,
       owner: true,
       joinedAt: Date.now(),
+      transport: mode,
+      memberConfig: defaultMemberConfig(this.config.workspacePath),
     };
     const conn = await this.open(meta);
     this.activeRoomId = meta.roomId;
@@ -287,7 +367,7 @@ export class CollabBridge {
       this.log("warn", `directory publish failed: ${(e as Error).message}`);
       return undefined;
     });
-    return { ...this.view(conn), invite: meta.invite, listed: !!listing };
+    return { ...this.view(conn), invite: meta.invite, listed: !!listing, transport: mode };
   }
 
   /** Join by invite. `info` carries directory metadata when joining from search results. */
@@ -419,20 +499,151 @@ export class CollabBridge {
       last: last && { from: last.from, text: last.text, ts: last.ts },
       sessionTitle: `collab:${conn.meta.roomId}`,
       bound: !!sessionId,
+      transport: conn.meta.transport ?? (conn.meta.invite.startsWith("collab://lan/") ? "lan" : "relay"),
+      memberConfig: conn.meta.memberConfig ? publicMemberConfig(conn.meta.memberConfig) : null,
+      peerConfigs: Object.fromEntries(this.peerConfigs.get(conn.meta.roomId) ?? []),
     };
   }
   state() {
     return {
       self: this.identity?.agentId ?? null,
       relayUrl: this.config.relayUrl,
+      lanRelayPort: this.lanRelay?.port ?? null,
       activeRoomId: this.activeRoomId,
+      approvals: this.approvals.list(),
       rooms: [...this.rooms.values()].sort((a, b) => (b.messages.at(-1)?.ts ?? b.meta.joinedAt) - (a.messages.at(-1)?.ts ?? a.meta.joinedAt)).map((r) => this.view(r)),
     };
+  }
+
+
+  // ── member config + MCP + approvals ─────────────────────────────────────
+  async announceMemberConfig(conn: RoomConn) {
+    if (!conn.client || !conn.meta.memberConfig) return;
+    const pub = publicMemberConfig(conn.meta.memberConfig);
+    await conn.client.publish({ kind: "member.config", ...pub } as Record<string, unknown> & { kind: "member.config" });
+  }
+
+  async updateMemberConfig(roomId: string, patch: Partial<RoomMemberConfig>) {
+    const conn = this.room(roomId);
+    const cur = conn.meta.memberConfig ?? defaultMemberConfig(this.config.workspacePath);
+    const next: RoomMemberConfig = {
+      ...cur,
+      ...patch,
+      permissions: { ...cur.permissions, ...(patch.permissions ?? {}) },
+      workspacePath: patch.workspacePath ?? cur.workspacePath,
+      workspaceLabel: patch.workspaceLabel ?? cur.workspaceLabel,
+    };
+    // Never accept secrets through this API
+    conn.meta.memberConfig = next;
+    this.mcpByRoom.get(roomId)?.updateConfig(next);
+    await this.persist();
+    if (conn.client) await this.announceMemberConfig(conn);
+    this.emit({ type: "rooms" });
+    return publicMemberConfig(next);
+  }
+
+  getMemberConfig(roomId: string) {
+    const conn = this.room(roomId);
+    const cfg = conn.meta.memberConfig ?? defaultMemberConfig(this.config.workspacePath);
+    return { ...publicMemberConfig(cfg), workspacePath: cfg.workspacePath };
+  }
+
+  async decideApproval(requestId: string, decision: "allow" | "deny") {
+    const ok = this.approvals.decide(requestId, decision);
+    if (!ok) throw new Error("unknown or expired approval request");
+    // Mirror decision into the room so the requester sees it
+    const pending = this.approvals.list(); // already removed
+    // Find room from recent — publish broadly via active room if needed
+    for (const conn of this.rooms.values()) {
+      if (conn.client) {
+        try {
+          await conn.client.publish({ kind: "approval.response", requestId, decision } as Record<string, unknown> & { kind: "approval.response" });
+        } catch { /* */ }
+      }
+    }
+    this.emit({ type: "rooms" });
+    return { ok: true, requestId, decision };
+  }
+
+  async callLocalMcp(roomId: string, tool: string, args: Record<string, unknown>, from = "local") {
+    const mcp = this.mcpByRoom.get(roomId) ?? (() => {
+      const conn = this.room(roomId);
+      const cfg = conn.meta.memberConfig ?? defaultMemberConfig(this.config.workspacePath);
+      conn.meta.memberConfig = cfg;
+      const w = new WorkspaceMcp(cfg, this.approvals, roomId);
+      this.mcpByRoom.set(roomId, w);
+      return w;
+    })();
+    return mcp.call(tool, args ?? {}, from);
+  }
+
+  async mcpCallPeer(roomId: string, target: string, tool: string, args: Record<string, unknown>) {
+    const conn = this.room(roomId);
+    if (!conn.client) throw new Error("room offline");
+    const callId = newMessageId();
+    await conn.client.publish({
+      kind: "mcp.call",
+      callId,
+      tool,
+      args: args ?? {},
+      target,
+    } as Record<string, unknown> & { kind: "mcp.call" });
+    return { callId, pending: true };
+  }
+
+  private async handleMcpCall(conn: RoomConn, p: McpCallPayload, from: string) {
+    if (p.target !== this.identity?.agentId) return;
+    const mcp = this.mcpByRoom.get(conn.meta.roomId);
+    if (!mcp || !conn.client) {
+      await conn.client?.publish({ kind: "mcp.result", callId: p.callId, ok: false, error: "MCP not available" } as Record<string, unknown> & { kind: "mcp.result" });
+      return;
+    }
+    try {
+      const result = await mcp.call(p.tool, p.args ?? {}, from);
+      await conn.client.publish({ kind: "mcp.result", callId: p.callId, ok: true, result } as Record<string, unknown> & { kind: "mcp.result" });
+    } catch (e) {
+      const msg = (e as Error).message;
+      const pending = msg.startsWith("denied:") ? false : /denied|approval/.test(msg);
+      await conn.client.publish({
+        kind: "mcp.result",
+        callId: p.callId,
+        ok: false,
+        error: msg,
+        pendingApproval: /waiting|approval/.test(msg),
+      } as Record<string, unknown> & { kind: "mcp.result" });
+    }
   }
 
   // ── inbound: room → Session wake ─────────────────────────────────────────
   private async onPayload(conn: RoomConn, p: CollabPayload, from: string, seq: number) {
     if (this.disposed || !conn.client) return;
+    // Control-plane-like E2EE payloads
+    if (p.kind === "member.config") {
+      const pub = publicMemberConfig({
+        workspacePath: "",
+        workspaceLabel: (p as MemberConfigPayload).workspaceLabel ?? "workspace",
+        permissions: (p as MemberConfigPayload).permissions,
+        mcpEnabled: (p as MemberConfigPayload).mcpEnabled ?? false,
+        model: (p as MemberConfigPayload).model,
+        provider: (p as MemberConfigPayload).provider,
+        reasoningEffort: (p as MemberConfigPayload).reasoningEffort,
+      });
+      if (!this.peerConfigs.has(conn.meta.roomId)) this.peerConfigs.set(conn.meta.roomId, new Map());
+      this.peerConfigs.get(conn.meta.roomId)!.set(from, pub);
+      this.emit({ type: "rooms" });
+      this.log("info", `member.config from ${from} in ${conn.meta.roomId}`);
+      return;
+    }
+    if (p.kind === "mcp.call") {
+      await this.handleMcpCall(conn, p as McpCallPayload, from);
+      return;
+    }
+    if (p.kind === "mcp.result" || p.kind === "approval.request" || p.kind === "approval.response") {
+      const m = toMessage(p, this.identity!.agentId, seq);
+      if (m && conn.add(m)) this.emit({ type: "message", roomId: conn.meta.roomId, message: m });
+      this.emit({ type: "rooms" });
+      return;
+    }
     const m = toMessage(p, this.identity!.agentId, seq);
     if (m && conn.add(m)) this.emit({ type: "message", roomId: conn.meta.roomId, message: m });
     const wake = conn.client.shouldWake(p) && this.passesLoopGuard(conn, p);
@@ -596,6 +807,7 @@ export class CollabBridge {
   async dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    void this.lanRelay?.close();
     this.abort.abort();
     this.listeners.clear();
     for (const conn of this.rooms.values()) {

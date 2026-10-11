@@ -18,6 +18,11 @@ const PAYLOAD_KINDS = new Set([
   "task.update",
   "presence",
   "hello",
+  "member.config",
+  "approval.request",
+  "approval.response",
+  "mcp.call",
+  "mcp.result",
 ]);
 
 export function assertPayload(p: unknown): CollabPayload {

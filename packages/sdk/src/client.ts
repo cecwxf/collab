@@ -44,6 +44,7 @@ export interface CreateRoomResult {
   roomKey: Uint8Array;
   roomKeyB64: string;
   uri: string;
+  mode: import("@collab/protocol").TransportMode;
 }
 
 type Waiter = {
@@ -93,8 +94,8 @@ export class CollabClient {
     });
   }
 
-  static createRoom(): CreateRoomResult {
-    return createRoomInvite();
+  static createRoom(opts?: Parameters<typeof createRoomInvite>[0]): CreateRoomResult {
+    return createRoomInvite(opts);
   }
 
   static parseInvite(uri: string) {

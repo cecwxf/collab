@@ -148,7 +148,12 @@ export type PayloadKind =
   | "task.claim"
   | "task.update"
   | "presence"
-  | "hello";
+  | "hello"
+  | "member.config"
+  | "approval.request"
+  | "approval.response"
+  | "mcp.call"
+  | "mcp.result";
 
 export interface PayloadBase {
   v: 1;
@@ -216,6 +221,71 @@ export interface HelloPayload extends PayloadBase {
   displayName?: string;
 }
 
+
+/** Local agent settings announced to the room (never includes API keys). */
+export interface MemberConfigPayload extends PayloadBase {
+  kind: "member.config";
+  model?: string;
+  provider?: string;
+  reasoningEffort?: "low" | "medium" | "high" | "max";
+  /** Display label for the workspace root (not necessarily the absolute path). */
+  workspaceLabel?: string;
+  /** Absolute workspace path is local-only; peers see workspaceLabel. Optionally share basename. */
+  permissions: {
+    /** Auto-allow reads in the shared workspace. */
+    autoRead: boolean;
+    /** Auto-allow writes (default false → approval). */
+    autoWrite: boolean;
+    /** Auto-allow shell commands (default false → approval). */
+    autoShell: boolean;
+    /** Auto-allow network egress from tools (default false → approval). */
+    autoNetwork: boolean;
+  };
+  /** MCP tools this member exposes to the room. */
+  mcpTools?: string[];
+  mcpEnabled?: boolean;
+}
+
+export type ApprovalAction = "fs.write" | "fs.delete" | "shell.exec" | "network.fetch" | "mcp.call";
+
+export interface ApprovalRequestPayload extends PayloadBase {
+  kind: "approval.request";
+  requestId: string;
+  action: ApprovalAction;
+  /** Human-readable summary, e.g. path or command. */
+  summary: string;
+  detail?: string;
+  /** Agent that must approve (usually the workspace owner). */
+  approver: AgentId;
+}
+
+export interface ApprovalResponsePayload extends PayloadBase {
+  kind: "approval.response";
+  requestId: string;
+  decision: "allow" | "deny";
+  reason?: string;
+}
+
+/** MCP-over-room: tool call from a peer into this member's workspace MCP. */
+export interface McpCallPayload extends PayloadBase {
+  kind: "mcp.call";
+  callId: string;
+  tool: string;
+  args: Record<string, unknown>;
+  /** Target agent that hosts the MCP workspace. */
+  target: AgentId;
+}
+
+export interface McpResultPayload extends PayloadBase {
+  kind: "mcp.result";
+  callId: string;
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+  /** Set when the call is waiting on local approval. */
+  pendingApproval?: boolean;
+}
+
 export type CollabPayload =
   | ChatPayload
   | StatusPayload
@@ -225,7 +295,12 @@ export type CollabPayload =
   | TaskClaimPayload
   | TaskUpdatePayload
   | PresencePayload
-  | HelloPayload;
+  | HelloPayload
+  | MemberConfigPayload
+  | ApprovalRequestPayload
+  | ApprovalResponsePayload
+  | McpCallPayload
+  | McpResultPayload;
 
 export type AutoReplyMode = "off" | "mention" | "mention-or-task";
 

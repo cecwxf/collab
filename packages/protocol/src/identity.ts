@@ -2,7 +2,8 @@ import { webcrypto } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { AgentId } from "./types.js";
-import { b64uEncode, b64uDecode, randomBytes, ulidLike } from "./util.js";
+import { b64uEncode, b64uDecode, ulidLike } from "./util.js";
+
 
 const subtle = webcrypto.subtle;
 
@@ -134,24 +135,6 @@ export async function openJoinProof(
   }
 }
 
-export function createRoomInvite(): {
-  roomId: string;
-  roomKey: Uint8Array;
-  roomKeyB64: string;
-  uri: string;
-} {
-  const roomId = ulidLike();
-  const roomKey = randomBytes(32);
-  const roomKeyB64 = b64uEncode(roomKey);
-  const uri = `collab://join/${roomId}#${roomKeyB64}`;
-  return { roomId, roomKey, roomKeyB64, uri };
-}
-
-export function parseInviteUri(uri: string): { roomId: string; roomKeyB64: string } {
-  const m = /^collab:\/\/join\/([A-Za-z0-9_-]+)(?:#([A-Za-z0-9_-]+))?$/.exec(
-    uri.trim(),
-  );
-  if (!m) throw new Error("invalid invite URI");
-  if (!m[2]) throw new Error("invite URI missing room key fragment");
-  return { roomId: m[1]!, roomKeyB64: m[2]! };
-}
+// Invite helpers live in ./invite.js (dual transport: relay | lan).
+export { createRoomInvite, parseInviteUri, inviteWsUrl } from "./invite.js";
+export type { TransportMode, ParsedInvite } from "./invite.js";

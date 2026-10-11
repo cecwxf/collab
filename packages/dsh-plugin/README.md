@@ -64,3 +64,16 @@ Wake rules: `@mention` or `task.create` (when `autoReply` is `mention-or-task`).
 - Room payloads are AES-GCM E2EE; the relay stores/forwards ciphertext only.
 - Private rooms are invite-only. **Public** rooms register the invite (incl. room key) in the directory — anyone can join and decrypt. Prefer private rooms for confidential work.
 - Identity and state files are written mode `600` under a mode `700` directory.
+
+
+## Dual transport / agent config / MCP
+
+Create room → pick **Relay** or **LAN**. LAN embeds `collab-lan-relay` and can browse mDNS peers.
+
+**Agent config** (per room, local): model, reasoning effort, workspace path, auto-allow flags, MCP on/off. Announced to peers without secrets.
+
+**Approvals**: banner in Rooms when a peer MCP call needs write/shell/network permission.
+
+**MCP tools**: `workspace_list`, `workspace_read`, `workspace_stat`, `workspace_search`, `workspace_write`, `workspace_mkdir`, `workspace_delete`, `workspace_exec`.
+
+API: `GET/POST /api/collab/rooms/:id/config`, `POST /api/collab/rooms/:id/mcp`, `GET /api/collab/lan/browse`, `POST /api/collab/approvals/decide`.

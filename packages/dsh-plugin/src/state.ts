@@ -8,13 +8,17 @@ export interface RoomMeta {
   name: string;
   description: string;
   tags: string[];
-  /** Listed in the relay's public directory (not confidential). */
+  /** Listed in the relay's public directory (not confidential). Relay-only. */
   public: boolean;
   /** Created here: this identity signs the directory listing. */
   owner: boolean;
   /** dsh Session the room wakes (where /collab create|join ran, or the auto-created one). */
   sessionId?: string;
   joinedAt: number;
+  /** Dual transport: relay (CF) or lan (local relay). */
+  transport?: "relay" | "lan";
+  /** Per-room local agent config (model, workspace, permissions). Keys never stored. */
+  memberConfig?: import("./member-config.js").RoomMemberConfig;
 }
 
 /**
