@@ -1,5 +1,5 @@
 /**
- * Collab Rooms — browser UI for the dsh-collab plugin.
+ * DSH Room — browser UI for the dsh room plugin.
  * Independent product surface inside the dsh shell (sidebar entry + main panel).
  * Visual identity, layout, and copy are Rooms-specific (rooms / members / invites /
  * search / tasks). Own visual identity — not a clone of other dsh panel UIs.
@@ -9,7 +9,7 @@ import { Button, Input, Modal, StateDot, Switch, Tag, Toast, writeClipboard } fr
 import roomsCss from "./rooms.css";
 import { createRoomsStore } from "./store.js";
 
-export const name = "dsh-collab-client";
+export const name = "dsh-room-client";
 export const inject = ["slots", "layout"];
 const PANEL_ID = "collab";
 
@@ -598,7 +598,7 @@ function Overlay({ store }) {
 function installStyles() {
   if (typeof document === "undefined") return () => {};
   const style = document.createElement("style");
-  style.setAttribute("data-dsh-collab", "rooms");
+  style.setAttribute("data-dsh-room", "rooms");
   style.textContent = roomsCss;
   document.head.appendChild(style);
   return () => style.remove();
@@ -606,14 +606,14 @@ function installStyles() {
 
 export function apply(ctx) {
   const store = createRoomsStore();
-  ctx.effect(() => installStyles(), "dsh-collab: styles");
-  ctx.effect(() => () => store.dispose(), "dsh-collab: store");
+  ctx.effect(() => installStyles(), "dsh-room: styles");
+  ctx.effect(() => () => store.dispose(), "dsh-room: store");
   const info = () => ctx.layout.panelInfo;
   const ensurePanel = () => { try { if (info().getSnapshot().activePanelId !== PANEL_ID) ctx.layout.selectPanel(PANEL_ID); } catch { /* layout busy */ } };
 
-  ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({ name: "sidebar.panellist", id: PANEL_ID, order: 11, label: () => "Rooms" }, PanelIcon));
+  ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({ name: "sidebar.panellist", id: PANEL_ID, order: 11, label: () => "DSH Room" }, PanelIcon));
   ctx.slots.inject("main", () => ctx.slots.register({ name: "main", key: PANEL_ID, inject: () => ({ store }) }, RoomsMain));
-  ctx.slots.inject("shell.overlay", () => ctx.slots.register({ name: "shell.overlay", id: "dsh-collab-dialogs", inject: () => ({ store }) }, Overlay));
+  ctx.slots.inject("shell.overlay", () => ctx.slots.register({ name: "shell.overlay", id: "dsh-room-dialogs", inject: () => ({ store }) }, Overlay));
   // While Rooms is the active panel, replace the Workspaces region with the room list.
   ctx.slots.inject("sidebar.workspaces", () => {
     let dispose;

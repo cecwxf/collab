@@ -1,21 +1,26 @@
-# Updating the Mac dsh plugin when box SSH is unavailable
+# Updating the Mac mini collab / dsh room plugin
 
-The shared box currently has **no `openssh-client` / `rsync` in apt** (Debian trixie candidate: none). Prefer GitHub:
+Package id: `@collab/dsh-room`. Sidebar: **DSH Room**. Prefer “dsh room” over “deepseek room”.
+
+## From the box (Tailscale userspace + OpenSSH in ~/.local/bin)
 
 ```sh
-# On the Mac
-cd ~/collab-e2e   # or wherever you keep the checkout
+export PATH="$HOME/.local/bin:$PATH"
+SOCK=$HOME/.local/tailscale/tailscaled.sock
+ssh -o "ProxyCommand=tailscale --socket=$SOCK nc %h %p" cecwxf@100.73.167.125 '…'
+```
+
+## On the Mac
+
+```sh
+cd ~/collab-e2e   # cecwxf/collab checkout (or linked packages)
 git fetch origin && git checkout master && git pull --ff-only
-# Refresh the dsh plugin link / install
-# (adjust paths to your profile)
-dsh plugin add /path/to/collab/packages/dsh-plugin
-# or: rsync local clone into the profile node_modules path you already use
+npm install && npm run build -w @collab/dsh-room
+# dsh is usually under a profile PATH — use the same launcher you already use for collab
+dsh plugin --profile collab add ./packages/dsh-room
+bash ~/collab-e2e/restart-mac-dsh.sh
 ```
 
-If you restore SSH on the box later:
+## Restoring openssh-client on the Debian box
 
-```sh
-# Extract openssh-client from a Debian .deb when apt has no candidate, e.g.
-# http://ftp.debian.org/debian/pool/main/o/openssh/openssh-client_*_amd64.deb
-# then: ar x … && tar xf data.tar.* && cp usr/bin/ssh ~/.local/bin/
-```
+Apt may have no candidate. Extract `ssh`/`scp` from the Debian `.deb` with Python `lzma` + `tarfile` into `~/.local/bin` (see prior agent notes). `ssh -V` should report OpenSSH_10.

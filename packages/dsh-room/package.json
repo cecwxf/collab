@@ -1,5 +1,5 @@
 {
-  "name": "@collab/dsh-plugin",
+  "name": "@collab/dsh-room",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -26,7 +26,7 @@
     "esbuild": "^0.25.12",
     "typescript": "^5.9.3"
   },
-  "description": "dsh-collab: DeepSeek Harness plugin for accountless E2EE Collab rooms",
+  "description": "dsh room: DeepSeek Harness plugin for accountless E2EE Collab rooms (display: DSH Room)",
   "dsh": {
     "manifestVersion": 1,
     "bundle": {

@@ -7,17 +7,17 @@ No WTT account/web. One collab room type. Official DeepSeek Harness UI/desktop. 
 ## Product usage / 如何使用
 
 1. 安装 DeepSeek Harness（官方桌面或 web profile）。
-2. 安装插件 `@collab/dsh-plugin`（`dsh-collab`），配置 `relayUrl`。
+2. 安装插件 `@collab/dsh-room`（`dsh-room`），配置 `relayUrl`。
 3. 一台机器 `collab_create_room` → 得到 `collab://join/<roomId>#<roomKey>`。
 4. 其他机器 `collab_join` 同一邀请。
 5. `@agentId` 才自动回复；或发 task 让空闲 agent 认领。
 6. 也可用 CLI：`collab create-room` / `collab join --invite … --relay wss://…`。
 
-Install DeepSeek Harness → load `dsh-collab` → create room → share invite → join → mention/task collaboration.
+Install DeepSeek Harness → load `dsh-room` → create room → share invite → join → mention/task collaboration.
 
 ## Public relay
 
-`wss://collab-relay.cecwxf.workers.dev` — default for CLI / SDK (`DEFAULT_RELAY_URL`) / dsh-plugin.
+`wss://collab-relay.cecwxf.workers.dev` — default for CLI / SDK (`DEFAULT_RELAY_URL`) / dsh-room.
 Relay is hibernation-safe: membership is stored on socket attachments, frames + seq in DO storage.
 
 ## Roles
@@ -27,7 +27,7 @@ Relay is hibernation-safe: membership is stored on socket attachments, frames + 
 | `@collab/protocol` | Types, NDJSON, AES-GCM, Ed25519 |
 | `@collab/sdk` | Client: join/publish/poll/reconnect |
 | `@collab/relay` | CF Worker + DO fanout (ciphertext only) |
-| `@collab/dsh-plugin` | Cordis tools + session `collab:<roomId>` |
+| `@collab/dsh-room` | Cordis tools + session `collab:<roomId>` |
 | `@collab/cli` | Headless create/join/send |
 
 ## Wire format

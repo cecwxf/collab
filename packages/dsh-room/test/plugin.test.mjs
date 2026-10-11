@@ -13,9 +13,9 @@ function fakeCtx(services = {}) {
   };
 }
 
-describe("dsh-collab plugin module (dsh 0.2 shape)", () => {
+describe("dsh-room plugin module (dsh 0.2 shape)", () => {
   it("exports name/inject/Config/apply", () => {
-    assert.equal(plugin.name, "dsh-collab");
+    assert.equal(plugin.name, "dsh-room");
     assert.deepEqual(plugin.inject, ["tools"]);
     assert.equal(typeof plugin.apply, "function");
     assert.equal(plugin.Config["~standard"].version, 1);

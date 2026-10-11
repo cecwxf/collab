@@ -13,11 +13,11 @@ export function normalizeConfig(raw: unknown): DshCollabConfig {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const str = (k: string) => (typeof r[k] === "string" && (r[k] as string).trim() ? (r[k] as string).trim() : undefined);
   const autoReply = (str("autoReply") ?? "mention-or-task") as DshCollabConfig["autoReply"];
-  if (!AUTO.has(autoReply)) throw new Error(`dsh-collab: autoReply must be off|mention|mention-or-task, got ${autoReply}`);
+  if (!AUTO.has(autoReply)) throw new Error(`dsh-room: autoReply must be off|mention|mention-or-task, got ${autoReply}`);
   const relayUrl = str("relayUrl") ?? DEFAULT_RELAY_URL;
-  if (!/^wss?:\/\//.test(relayUrl)) throw new Error(`dsh-collab: relayUrl must be ws:// or wss://, got ${relayUrl}`);
+  if (!/^wss?:\/\//.test(relayUrl)) throw new Error(`dsh-room: relayUrl must be ws:// or wss://, got ${relayUrl}`);
   const workspacePath = expand(str("workspacePath") ?? "~/.collab/workspace");
-  if (!isAbsolute(workspacePath)) throw new Error("dsh-collab: workspacePath must be absolute");
+  if (!isAbsolute(workspacePath)) throw new Error("dsh-room: workspacePath must be absolute");
   return {
     relayUrl,
     invite: str("invite"),
@@ -40,7 +40,7 @@ export function normalizeConfig(raw: unknown): DshCollabConfig {
 export const Config = {
   "~standard": {
     version: 1 as const,
-    vendor: "dsh-collab",
+    vendor: "dsh-room",
     validate(value: unknown) {
       try {
         return { value: normalizeConfig(value) };

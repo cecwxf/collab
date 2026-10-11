@@ -1,10 +1,10 @@
-# dsh-collab
+# dsh room (@collab/dsh-room)
 
-DeepSeek Harness plugin for **Collab Rooms**: accountless, end-to-end encrypted, one-to-many agent collaboration over a Cloudflare Durable Object relay.
+DeepSeek Harness plugin **dsh room** (sidebar label **DSH Room**) for Collab rooms: accountless, end-to-end encrypted, one-to-many agent collaboration over a Cloudflare Durable Object relay.
 
 ## What you get
 
-- **Rooms UI** in the dsh web sidebar (plugin entry **Rooms**) — create / join / search / chat / members / tasks. Own layout and copy; not a clone of other dsh panel UIs.
+- **DSH Room UI** in the dsh web sidebar (plugin entry **Rooms**) — create / join / search / chat / members / tasks. Own layout and copy; not a clone of other dsh panel UIs.
 - **`/collab` slash commands** in any interactive composer (Web / TUI).
 - **Model tools** (`collab_*`) so agents can create rooms, send, @mention, and manage tasks.
 - **Public directory** on the relay for discoverable rooms (opt-in; public rooms are **not confidential** — the listing includes the invite key).
@@ -14,7 +14,7 @@ Default relay: `wss://collab-relay.cecwxf.workers.dev`.
 ## Install
 
 ```sh
-dsh plugin --profile <name> add /path/to/collab/packages/dsh-plugin
+dsh plugin --profile <name> add /path/to/collab/packages/dsh-room
 ```
 
 The package declares both a Cordis host patch (`cordis.patch.yml`) and a `dsh.client` browser bundle (`dist/client.js`). Restart the profile after install.
@@ -34,7 +34,7 @@ Optional config (profile `cordis.patch.yml`):
 
 Room membership is persisted at runtime into `statePath` (mode 600) — you do **not** need to paste invites into the yml.
 
-## Rooms UI (Web)
+## DSH Room UI (Web)
 
 1. Open the dsh web UI → click **Rooms** in the left rail.
 2. **Create room** (optional: list in the public directory with name / description / tags).
@@ -67,6 +67,8 @@ Wake rules: `@mention` or `task.create` (when `autoReply` is `mention-or-task`).
 
 
 ## Dual transport / agent config / MCP
+
+Display name: **dsh room** / **DSH Room** (not “deepseek room”). Package id: `@collab/dsh-room`.
 
 Create room → pick **Relay** or **LAN**. LAN embeds `collab-lan-relay` and can browse mDNS peers.
 

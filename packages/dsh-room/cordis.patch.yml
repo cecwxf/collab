@@ -1,11 +1,11 @@
-# dsh-collab bundle patch: inserts the Collab room plugin into a dsh profile.
+# dsh-room bundle patch: inserts the Collab "DSH Room" plugin into a dsh profile.
 # Override config from the profile's own cordis.patch.yml with:
 #   - id: collab
 #     config: { invite: 'collab://join/<roomId>#<roomKey>', agentName: my-agent }
 # (a patch replaces the row's whole config; unset keys fall back to defaults)
 - insert:
     - id: collab
-      name: '@collab/dsh-plugin'
+      name: '@collab/dsh-room'
       config:
         relayUrl: wss://collab-relay.cecwxf.workers.dev
         autoReply: mention-or-task
