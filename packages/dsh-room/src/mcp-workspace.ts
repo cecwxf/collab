@@ -7,6 +7,7 @@ import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 import type { RoomMemberConfig, McpToolName } from "./member-config.js";
+import { resolvePeerGrant } from "./member-config.js";
 import type { ApprovalQueue } from "./approval-queue.js";
 import type { ApprovalAction } from "@collab/protocol";
 
@@ -62,7 +63,33 @@ export class WorkspaceMcp {
 
   private async maybeApprove(tool: string, summary: string, detail: string, from: string) {
     const action = actionFor(tool);
+    // Peer grant ACL (what other members may do on *this* workspace via MCP)
+    let cap: "read" | "write" | "exec" | "delete" | null = null;
+    if (tool === "workspace_read" || tool === "workspace_list" || tool === "workspace_stat" || tool === "workspace_search") cap = "read";
+    else if (tool === "workspace_write" || tool === "workspace_mkdir") cap = "write";
+    else if (tool === "workspace_delete") cap = "delete";
+    else if (tool === "workspace_exec") cap = "exec";
+    if (cap) {
+      const grant = resolvePeerGrant(this.cfg, from, cap);
+      if (grant === "deny") throw new Error(`peer grant deny: ${cap} for ${from}`);
+      if (grant === "auto") return;
+      // ask → fall through to approval queue
+    }
+    if (!action && cap === "read") {
+      // read asks go through generic approval as fs.write-like? use shell? Use fs.write bucket for ask-read via summary
+      const decision = await this.approvals.request({
+        roomId: this.roomId,
+        action: "fs.write",
+        summary: `MCP read: ${summary}`,
+        detail,
+        from,
+        timeoutMs: 120_000,
+      });
+      if (decision !== "allow") throw new Error(`denied: read (${summary})`);
+      return;
+    }
     if (!action) return;
+    // Legacy auto* still applies for "ask" path shortcuts when host marked auto*
     const p = this.cfg.permissions;
     if (action === "fs.write" || action === "fs.delete") {
       if (p.autoWrite) return;

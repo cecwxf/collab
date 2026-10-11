@@ -113,7 +113,10 @@ export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId" | "membe
   bound: boolean;
   transport?: "relay" | "lan";
   /** Public member config (no secrets / no absolute path). */
-  memberConfig?: ReturnType<typeof publicMemberConfig> | null;
+  memberConfig?: (ReturnType<typeof publicMemberConfig> & {
+    workspacePath?: string;
+    peerGrants?: RoomMemberConfig["peerGrants"];
+  }) | null;
   peerConfigs?: Record<string, ReturnType<typeof publicMemberConfig>>;
 }
 
@@ -619,7 +622,7 @@ export class CollabBridge {
       sessionTitle: `collab:${conn.meta.roomId}`,
       bound: !!sessionId,
       transport: conn.meta.transport ?? (conn.meta.invite.startsWith("collab://lan/") ? "lan" : "relay"),
-      memberConfig: conn.meta.memberConfig ? publicMemberConfig(conn.meta.memberConfig) : null,
+      memberConfig: conn.meta.memberConfig ? { ...publicMemberConfig(conn.meta.memberConfig), workspacePath: conn.meta.memberConfig.workspacePath, peerGrants: conn.meta.memberConfig.peerGrants, permissions: conn.meta.memberConfig.permissions } : null,
       peerConfigs: Object.fromEntries(this.peerConfigs.get(conn.meta.roomId) ?? []),
     };
   }
@@ -651,6 +654,12 @@ export class CollabBridge {
       ...cur,
       ...patch,
       permissions: { ...cur.permissions, ...(patch.permissions ?? {}) },
+      peerGrants: patch.peerGrants
+        ? {
+            default: { ...(cur.peerGrants?.default ?? { read: "auto", write: "ask", exec: "ask", delete: "ask" }), ...patch.peerGrants.default },
+            byAgent: { ...(cur.peerGrants?.byAgent ?? {}), ...(patch.peerGrants.byAgent ?? {}) },
+          }
+        : cur.peerGrants,
       workspacePath: patch.workspacePath ?? cur.workspacePath,
       workspaceLabel: patch.workspaceLabel ?? cur.workspaceLabel,
     };
@@ -666,7 +675,7 @@ export class CollabBridge {
   getMemberConfig(roomId: string) {
     const conn = this.room(roomId);
     const cfg = conn.meta.memberConfig ?? defaultMemberConfig(this.config.workspacePath);
-    return { ...publicMemberConfig(cfg), workspacePath: cfg.workspacePath };
+    return { ...publicMemberConfig(cfg), workspacePath: cfg.workspacePath, peerGrants: cfg.peerGrants };
   }
 
   async decideApproval(requestId: string, decision: "allow" | "deny") {

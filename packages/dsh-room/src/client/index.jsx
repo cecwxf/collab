@@ -59,7 +59,6 @@ function renderMentions(text) {
 function PanelIcon({ size }) { return <RoomsIcon size={size} />; }
 
 function RoomsSidebar({ store, ensurePanel }) {
-  const s = useStore(store);
   const a = store.actions;
   const [menu, setMenu] = useState(null);
   const [searching, setSearching] = useState(false);
@@ -263,31 +262,166 @@ function Composer({ room, store, draft, setDraft }) {
   const a = store.actions;
   const [mode, setMode] = useState("chat");
   const [busy, setBusy] = useState(false);
+  const [modelOpen, setModelOpen] = useState(false);
+  const [permOpen, setPermOpen] = useState(false);
+  const [peerOpen, setPeerOpen] = useState(false);
   const offline = room.status !== "online";
+  const mc = room.memberConfig || {};
+  const modelLabel = mc.model || "Default model";
+  const effort = mc.reasoningEffort || "medium";
+  const permSummary = (() => {
+    const p = mc.permissions || {};
+    const bits = [];
+    if (p.autoRead !== false) bits.push("read");
+    if (p.autoWrite) bits.push("write");
+    if (p.autoShell) bits.push("shell");
+    if (p.autoNetwork) bits.push("net");
+    return bits.length ? `Auto · ${bits.join("+")}` : "Ask to run";
+  })();
+  const MODELS = ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"];
+  const EFFORTS = ["low", "medium", "high", "max"];
+
+  const patchConfig = async (patch) => {
+    try {
+      const next = {
+        model: mc.model,
+        provider: mc.provider,
+        reasoningEffort: mc.reasoningEffort || "medium",
+        workspacePath: mc.workspacePath,
+        workspaceLabel: mc.workspaceLabel,
+        mcpEnabled: mc.mcpEnabled !== false,
+        ...patch,
+        permissions: { ...(mc.permissions || { autoRead: true, autoWrite: false, autoShell: false, autoNetwork: false }), ...(patch.permissions || {}) },
+        peerGrants: patch.peerGrants !== undefined ? patch.peerGrants : mc.peerGrants,
+      };
+      await a.saveConfig(room.roomId, next);
+    } catch (e) { a.toast(e.message); }
+  };
+
   const submit = async () => {
-    const t = draft.trim();
-    if (!t || busy) return;
+    const text = draft.trim();
+    if (!text || busy) return;
     setBusy(true);
     try {
       if (mode === "task") {
-        const m = /^@([A-Za-z0-9][\w.:-]*)\s+/.exec(t);
-        await a.task(room.roomId, m ? t.slice(m[0].length) : t, m ? m[1] : undefined);
+        const m = /^@([A-Za-z0-9][\w.:-]*)\s+/.exec(text);
+        await a.task(room.roomId, m ? text.slice(m[0].length) : text, m ? m[1] : undefined);
         setMode("chat");
-      } else await a.send(room.roomId, t);
+      } else await a.send(room.roomId, text);
       setDraft("");
     } catch (e) { a.toast(e.message); }
     finally { setBusy(false); }
   };
+
   return (
-    <div className="rm-composer">
-      <div className="rm-composer-box">
-        <button type="button" className="rm-composer-mode" aria-pressed={mode === "task"} title={mode === "task" ? "Creating a task (click for chat)" : "Create a task"} onClick={() => setMode(mode === "task" ? "chat" : "task")}><TaskIcon /></button>
+    <div className="rm-composer-card" data-rm-composer="">
+      <div className="rm-composer-grow">
         <textarea rows={1} disabled={offline} aria-label="Message the room"
           placeholder={offline ? "Room is offline" : mode === "task" ? "Task: @assignee title (optional assignee)" : `Message ${room.name} · @agent wakes it`}
           value={draft} onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void submit(); } }} />
       </div>
-      <Button variant="primary" size="sm" aria-label={mode === "task" ? "Create task" : "Send"} disabled={!draft.trim() || busy || offline} onClick={submit} icon={<SendIcon />} />
+      <div className="rm-composer-row">
+        <div className="rm-composer-tools">
+          <button type="button" className="rm-composer-add" title={mode === "task" ? "Switch to chat" : "Create a task"} aria-pressed={mode === "task"} onClick={() => setMode(mode === "task" ? "chat" : "task")}><TaskIcon /></button>
+        </div>
+        <div className="rm-composer-modes">
+          <div className="rm-composer-popwrap">
+            <button type="button" className="rm-composer-select" disabled={offline} onClick={() => { setModelOpen(!modelOpen); setPermOpen(false); setPeerOpen(false); }} title="Room agent model">
+              <span className="rm-composer-model-text">{modelLabel}</span>
+              <span className="rm-composer-model-icon" aria-hidden>◆</span>
+              <span className="rm-composer-effort">{effort}</span>
+            </button>
+            {modelOpen ? (
+              <div className="rm-composer-menu" role="menu">
+                <div className="rm-composer-menu-label">Model</div>
+                {MODELS.map((m) => (
+                  <button key={m} type="button" role="menuitem" className={mc.model === m ? "is-active" : ""} onClick={() => { void patchConfig({ model: m }); setModelOpen(false); }}>{m}</button>
+                ))}
+                <div className="rm-composer-menu-label">Reasoning</div>
+                {EFFORTS.map((e) => (
+                  <button key={e} type="button" role="menuitem" className={effort === e ? "is-active" : ""} onClick={() => { void patchConfig({ reasoningEffort: e }); setModelOpen(false); }}>{e}</button>
+                ))}
+                <button type="button" role="menuitem" onClick={() => { setModelOpen(false); a.openDialog({ kind: "config", roomId: room.roomId }); }}>More agent settings…</button>
+              </div>
+            ) : null}
+          </div>
+          <div className="rm-composer-popwrap">
+            <button type="button" className="rm-composer-select" disabled={offline} onClick={() => { setPermOpen(!permOpen); setModelOpen(false); setPeerOpen(false); }} title="Your auto-permissions">
+              {permSummary}
+            </button>
+            {permOpen ? (
+              <div className="rm-composer-menu" role="menu">
+                <div className="rm-composer-menu-label">Auto-allow (you)</div>
+                {[["autoRead","Read"],["autoWrite","Write"],["autoShell","Shell"],["autoNetwork","Network"]].map(([k, label]) => (
+                  <label key={k} className="rm-composer-check">
+                    <input type="checkbox" checked={!!(mc.permissions || {})[k] || (k === "autoRead" && (mc.permissions?.autoRead !== false))}
+                      onChange={(e) => void patchConfig({ permissions: { [k]: e.target.checked } })} />
+                    {label}
+                  </label>
+                ))}
+                <button type="button" role="menuitem" onClick={() => { setPermOpen(false); a.openDialog({ kind: "config", roomId: room.roomId }); }}>Open full settings…</button>
+              </div>
+            ) : null}
+          </div>
+          <div className="rm-composer-popwrap">
+            <button type="button" className="rm-composer-select rm-composer-peers" disabled={offline} onClick={() => { setPeerOpen(!peerOpen); setModelOpen(false); setPermOpen(false); }} title="Peer MCP limits on this workspace">
+              Peer MCP
+            </button>
+            {peerOpen ? (
+              <PeerGrantsMenu room={room} store={store} onClose={() => setPeerOpen(false)} patchConfig={patchConfig} />
+            ) : null}
+          </div>
+        </div>
+        <div className="rm-composer-trailing">
+          <button type="button" className="rm-composer-send" aria-label={mode === "task" ? "Create task" : "Send"} disabled={!draft.trim() || busy || offline} onClick={submit}><SendIcon /></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PeerGrantsMenu({ room, store, onClose, patchConfig }) {
+  const mc = room.memberConfig || {};
+  const def = (mc.peerGrants && mc.peerGrants.default) || { read: "auto", write: "ask", exec: "ask", delete: "ask" };
+  const byAgent = (mc.peerGrants && mc.peerGrants.byAgent) || {};
+  const peers = (room.members || []).filter((m) => !m.self);
+  const setDefault = (cap, v) => {
+    void patchConfig({ peerGrants: { default: { ...def, [cap]: v }, byAgent: { ...byAgent } } });
+  };
+  const setPeer = (agentId, cap, v) => {
+    const cur = { ...(byAgent[agentId] || {}) };
+    cur[cap] = v;
+    void patchConfig({ peerGrants: { default: { ...def }, byAgent: { ...byAgent, [agentId]: cur } } });
+  };
+  const GRANT = ["auto", "ask", "deny"];
+  return (
+    <div className="rm-composer-menu rm-composer-menu-wide" role="menu">
+      <div className="rm-composer-menu-label">Default peer limits (this workspace)</div>
+      <div className="rm-note" style={{ margin: "0 8px 6px" }}>Controls what same-room peers may do via MCP on your path. Never shares API keys.</div>
+      {["read", "write", "exec", "delete"].map((cap) => (
+        <div key={cap} className="rm-grant-row">
+          <span>{cap}</span>
+          <select value={def[cap] || "ask"} onChange={(e) => setDefault(cap, e.target.value)} aria-label={`Default ${cap}`}>
+            {GRANT.map((g) => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+      ))}
+      {peers.length ? <div className="rm-composer-menu-label">Per peer</div> : <div className="rm-note" style={{ margin: 8 }}>No other peers online yet.</div>}
+      {peers.map((m) => (
+        <div key={m.agentId} className="rm-peer-grant-block">
+          <div className="rm-peer-grant-name">{m.agentId}</div>
+          {["read", "write", "exec", "delete"].map((cap) => (
+            <div key={cap} className="rm-grant-row">
+              <span>{cap}</span>
+              <select value={(byAgent[m.agentId] && byAgent[m.agentId][cap]) || def[cap] || "ask"} onChange={(e) => setPeer(m.agentId, cap, e.target.value)} aria-label={`${m.agentId} ${cap}`}>
+                {GRANT.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+      ))}
+      <button type="button" role="menuitem" onClick={onClose}>Done</button>
     </div>
   );
 }
@@ -392,7 +526,6 @@ function EmptyMain({ store }) {
 
 function RoomsMain({ store }) {
   // approvals rendered in ActiveRoom
-  const s = useStore(store);
   const [drafts, setDrafts] = useState({});
   const room = s.rooms.find((r) => r.roomId === s.selected);
   if (!room) return <EmptyMain store={store} />;
@@ -590,6 +723,7 @@ function ConfigDialog({ store, d }) {
         </Field>
         <Field label="Workspace label" htmlFor="rm-cfg-wsl"><Input id="rm-cfg-wsl" value={f.workspaceLabel} onChange={(e) => setF({ ...f, workspaceLabel: e.target.value })} /></Field>
         <div className="rm-switch-row"><div><div className="rm-field-label">Expose MCP workspace</div><div className="rm-field-hint">Same-room peers can call workspace_* tools over E2EE.</div></div><Switch checked={f.mcpEnabled} onChange={(v) => setF({ ...f, mcpEnabled: v })} label="MCP" /></div>
+        <div className="rm-note">Peer MCP limits (read/write/exec/delete) are edited from the room composer · Peer MCP control.</div>
         <div className="rm-switch-row"><div><div className="rm-field-label">Auto-allow reads</div></div><Switch checked={f.autoRead} onChange={(v) => setF({ ...f, autoRead: v })} label="autoRead" /></div>
         <div className="rm-switch-row"><div><div className="rm-field-label">Auto-allow writes</div><div className="rm-field-hint">Off → approval UI for write/mkdir/delete.</div></div><Switch checked={f.autoWrite} onChange={(v) => setF({ ...f, autoWrite: v })} label="autoWrite" /></div>
         <div className="rm-switch-row"><div><div className="rm-field-label">Auto-allow shell</div></div><Switch checked={f.autoShell} onChange={(v) => setF({ ...f, autoShell: v })} label="autoShell" /></div>
@@ -601,7 +735,6 @@ function ConfigDialog({ store, d }) {
 }
 
 function ApprovalBanner({ store }) {
-  const s = useStore(store);
   const list = s.approvals || [];
   if (!list.length) return null;
   const a = store.actions;
@@ -626,7 +759,6 @@ function ApprovalBanner({ store }) {
 
 function WorkspaceDialog({ store }) {
   const a = store.actions;
-  const s = useStore(store);
   const [name, setName] = useState("");
   const [path, setPath] = useState("");
   const [err, setErr] = useState(null);
@@ -667,7 +799,6 @@ function WorkspaceDialog({ store }) {
 }
 
 function Overlay({ store }) {
-  const s = useStore(store);
   const d = s.dialog;
   return (
     <>
