@@ -4,6 +4,10 @@ export function encodeFrame(frame: WireFrame): string {
   return JSON.stringify(frame);
 }
 
+/** Exact NDJSON line the CF room DO auto-answers without waking (must stay byte-identical). */
+export const HIBERNATION_PING_LINE = JSON.stringify({ v: 1, type: "ctrl", method: "ping" }) + "\n";
+export const HIBERNATION_PONG_LINE = JSON.stringify({ v: 1, type: "ctrl", method: "pong", ts: 0 }) + "\n";
+
 export function decodeFrame(line: string): WireFrame {
   const trimmed = line.trim();
   if (!trimmed) throw new Error("empty frame");

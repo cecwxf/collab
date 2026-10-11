@@ -89,15 +89,42 @@ interface SocketState {
 const FRAME_PREFIX = "f:";
 const frameKey = (seq: number) => FRAME_PREFIX + String(seq).padStart(12, "0");
 
+/**
+ * Hibernation-first room DO:
+ * - No setAlarm / setInterval — idle rooms with open sockets sleep; empty rooms cost ~0.
+ * - Client sends minimal `{v:1,type:ctrl,method:ping}` every ~45s; CF auto-responds
+ *   without waking this isolate (must match HIBERNATION_PING_LINE byte-for-byte).
+ * - Mismatched ping frames WOULD wake the DO — keep client frames minimal.
+ */
 export class CollabRoom implements DurableObject {
   /** rate limit buckets: in-memory only, resetting on hibernation is acceptable */
   private rate = new Map<string, number[]>();
   private roomRate: number[] = [];
+  private autoResponseReady = false;
 
   constructor(
     private state: DurableObjectState,
     _env: Env,
-  ) {}
+  ) {
+    // Once per isolate boot — not per connection — so we do not reconfigure on every accept.
+    this.ensureAutoResponse();
+  }
+
+  private ensureAutoResponse() {
+    if (this.autoResponseReady) return;
+    try {
+      // Byte-identical to packages/protocol HIBERNATION_PING_LINE / PONG_LINE
+      this.state.setWebSocketAutoResponse(
+        new WebSocketRequestResponsePair(
+          JSON.stringify({ v: 1, type: "ctrl", method: "ping" }) + "\n",
+          JSON.stringify({ v: 1, type: "ctrl", method: "pong", ts: 0 }) + "\n",
+        ),
+      );
+      this.autoResponseReady = true;
+    } catch {
+      /* older runtime: pings fall through to handleFrame (wakes DO — clients should still use 45s+) */
+    }
+  }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -106,18 +133,8 @@ export class CollabRoom implements DurableObject {
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
+    this.ensureAutoResponse();
     this.state.acceptWebSocket(server);
-    // Keep hibernated sockets alive: CF answers ping without waking the DO isolate.
-    try {
-      this.state.setWebSocketAutoResponse(
-        new WebSocketRequestResponsePair(
-          JSON.stringify({ v: 1, type: "ctrl", method: "ping" }) + "\n",
-          JSON.stringify({ v: 1, type: "ctrl", method: "pong", ts: 0 }) + "\n",
-        ),
-      );
-    } catch {
-      /* older runtime */
-    }
     this.setState(server, { roomId, joined: false });
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -196,8 +213,9 @@ export class CollabRoom implements DurableObject {
     if (frame.v !== 1) return this.err(ws, "bad_version", "v must be 1");
     const s = this.getState(ws);
 
+    // Fallback only when auto-response did not match (wakes this isolate — avoid in production clients).
     if (frame.type === "ctrl" && frame.method === "ping") {
-      this.send(ws, { v: 1, type: "ctrl", method: "pong", ts: Date.now() });
+      this.send(ws, { v: 1, type: "ctrl", method: "pong", ts: 0 });
       return;
     }
     if (frame.type === "ctrl" && frame.method === "join") {

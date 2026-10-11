@@ -26,6 +26,7 @@ const json = (status: number, body: unknown) =>
     headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*", "cache-control": "no-store" },
   });
 
+/** Request-driven only: no alarms. Expired listings purged lazily on GET/POST. */
 export class CollabDirectory implements DurableObject {
   private buckets = new Map<string, number[]>();
 

@@ -25,6 +25,9 @@ import { WsTransport } from "./ws-transport.js";
 export type PayloadHandler = (payload: CollabPayload, meta: { seq: number; from: string }) => void;
 export type PeerHandler = (peers: PeerInfo[], event?: { type: "joined" | "left"; agentId: string }) => void;
 export type ConnectionStatus = "connected" | "connecting" | "disconnected";
+/** Client→relay keepalive. Must match CollabRoom setWebSocketAutoResponse request bytes exactly
+ *  (no roomId/agentId) so Cloudflare answers without waking the Durable Object. */
+export const CLIENT_PING_MS = 45_000;
 export type StatusHandler = (status: ConnectionStatus, detail?: string) => void;
 
 export interface CollabClientOptions {
@@ -469,6 +472,8 @@ export class CollabClient {
 
   private startPing(): void {
     this.stopPing();
+    // Minimal frame only — CF hibernation auto-response matches this exact JSON+\n.
+    // Extra fields would miss the auto-response and wake the room DO every interval.
     this.pingTimer = setInterval(() => {
       if (!this.transport.connected) return;
       try {
@@ -476,13 +481,11 @@ export class CollabClient {
           v: 1,
           type: "ctrl",
           method: "ping",
-          roomId: this.roomId,
-          agentId: this.identity.agentId,
-        });
+        } as WireFrame);
       } catch {
         /* ignore */
       }
-    }, 15_000);
+    }, CLIENT_PING_MS);
   }
 
   private stopPing(): void {
@@ -491,13 +494,17 @@ export class CollabClient {
   }
 
   private async reconnectLoop(): Promise<void> {
-    let delay = 400;
+    // Exponential backoff with jitter — avoid reconnect storms that wake room DOs.
+    let delay = 1_000;
+    let attempts = 0;
     while (!this.disposed && !this.joined) {
       try {
         this.setConnStatus("connecting", "reconnect");
-        await sleep(delay);
+        const jitter = Math.floor(Math.random() * Math.min(500, delay / 4));
+        await sleep(delay + jitter);
         await this.join();
-        // Re-announce so peers refresh presence after a blip
+        attempts = 0;
+        // Presence is optional; skip if join already refreshed peer list for peers.
         try {
           await this.publish({ kind: "presence", state: "online" });
         } catch {
@@ -505,7 +512,12 @@ export class CollabClient {
         }
         return;
       } catch {
-        delay = Math.min(delay * 2, 10_000);
+        attempts++;
+        delay = Math.min(delay * 2, 30_000);
+        if (attempts > 50) {
+          this.setConnStatus("disconnected", "reconnect_gave_up");
+          return;
+        }
       }
     }
   }

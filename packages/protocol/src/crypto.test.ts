@@ -13,6 +13,7 @@ import {
 } from "./identity.js";
 import { b64uEncode } from "./util.js";
 import { shouldAutoReply } from "./schema.js";
+import { encodeFrame, HIBERNATION_PING_LINE, HIBERNATION_PONG_LINE } from "./encode.js";
 import type { ChatPayload, TaskCreatePayload } from "./types.js";
 
 describe("AES-GCM room crypto", () => {
@@ -114,5 +115,14 @@ describe("shouldAutoReply", () => {
     assert.equal(shouldAutoReply("mention-or-task", task(), "b"), true);
     assert.equal(shouldAutoReply("mention-or-task", task("c"), "b"), false);
     assert.equal(shouldAutoReply("off", chat(["b"]), "b"), false);
+  });
+});
+
+
+describe("hibernation ping bytes", () => {
+  it("encodeFrame(minimal ping)+\\n matches HIBERNATION_PING_LINE", () => {
+    const line = encodeFrame({ v: 1, type: "ctrl", method: "ping" }) + "\n";
+    assert.equal(line, HIBERNATION_PING_LINE);
+    assert.ok(HIBERNATION_PONG_LINE.includes("pong"));
   });
 });
