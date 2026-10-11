@@ -9,8 +9,6 @@ import {
   RATE_PER_SEC,
   ROOM_RATE_PER_SEC,
   checkRate,
-  pushRing,
-  framesSince,
   randomChallenge,
   verifyEd25519,
   type FwdFrame,
@@ -64,48 +62,61 @@ export default {
   },
 };
 
-interface Member {
-  agentId: string;
-  publicKey: string;
+/**
+ * Per-socket state lives in the WebSocket attachment so it survives DO hibernation.
+ * (In-memory maps are wiped when the DO hibernates between messages.)
+ */
+interface SocketState {
+  roomId: string;
+  agentId?: string;
+  publicKey?: string;
   capabilities?: string[];
-  ws: WebSocket;
-  lastSeen: number;
+  joined: boolean;
+  challenge?: string;
+  challengeFor?: string;
 }
 
+const FRAME_PREFIX = "f:";
+const frameKey = (seq: number) => FRAME_PREFIX + String(seq).padStart(12, "0");
+
 export class CollabRoom implements DurableObject {
-  private members = new Map<string, Member>();
-  private challenges = new Map<string, string>();
-  private seq = 0;
-  private ring: FwdFrame[] = [];
+  /** rate limit buckets: in-memory only, resetting on hibernation is acceptable */
   private rate = new Map<string, number[]>();
   private roomRate: number[] = [];
-  private roomId = "";
 
   constructor(
     private state: DurableObjectState,
     _env: Env,
-  ) {
-    this.state.blockConcurrencyWhile(async () => {
-      const saved = await this.state.storage.get<{ seq: number; ring: FwdFrame[] }>(
-        "ring",
-      );
-      if (saved) {
-        this.seq = saved.seq;
-        this.ring = saved.ring ?? [];
-      }
-    });
-  }
+  ) {}
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const m = /^\/ws\/([^/]+)/.exec(url.pathname);
-    this.roomId = m ? decodeURIComponent(m[1]!) : this.roomId;
+    const roomId = m ? decodeURIComponent(m[1]!) : "";
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
     this.state.acceptWebSocket(server);
-
+    this.setState(server, { roomId, joined: false });
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  private getState(ws: WebSocket): SocketState {
+    return (ws.deserializeAttachment() as SocketState | null) ?? { roomId: "", joined: false };
+  }
+
+  private setState(ws: WebSocket, s: SocketState): void {
+    ws.serializeAttachment(s);
+  }
+
+  /** Joined members, rebuilt from live sockets (hibernation-safe) */
+  private members(): { ws: WebSocket; s: SocketState }[] {
+    const out: { ws: WebSocket; s: SocketState }[] = [];
+    for (const ws of this.state.getWebSockets()) {
+      const s = this.getState(ws);
+      if (s.joined && s.agentId) out.push({ ws, s });
+    }
+    return out;
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
@@ -117,35 +128,31 @@ export class CollabRoom implements DurableObject {
       try {
         frame = JSON.parse(trimmed) as Record<string, unknown>;
       } catch {
-        this.send(ws, {
-          v: 1,
-          type: "ctrl",
-          method: "error",
-          code: "bad_json",
-          message: "invalid JSON",
-        });
+        this.err(ws, "bad_json", "invalid JSON");
         continue;
       }
       await this.handleFrame(ws, frame);
     }
   }
 
-  async webSocketClose(ws: WebSocket): Promise<void> {
-    this.removeSocket(ws);
+  async webSocketClose(ws: WebSocket, code: number): Promise<void> {
+    this.markLeft(ws);
+    try {
+      ws.close(code === 1005 ? 1000 : code, "closed");
+    } catch {
+      /* already closed */
+    }
   }
 
   async webSocketError(ws: WebSocket): Promise<void> {
-    this.removeSocket(ws);
+    this.markLeft(ws);
   }
 
-  private removeSocket(ws: WebSocket): void {
-    for (const [aid, m] of this.members) {
-      if (m.ws === ws) {
-        this.members.delete(aid);
-        this.broadcastPeerUpdate(aid, "left");
-        break;
-      }
-    }
+  private markLeft(ws: WebSocket): void {
+    const s = this.getState(ws);
+    if (!s.joined || !s.agentId) return;
+    this.setState(ws, { ...s, joined: false });
+    this.broadcastPeerUpdate(s.roomId, s.agentId, "left", ws);
   }
 
   private send(ws: WebSocket, obj: unknown): void {
@@ -156,226 +163,149 @@ export class CollabRoom implements DurableObject {
     }
   }
 
+  private err(ws: WebSocket, code: string, message: string): void {
+    const s = this.getState(ws);
+    this.send(ws, { v: 1, type: "ctrl", method: "error", code, message, roomId: s.roomId });
+  }
+
   private async handleFrame(ws: WebSocket, frame: Record<string, unknown>): Promise<void> {
-    if (frame.v !== 1) {
-      this.send(ws, {
-        v: 1,
-        type: "ctrl",
-        method: "error",
-        code: "bad_version",
-        message: "v must be 1",
-      });
-      return;
-    }
+    if (frame.v !== 1) return this.err(ws, "bad_version", "v must be 1");
+    const s = this.getState(ws);
 
     if (frame.type === "ctrl" && frame.method === "ping") {
       this.send(ws, { v: 1, type: "ctrl", method: "pong", ts: Date.now() });
-      const agentId = String(frame.agentId ?? "");
-      const m = this.members.get(agentId);
-      if (m) m.lastSeen = Date.now();
       return;
     }
-
     if (frame.type === "ctrl" && frame.method === "join") {
-      await this.handleJoin(ws, frame as unknown as JoinMsg);
-      return;
+      return this.handleJoin(ws, frame as unknown as JoinMsg);
     }
-
     if (frame.type === "ctrl" && frame.method === "leave") {
-      const agentId = String(frame.agentId ?? "");
-      if (this.members.has(agentId)) {
-        this.members.delete(agentId);
-        this.broadcastPeerUpdate(agentId, "left");
-      }
+      this.markLeft(ws);
       return;
     }
-
     if (frame.type === "ctrl" && frame.method === "poll") {
-      const sinceSeq = Number(frame.sinceSeq ?? 0);
-      const agentId = String(frame.agentId ?? "");
-      if (!this.members.has(agentId)) {
-        this.send(ws, {
-          v: 1,
-          type: "ctrl",
-          method: "error",
-          code: "not_member",
-          message: "join first",
-          roomId: this.roomId,
-        });
-        return;
-      }
+      if (!s.joined) return this.err(ws, "not_member", "join first");
+      const sinceSeq = Math.max(0, Number(frame.sinceSeq ?? 0));
+      const seq = (await this.state.storage.get<number>("seq")) ?? 0;
+      const rows = await this.state.storage.list<FwdFrame>({
+        prefix: FRAME_PREFIX,
+        start: frameKey(sinceSeq + 1),
+        limit: RING_SIZE,
+      });
       this.send(ws, {
         v: 1,
         type: "ctrl",
         method: "poll_result",
-        roomId: this.roomId,
-        frames: framesSince(this.ring, sinceSeq),
-        seq: this.seq,
+        roomId: s.roomId,
+        frames: [...rows.values()],
+        seq,
       });
       return;
     }
-
-    if (frame.type === "fwd") {
-      await this.handleFwd(ws, frame);
-      return;
-    }
-
-    this.send(ws, {
-      v: 1,
-      type: "ctrl",
-      method: "error",
-      code: "unknown",
-      message: "unknown frame",
-    });
+    if (frame.type === "fwd") return this.handleFwd(ws, frame);
+    this.err(ws, "unknown", "unknown frame");
   }
 
   private async handleJoin(ws: WebSocket, frame: JoinMsg): Promise<void> {
-    if (frame.roomId) this.roomId = frame.roomId;
+    const s = this.getState(ws);
     const agentId = frame.agentId;
     if (!agentId || !frame.publicKey) {
-      this.send(ws, {
-        v: 1,
-        type: "ctrl",
-        method: "error",
-        code: "bad_join",
-        message: "agentId and publicKey required",
-      });
+      return this.err(ws, "bad_join", "agentId and publicKey required");
+    }
+    if (frame.roomId && s.roomId && frame.roomId !== s.roomId) {
+      return this.err(ws, "bad_join", "roomId does not match socket path");
+    }
+
+    if (!frame.challengeResp || !s.challenge || s.challengeFor !== agentId) {
+      const challenge = randomChallenge();
+      this.setState(ws, { ...s, challenge, challengeFor: agentId });
+      this.send(ws, { v: 1, type: "ctrl", method: "challenge", roomId: s.roomId, challenge });
       return;
     }
 
-    let challenge = this.challenges.get(agentId);
-    if (!challenge || !frame.challengeResp) {
-      challenge = randomChallenge();
-      this.challenges.set(agentId, challenge);
-      this.send(ws, {
-        v: 1,
-        type: "ctrl",
-        method: "challenge",
-        roomId: this.roomId,
-        challenge,
-      });
-      return;
-    }
-
-    const sigOk = await verifyEd25519(frame.publicKey, challenge, frame.challengeResp);
+    const sigOk = await verifyEd25519(frame.publicKey, s.challenge, frame.challengeResp);
     if (!sigOk) {
-      this.send(ws, {
-        v: 1,
-        type: "ctrl",
-        method: "error",
-        code: "bad_sig",
-        message: "challenge signature invalid",
-        roomId: this.roomId,
-      });
-      return;
+      this.setState(ws, { ...s, challenge: undefined, challengeFor: undefined });
+      return this.err(ws, "bad_sig", "challenge signature invalid");
     }
 
-    this.challenges.delete(agentId);
-
-    const prev = this.members.get(agentId);
-    if (prev && prev.ws !== ws) {
-      try {
-        prev.ws.close(1000, "replaced");
-      } catch {
-        /* ignore */
+    // Replace a stale connection for the same agent
+    for (const m of this.members()) {
+      if (m.s.agentId === agentId && m.ws !== ws) {
+        this.setState(m.ws, { ...m.s, joined: false });
+        try {
+          m.ws.close(1000, "replaced");
+        } catch {
+          /* ignore */
+        }
       }
     }
 
-    this.members.set(agentId, {
+    this.setState(ws, {
+      roomId: s.roomId,
       agentId,
       publicKey: frame.publicKey,
       capabilities: frame.capabilities,
-      ws,
-      lastSeen: Date.now(),
+      joined: true,
     });
 
+    const seq = (await this.state.storage.get<number>("seq")) ?? 0;
     this.send(ws, {
       v: 1,
       type: "ctrl",
       method: "joined",
-      roomId: this.roomId,
+      roomId: s.roomId,
       agentId,
       peers: this.peerList(),
-      seq: this.seq,
+      seq,
     });
-    this.broadcastPeerUpdate(agentId, "joined", ws);
+    this.broadcastPeerUpdate(s.roomId, agentId, "joined", ws);
   }
 
   private async handleFwd(ws: WebSocket, frame: Record<string, unknown>): Promise<void> {
+    const s = this.getState(ws);
     const from = String(frame.from ?? "");
-    const member = this.members.get(from);
-    if (!member || member.ws !== ws) {
-      this.send(ws, {
-        v: 1,
-        type: "ctrl",
-        method: "error",
-        code: "not_member",
-        message: "sender not joined",
-        roomId: this.roomId,
-      });
-      return;
+    if (!s.joined || s.agentId !== from) {
+      return this.err(ws, "not_member", "sender not joined");
     }
 
     const now = Date.now();
     const agentRate = checkRate(this.rate.get(from) ?? [], now, RATE_PER_SEC);
     this.rate.set(from, agentRate.next);
-    if (!agentRate.ok) {
-      this.send(ws, {
-        v: 1,
-        type: "ctrl",
-        method: "error",
-        code: "rate_limit",
-        message: "agent rate limit",
-        roomId: this.roomId,
-      });
-      return;
-    }
+    if (!agentRate.ok) return this.err(ws, "rate_limit", "agent rate limit");
     const roomRate = checkRate(this.roomRate, now, ROOM_RATE_PER_SEC);
     this.roomRate = roomRate.next;
-    if (!roomRate.ok) {
-      this.send(ws, {
-        v: 1,
-        type: "ctrl",
-        method: "error",
-        code: "rate_limit",
-        message: "room rate limit",
-        roomId: this.roomId,
-      });
-      return;
+    if (!roomRate.ok) return this.err(ws, "rate_limit", "room rate limit");
+
+    const ciphertext = String(frame.ciphertext ?? "");
+    const nonce = String(frame.nonce ?? "");
+    if (!ciphertext || !nonce || ciphertext.length > 256 * 1024) {
+      return this.err(ws, "bad_frame", "ciphertext/nonce missing or too large");
     }
 
-    this.seq += 1;
-    const out: FwdFrame = {
-      v: 1,
-      type: "fwd",
-      roomId: this.roomId,
-      from,
-      seq: this.seq,
-      ciphertext: String(frame.ciphertext ?? ""),
-      nonce: String(frame.nonce ?? ""),
-    };
-    this.ring = pushRing(this.ring, out, RING_SIZE);
-    member.lastSeen = now;
+    // storage ops in a DO are serialized per input gate, so seq is race-free
+    const seq = ((await this.state.storage.get<number>("seq")) ?? 0) + 1;
+    const out: FwdFrame = { v: 1, type: "fwd", roomId: s.roomId, from, seq, ciphertext, nonce };
+    const puts: Record<string, unknown> = { seq, [frameKey(seq)]: out };
+    await this.state.storage.put(puts);
+    if (seq > RING_SIZE) await this.state.storage.delete(frameKey(seq - RING_SIZE));
 
-    if (this.seq % 10 === 0) {
-      await this.state.storage.put("ring", { seq: this.seq, ring: this.ring });
-    }
-
-    for (const m of this.members.values()) {
+    for (const m of this.members()) {
       if (m.ws === ws) continue;
       this.send(m.ws, out);
     }
   }
 
   private peerList(): PeerInfo[] {
-    return [...this.members.values()].map((m) => ({
-      agentId: m.agentId,
-      publicKey: m.publicKey,
-      capabilities: m.capabilities,
+    return this.members().map(({ s }) => ({
+      agentId: s.agentId!,
+      publicKey: s.publicKey!,
+      capabilities: s.capabilities,
     }));
   }
 
   private broadcastPeerUpdate(
+    roomId: string,
     agentId: string,
     event: "joined" | "left",
     except?: WebSocket,
@@ -384,12 +314,12 @@ export class CollabRoom implements DurableObject {
       v: 1,
       type: "ctrl",
       method: "peer_update",
-      roomId: this.roomId,
+      roomId,
       peers: this.peerList(),
       event,
       agentId,
     };
-    for (const m of this.members.values()) {
+    for (const m of this.members()) {
       if (m.ws === except) continue;
       this.send(m.ws, msg);
     }

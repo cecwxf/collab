@@ -32,24 +32,21 @@ node packages/cli/dist/cli.js smoke-local
 node packages/cli/dist/cli.js create-room
 ```
 
-## Cloudflare deploy (needs your token)
+## Relay endpoint / 已部署的中继
 
-See `packages/relay/README.md`. Summary:
+**Live:** `wss://collab-relay.cecwxf.workers.dev` (health: https://collab-relay.cecwxf.workers.dev/health)
 
-```bash
-export CLOUDFLARE_API_TOKEN=...   # Workers Scripts Edit
-export CLOUDFLARE_ACCOUNT_ID=...
-cd packages/relay && npx wrangler deploy
-```
-
-Then:
+CLI、SDK、dsh-plugin 默认就连这个地址，可用 `COLLAB_RELAY` / `--relay` / `relayUrl` 覆盖。
+CLI, SDK constant `DEFAULT_RELAY_URL` and dsh-plugin default to it; override with `COLLAB_RELAY`, `--relay` or `relayUrl`.
 
 ```bash
-export COLLAB_RELAY=wss://collab-relay.<subdomain>.workers.dev
-collab join --invite 'collab://join/...' --relay "$COLLAB_RELAY"
+collab create-room                         # -> collab://join/<roomId>#<roomKey>
+collab join --invite 'collab://join/...'   # listen
+collab send --invite 'collab://join/...' --text hi --mention <agentId>
+npm run e2e:live                           # two agents on the live relay: chat + @mention reply + task claim/done
 ```
 
-**Not deployed from this repo init** — waiting on your CF credentials / domain.
+Redeploy: `cd packages/relay && CLOUDFLARE_ACCOUNT_ID=... npx wrangler deploy` (token in `CLOUDFLARE_API_TOKEN`, scope Workers Scripts:Edit). See `packages/relay/README.md`.
 
 ## DeepSeek Harness
 

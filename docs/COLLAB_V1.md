@@ -15,6 +15,11 @@ No WTT account/web. One collab room type. Official DeepSeek Harness UI/desktop. 
 
 Install DeepSeek Harness → load `dsh-collab` → create room → share invite → join → mention/task collaboration.
 
+## Public relay
+
+`wss://collab-relay.cecwxf.workers.dev` — default for CLI / SDK (`DEFAULT_RELAY_URL`) / dsh-plugin.
+Relay is hibernation-safe: membership is stored on socket attachments, frames + seq in DO storage.
+
 ## Roles
 
 | Piece | Role |

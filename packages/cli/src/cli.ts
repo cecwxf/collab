@@ -4,7 +4,7 @@
  */
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { generateIdentity, loadOrCreateIdentity, b64uEncode } from "@collab/protocol";
+import { generateIdentity, loadOrCreateIdentity, b64uEncode, DEFAULT_RELAY_URL } from "@collab/protocol";
 import { CollabClient, RoomHub, WsTransport } from "@collab/sdk";
 
 function usage(): never {
@@ -18,7 +18,7 @@ Usage:
   collab smoke-local
 
 Env:
-  COLLAB_RELAY   default relay base, e.g. wss://collab-relay.example.com
+  COLLAB_RELAY   relay base (default wss://collab-relay.cecwxf.workers.dev)
   COLLAB_IDENTITY  default ~/.collab/identity.json
 `);
   process.exit(1);
@@ -28,9 +28,8 @@ function identityPath(flag?: string): string {
   return flag ?? process.env.COLLAB_IDENTITY ?? join(homedir(), ".collab", "identity.json");
 }
 
-function relayUrl(roomId: string, flag?: string): string | null {
-  const base = flag ?? process.env.COLLAB_RELAY;
-  if (!base) return null;
+function relayUrl(roomId: string, flag?: string): string {
+  const base = flag ?? process.env.COLLAB_RELAY ?? DEFAULT_RELAY_URL;
   const trimmed = base.replace(/\/$/, "");
   return `${trimmed}/ws/${encodeURIComponent(roomId)}`;
 }
@@ -67,22 +66,16 @@ async function main(): Promise<void> {
     const id = await loadOrCreateIdentity(identityPath(flags.identity));
     const url = relayUrl(parsed.roomId, flags.relay);
 
-    let client: CollabClient;
-    if (url) {
-      client = new CollabClient({
-        identity: id,
-        roomId: parsed.roomId,
-        roomKey: parsed.roomKeyB64,
-        transport: new WsTransport(url),
-        reconnect: false,
-      });
-    } else {
-      console.error("No --relay / COLLAB_RELAY; use smoke-local for in-process demo");
-      process.exit(2);
-    }
+    const client = new CollabClient({
+      identity: id,
+      roomId: parsed.roomId,
+      roomKey: parsed.roomKeyB64,
+      transport: new WsTransport(url),
+      reconnect: cmd === "join",
+    });
 
-    client.onPayload((p) => {
-      console.log("[msg]", JSON.stringify(p));
+    client.onPayload((p, meta) => {
+      console.log(`[msg seq=${meta.seq} from=${meta.from}]`, JSON.stringify(p));
     });
     client.onPeers((peers, ev) => {
       console.log("[peers]", peers.map((p) => p.agentId).join(", "), ev ?? "");

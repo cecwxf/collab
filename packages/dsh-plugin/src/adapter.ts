@@ -43,6 +43,7 @@ export interface SessionFactory {
 }
 
 export interface DshCollabConfig {
+  /** defaults to DEFAULT_RELAY_URL (wss://collab-relay.cecwxf.workers.dev) */
   relayUrl: string;
   identityPath?: string;
   autoReply?: "off" | "mention" | "mention-or-task";

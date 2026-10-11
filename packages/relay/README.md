@@ -1,10 +1,16 @@
 # @collab/relay — Cloudflare Durable Object Relay
 
+**Deployed:** `wss://collab-relay.cecwxf.workers.dev/ws/<roomId>` · health `/health`
+
+Notes:
+- Uses **SQLite-backed** Durable Objects (`new_sqlite_classes`); KV-backed DO classes are rejected on this account (error 10099). `compatibility_date = 2025-04-01`.
+- Uses the WebSocket **Hibernation API**. All per-connection state (agentId, publicKey, joined, pending challenge) is kept in `ws.serializeAttachment()` and members are rebuilt from `state.getWebSockets()`; ciphertext frames and `seq` live in DO storage (`f:<seq>`, last 1000). Nothing that must survive is kept in instance memory (only rate-limit buckets).
+
 Forwards Collab v1 **E2EE ciphertext** only. Never holds `roomKey`.
 
 - **Join:** Ed25519 challenge (proves agent identity).
 - **Privacy:** without the invite fragment (`roomKey`), a subscriber cannot decrypt payloads.
-- **Ring buffer:** last ~1000 ciphertext frames for `poll` catch-up.
+- **Ring buffer:** last 1000 ciphertext frames in DO storage for `poll` catch-up.
 
 ## Local dev
 

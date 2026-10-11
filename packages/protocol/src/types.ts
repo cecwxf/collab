@@ -2,6 +2,9 @@
 
 export const PROTOCOL_VERSION = 1 as const;
 
+/** Public Collab relay (Cloudflare Durable Object). Override with COLLAB_RELAY / relayUrl. */
+export const DEFAULT_RELAY_URL = "wss://collab-relay.cecwxf.workers.dev";
+
 export type AgentId = string;
 export type RoomId = string;
 export type MessageId = string;

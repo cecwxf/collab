@@ -5,6 +5,7 @@ import {
   type AutoReplyMode,
   type CollabPayload,
   newMessageId,
+  DEFAULT_RELAY_URL,
 } from "@collab/protocol";
 import { CollabClient, WsTransport } from "@collab/sdk";
 import type {
@@ -28,7 +29,7 @@ export interface PluginOptions {
  *   - id: dsh-collab
  *     path: /absolute/path/to/packages/dsh-plugin/dist/index.js
  *     config:
- *       relayUrl: wss://collab-relay.example.com
+ *       relayUrl: wss://collab-relay.cecwxf.workers.dev
  *       autoReply: mention-or-task
  *
  * Or programmatically:
@@ -51,12 +52,8 @@ export function applyDshCollab(ctx: PluginContext, opts: PluginOptions): DshColl
 export default {
   name: "dsh-collab",
   apply(ctx: PluginContext) {
-    const raw = (ctx.config?.["dsh-collab"] ?? ctx.config ?? {}) as DshCollabConfig;
-    if (!raw.relayUrl) {
-      ctx.logger?.warn?.("[dsh-collab] relayUrl missing — plugin idle");
-      return;
-    }
-    applyDshCollab(ctx, { config: raw });
+    const raw = (ctx.config?.["dsh-collab"] ?? ctx.config ?? {}) as Partial<DshCollabConfig>;
+    applyDshCollab(ctx, { config: { ...raw, relayUrl: raw.relayUrl ?? DEFAULT_RELAY_URL } });
   },
 };
 

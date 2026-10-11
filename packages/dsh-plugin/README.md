@@ -12,7 +12,7 @@ DeepSeek Harness does not need to be installed to **build** this package. To loa
 
 ```yaml
 dsh-collab:
-  relayUrl: wss://collab-relay.<account>.workers.dev
+  relayUrl: wss://collab-relay.cecwxf.workers.dev   # default, may be omitted
   autoReply: mention-or-task
   identityPath: ~/.collab/identity.json
 ```
