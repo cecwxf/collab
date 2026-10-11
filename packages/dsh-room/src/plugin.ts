@@ -106,6 +106,8 @@ function toMessage(p: CollabPayload, self: string, seq?: number): RoomMessage | 
 export type RoomStatus = "connecting" | "online" | "offline";
 
 export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId" | "memberConfig"> {
+  /** dsh Session woken for this room (shown nested under its workspace in the native sidebar). */
+  sessionId?: string;
   status: RoomStatus;
   error?: string;
   members: { agentId: string; self: boolean; online?: boolean }[];
@@ -164,6 +166,10 @@ export interface CreateRoomOptions {
   lanHostPort?: string;
   /** Workspace that owns this room (defaults to active). */
   workspaceId?: string;
+  /** Native dsh workspace path (preferred): the room attaches to it (member.config.workspace + MCP sandbox + woken session cwd). */
+  workspacePath?: string;
+  /** Display name of that native workspace. */
+  workspaceName?: string;
 }
 
 /**
@@ -432,6 +438,10 @@ export class CollabBridge {
   /** Create a room (private unless opts.public) and join it. */
   async createRoom(opts: CreateRoomOptions = {}, bindTo?: AgentLike) {
     const mode = opts.mode === "relay" ? "relay" : "lan";
+    if (opts.workspacePath?.trim()) {
+      const ws = await this.ensureWorkspace({ path: opts.workspacePath.trim(), name: opts.workspaceName });
+      opts = { ...opts, workspaceId: ws.id };
+    }
     // Public directory lives on config.relayUrl (default VPS Node relay).
     const isPublic = opts.public === true;
     let room;
@@ -481,8 +491,12 @@ export class CollabBridge {
   }
 
   /** Join by invite. `info` carries directory metadata when joining from search results. */
-  async joinInvite(invite: string, info: Partial<Pick<RoomMeta, "name" | "description" | "tags" | "public" | "workspaceId">> = {}, bindTo?: AgentLike) {
+  async joinInvite(invite: string, info: Partial<Pick<RoomMeta, "name" | "description" | "tags" | "public" | "workspaceId">> & { workspacePath?: string; workspaceName?: string } = {}, bindTo?: AgentLike) {
     const { roomId } = CollabClient.parseInvite(invite.trim());
+    if (info.workspacePath?.trim() && !this.rooms.has(roomId)) {
+      const ws = await this.ensureWorkspace({ path: info.workspacePath.trim(), name: info.workspaceName });
+      info = { ...info, workspaceId: ws.id };
+    }
     let conn = this.rooms.get(roomId);
     if (!conn) {
       const wsId = info.workspaceId ?? this.activeWorkspaceId ?? undefined;
@@ -629,6 +643,7 @@ export class CollabBridge {
       last: last && { from: last.from, text: last.text, ts: last.ts },
       sessionTitle: `collab:${conn.meta.roomId}`,
       bound: !!sessionId,
+      sessionId,
       transport: conn.meta.transport ?? (conn.meta.invite.startsWith("collab://lan/") ? "lan" : "relay"),
       memberConfig: conn.meta.memberConfig ? { ...publicMemberConfig(conn.meta.memberConfig), workspacePath: conn.meta.memberConfig.workspacePath, peerGrants: conn.meta.memberConfig.peerGrants, permissions: conn.meta.memberConfig.permissions } : null,
       peerConfigs: Object.fromEntries(this.peerConfigs.get(conn.meta.roomId) ?? []),
@@ -912,8 +927,12 @@ export class CollabBridge {
       const preset = await svc.agentPresets.resolve(cfg.agentPreset);
       const lease = await svc.agentPresets.acquireScope(preset.id);
       try {
-        await mkdir(cfg.workspacePath, { recursive: true });
-        const workspace = await svc.workspaceRegistry.create(cfg.workspacePath, "collab");
+        // Attach the room's agent session to the room's own workspace so it nests under
+        // that workspace in dsh's native sidebar; fall back to the plugin default.
+        const roomPath = conn.meta.memberConfig?.workspacePath;
+        const wsPath = roomPath && roomPath.trim() ? roomPath : cfg.workspacePath;
+        await mkdir(wsPath, { recursive: true });
+        const workspace = await svc.workspaceRegistry.create(wsPath, wsPath === cfg.workspacePath ? "collab" : undefined);
         const selected = svc.agentDefaultModel.currentSelection();
         const sessionId = `collab-${roomId}-${randomUUID().slice(0, 8)}`;
         const handle = await svc.agents.create({

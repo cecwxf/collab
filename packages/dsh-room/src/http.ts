@@ -68,13 +68,13 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
       if (method === "GET" && path === "/directory") return sendJson(res, 200, { rooms: await bridge.search(str(url.searchParams.get("q")), str(url.searchParams.get("tag"))) });
       if (method === "POST" && path === "/rooms") {
         const b = await readJson(req);
-        return sendJson(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "relay" ? "relay" : "lan", lanHostPort: typeof b.lanHostPort === "string" ? b.lanHostPort.trim() : undefined, workspaceId: str(b.workspaceId) }));
+        return sendJson(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "relay" ? "relay" : "lan", lanHostPort: typeof b.lanHostPort === "string" ? b.lanHostPort.trim() : undefined, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName) }));
       }
       if (method === "POST" && path === "/join") {
         const b = await readJson(req);
         const invite = str(b.invite);
         if (!invite || !/^collab:\/\/(join|lan|relay)\//.test(invite) || !/#\S+$/.test(invite)) throw new HttpError(400, "invite must be collab://join/…, collab://lan/…, or collab://relay/… with #key");
-        return sendJson(res, 200, await bridge.joinInvite(invite, { name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, workspaceId: str(b.workspaceId) }));
+        return sendJson(res, 200, await bridge.joinInvite(invite, { name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName) }));
       }
       const m = /^\/rooms\/([^/]+)\/(messages|invite|leave|send|task|active)$/.exec(path);
       if (m) {

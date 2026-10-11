@@ -93,13 +93,15 @@ export function createRoomsStore() {
       searchTimer = setTimeout(() => void runSearch(query), 300);
     },
     async create(form) {
-      const r = await post("/rooms", { ...form, workspaceId: form.workspaceId || snap.activeWorkspaceId });
+      const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? undefined : (form.workspaceId || snap.activeWorkspaceId) });
+      try { api.onRoomOpened && api.onRoomOpened(); } catch { /* layout busy */ }
       set({ selected: r.roomId, dialog: { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } });
       void loadMessages(r.roomId);
       return r;
     },
     async join(invite, info) {
-      const r = await post("/join", { invite, workspaceId: snap.activeWorkspaceId, ...(info || {}) });
+      const r = await post("/join", { invite, ...(info && info.workspacePath ? {} : { workspaceId: snap.activeWorkspaceId }), ...(info || {}) });
+      try { api.onRoomOpened && api.onRoomOpened(); } catch { /* layout busy */ }
       set((s) => ({ selected: r.roomId, dialog: null, search: { ...s.search, results: s.search.results.map((x) => (x.roomId === r.roomId ? { ...x, joined: true } : x)) } }));
       void loadMessages(r.roomId);
       toast(`Joined ${r.name}`);
@@ -131,10 +133,16 @@ export function createRoomsStore() {
     async mcp(roomId, tool, args, target) { return post(`/rooms/${encodeURIComponent(roomId)}/mcp`, { tool, args, target }); },
   };
 
-  return {
+  const api = {
     getSnapshot: () => snap,
     subscribe(fn) { subs.add(fn); connect(); return () => subs.delete(fn); },
     actions,
     dispose() { if (es) es.close(); es = null; subs.clear(); clearTimeout(searchTimer); },
+    /** Native dsh workspaces service (set by apply). */
+    native: null,
+    nativeList: null,
+    /** Called after a room is created/joined (apply switches to the DSH Room panel). */
+    onRoomOpened: null,
   };
+  return api;
 }

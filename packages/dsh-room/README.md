@@ -80,6 +80,8 @@ Display name: **dsh room** / **DSH Room**. Package id: `@cecwxf/dsh-room`.
 
 Create room → defaults to **LAN / VPS** with `62.234.113.56:80` (public directory supported). Blank host embeds `collab-lan-relay` + mDNS. Cloudflare is an advanced option. See `docs/VPS_RELAY.md`.
 
+**Rooms live in your dsh workspaces** (0.2+): the native left-sidebar workspace list is untouched. Hover a workspace and click the room icon next to "New session", or open its "…" menu → **New room** (the menu also has **New session**). The wide Create room dialog opens with that workspace preset; the room's member config workspace, MCP sandbox and woken agent session all use that path, and the room's agent session nests under the workspace natively (marked with the room icon). The **DSH Room** panel lists rooms grouped by workspace, with Join by invite and Browse public rooms.
+
 **Agent config** (per room, local): model, reasoning effort, workspace path, auto-allow flags, MCP on/off. Announced to peers without secrets.
 
 **Approvals**: banner in Rooms when a peer MCP call needs write/shell/network permission.

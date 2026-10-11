@@ -2520,6 +2520,10 @@ var CollabBridge = class {
   /** Create a room (private unless opts.public) and join it. */
   async createRoom(opts = {}, bindTo) {
     const mode = opts.mode === "relay" ? "relay" : "lan";
+    if (opts.workspacePath?.trim()) {
+      const ws = await this.ensureWorkspace({ path: opts.workspacePath.trim(), name: opts.workspaceName });
+      opts = { ...opts, workspaceId: ws.id };
+    }
     const isPublic = opts.public === true;
     let room;
     if (mode === "lan") {
@@ -2572,6 +2576,10 @@ var CollabBridge = class {
   /** Join by invite. `info` carries directory metadata when joining from search results. */
   async joinInvite(invite, info = {}, bindTo) {
     const { roomId } = CollabClient.parseInvite(invite.trim());
+    if (info.workspacePath?.trim() && !this.rooms.has(roomId)) {
+      const ws = await this.ensureWorkspace({ path: info.workspacePath.trim(), name: info.workspaceName });
+      info = { ...info, workspaceId: ws.id };
+    }
     let conn = this.rooms.get(roomId);
     if (!conn) {
       const wsId = info.workspaceId ?? this.activeWorkspaceId ?? void 0;
@@ -2716,6 +2724,7 @@ var CollabBridge = class {
       last: last && { from: last.from, text: last.text, ts: last.ts },
       sessionTitle: `collab:${conn.meta.roomId}`,
       bound: !!sessionId,
+      sessionId,
       transport: conn.meta.transport ?? (conn.meta.invite.startsWith("collab://lan/") ? "lan" : "relay"),
       memberConfig: conn.meta.memberConfig ? { ...publicMemberConfig(conn.meta.memberConfig), workspacePath: conn.meta.memberConfig.workspacePath, peerGrants: conn.meta.memberConfig.peerGrants, permissions: conn.meta.memberConfig.permissions } : null,
       peerConfigs: Object.fromEntries(this.peerConfigs.get(conn.meta.roomId) ?? [])
@@ -2973,8 +2982,10 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
       const preset = await svc.agentPresets.resolve(cfg.agentPreset);
       const lease = await svc.agentPresets.acquireScope(preset.id);
       try {
-        await mkdir4(cfg.workspacePath, { recursive: true });
-        const workspace = await svc.workspaceRegistry.create(cfg.workspacePath, "collab");
+        const roomPath = conn.meta.memberConfig?.workspacePath;
+        const wsPath = roomPath && roomPath.trim() ? roomPath : cfg.workspacePath;
+        await mkdir4(wsPath, { recursive: true });
+        const workspace = await svc.workspaceRegistry.create(wsPath, wsPath === cfg.workspacePath ? "collab" : void 0);
         const selected = svc.agentDefaultModel.currentSelection();
         const sessionId = `collab-${roomId}-${randomUUID2().slice(0, 8)}`;
         const handle = await svc.agents.create({
@@ -3290,13 +3301,13 @@ function createApiHandler(bridge, connection) {
       if (method === "GET" && path === "/directory") return sendJson2(res, 200, { rooms: await bridge.search(str(url.searchParams.get("q")), str(url.searchParams.get("tag"))) });
       if (method === "POST" && path === "/rooms") {
         const b = await readJson2(req);
-        return sendJson2(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "relay" ? "relay" : "lan", lanHostPort: typeof b.lanHostPort === "string" ? b.lanHostPort.trim() : void 0, workspaceId: str(b.workspaceId) }));
+        return sendJson2(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "relay" ? "relay" : "lan", lanHostPort: typeof b.lanHostPort === "string" ? b.lanHostPort.trim() : void 0, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName) }));
       }
       if (method === "POST" && path === "/join") {
         const b = await readJson2(req);
         const invite = str(b.invite);
         if (!invite || !/^collab:\/\/(join|lan|relay)\//.test(invite) || !/#\S+$/.test(invite)) throw new HttpError(400, "invite must be collab://join/\u2026, collab://lan/\u2026, or collab://relay/\u2026 with #key");
-        return sendJson2(res, 200, await bridge.joinInvite(invite, { name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, workspaceId: str(b.workspaceId) }));
+        return sendJson2(res, 200, await bridge.joinInvite(invite, { name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName) }));
       }
       const m = /^\/rooms\/([^/]+)\/(messages|invite|leave|send|task|active)$/.exec(path);
       if (m) {

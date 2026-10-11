@@ -23,6 +23,8 @@ export interface RoomMessage {
 }
 export type RoomStatus = "connecting" | "online" | "offline";
 export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId" | "memberConfig"> {
+    /** dsh Session woken for this room (shown nested under its workspace in the native sidebar). */
+    sessionId?: string;
     status: RoomStatus;
     error?: string;
     members: {
@@ -78,6 +80,10 @@ export interface CreateRoomOptions {
     lanHostPort?: string;
     /** Workspace that owns this room (defaults to active). */
     workspaceId?: string;
+    /** Native dsh workspace path (preferred): the room attaches to it (member.config.workspace + MCP sandbox + woken session cwd). */
+    workspacePath?: string;
+    /** Display name of that native workspace. */
+    workspaceName?: string;
 }
 /**
  * The live collab bridge: any number of joined rooms (each one-to-many, E2EE),
@@ -145,6 +151,8 @@ export declare class CollabBridge {
         invite: string;
         listed: boolean;
         transport: string;
+        /** dsh Session woken for this room (shown nested under its workspace in the native sidebar). */
+        sessionId?: string;
         status: RoomStatus;
         error?: string;
         members: {
@@ -175,8 +183,13 @@ export declare class CollabBridge {
         workspaceId?: string | undefined;
     }>;
     /** Join by invite. `info` carries directory metadata when joining from search results. */
-    joinInvite(invite: string, info?: Partial<Pick<RoomMeta, "name" | "description" | "tags" | "public" | "workspaceId">>, bindTo?: AgentLike): Promise<{
+    joinInvite(invite: string, info?: Partial<Pick<RoomMeta, "name" | "description" | "tags" | "public" | "workspaceId">> & {
+        workspacePath?: string;
+        workspaceName?: string;
+    }, bindTo?: AgentLike): Promise<{
         invite: string;
+        /** dsh Session woken for this room (shown nested under its workspace in the native sidebar). */
+        sessionId?: string;
         status: RoomStatus;
         error?: string;
         members: {
