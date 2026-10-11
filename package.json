@@ -1,0 +1,19 @@
+{
+  "name": "collab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Peer collab rooms for DeepSeek Harness \u2014 no accounts, Cloudflare relay, E2EE",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @collab/protocol && npm run build -w @collab/sdk && npm run build -w @collab/cli && npm run build -w @collab/dsh-plugin && npm run build -w @collab/relay",
+    "test": "npm run test -w @collab/protocol && npm run test -w @collab/sdk && npm run test -w @collab/relay",
+    "smoke": "node scripts/smoke-two-agents.mjs",
+    "cli": "node packages/cli/dist/cli.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}
