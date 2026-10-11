@@ -70,7 +70,7 @@ Wake rules: `@mention` or `task.create` (when `autoReply` is `mention-or-task`).
 
 Display name: **dsh room** / **DSH Room** (not “deepseek room”). Package id: `@collab/dsh-room`.
 
-Create room → pick **Relay** or **LAN**. LAN embeds `collab-lan-relay` and can browse mDNS peers.
+Create room → pick **Relay (CF)** or **LAN / VPS**. Blank LAN host embeds `collab-lan-relay` + mDNS; set host:port (e.g. `62.234.113.56:80`) to use a self-hosted Node relay. See `docs/VPS_RELAY.md`.
 
 **Agent config** (per room, local): model, reasoning effort, workspace path, auto-allow flags, MCP on/off. Announced to peers without secrets.
 

@@ -153,7 +153,7 @@ function RoomsSidebar({ store, ensurePanel }) {
                   <span className="rm-room-item-meta">{r.last ? `${r.last.from}: ${r.last.text}` : (r.description || (r.public ? "Public room" : "Private · invite only"))}</span>
                 </span>
                 <span className="rm-room-item-trail">
-                  {r.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}{r.transport === "lan" ? <span className="rm-badge">LAN</span> : null}
+                  {r.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}{r.transport === "lan" ? <span className="rm-badge">LAN/VPS</span> : null}
                   {r.last ? <span style={{ fontSize: 10.5, color: "var(--rm-quiet)" }}>{fmtTime(r.last.ts)}</span> : null}
                 </span>
               </button>
@@ -571,7 +571,7 @@ function RoomDetail({ room, messages, store, mention, assign }) {
         <div className="rm-detail-h">About</div>
         <dl className="rm-about">
           <dt>Visibility</dt><dd>{room.public ? <><GlobeIcon /> Public</> : <><LockIcon /> Private</>}</dd>
-          <dt>Transport</dt><dd>{room.transport === "lan" ? "LAN / mDNS" : "Relay (Cloudflare)"}</dd>
+          <dt>Transport</dt><dd>{room.transport === "lan" ? "LAN / VPS (Node relay)" : "Relay (Cloudflare)"}</dd>
           {room.memberConfig?.workspaceLabel ? <><dt>Workspace</dt><dd>{room.memberConfig.workspaceLabel}</dd></> : null}
           {room.description ? <><dt>Description</dt><dd>{room.description}</dd></> : null}
           {room.tags?.length ? <><dt>Tags</dt><dd>{room.tags.map((t) => "#" + t).join(" ")}</dd></> : null}
@@ -636,7 +636,7 @@ function RoomsMain({ store }) {
               <div className="rm-chat-header-title">{room.name}</div>
               <div className="rm-chat-header-sub">{room.members.filter((m) => m.online !== false).length} online · {room.public ? "public" : "private"}{room.status !== "online" ? ` · room ${room.status}` : ""}</div>
             </div>
-            {room.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}{room.transport === "lan" ? <span className="rm-badge">LAN</span> : null}
+            {room.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}{room.transport === "lan" ? <span className="rm-badge">LAN/VPS</span> : null}
             <StateDot state={room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error"} size={8} />
           </header>
           <ChatBody messages={messages} />
@@ -695,13 +695,13 @@ function CreateDialog({ store }) {
   };
   return (
     <Modal open onClose={a.closeDialog} title="Create room" closeLabel="Close"
-      description="Room is created inside the active workspace (path becomes MCP sandbox). Pick Relay or LAN. The room key never goes to the relay."
+      description="Room is created inside the active workspace (path becomes MCP sandbox). Pick Cloudflare Relay, or LAN/VPS (self-hosted Node relay). The room key never goes to the relay."
       footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={!ok} onClick={submit}>{busy ? "Creating…" : "Create"}</Button></>}>
       <div className="rm-root rm-form" onKeyDown={(e) => e.key === "Enter" && e.target.tagName === "INPUT" && submit()}>
-        <Field label="Transport" hint="Relay uses the public CF Durable Object. LAN starts a local relay on this machine and advertises via mDNS (_collab._tcp).">
+        <Field label="Transport" hint="Relay = Cloudflare Durable Object (default). LAN / VPS = Node relay: leave host blank for embedded local+mDNS, or set a public VPS like 62.234.113.56:80.">
           <div className="rm-mode-row">
-            <button type="button" className={"rm-mode-btn" + (f.mode === "relay" ? " is-on" : "")} onClick={() => setF({ ...f, mode: "relay" })}>Relay</button>
-            <button type="button" className={"rm-mode-btn" + (f.mode === "lan" ? " is-on" : "")} onClick={() => setF({ ...f, mode: "lan", public: false })}>LAN</button>
+            <button type="button" className={"rm-mode-btn" + (f.mode === "relay" ? " is-on" : "")} onClick={() => setF({ ...f, mode: "relay" })}>Relay (CF)</button>
+            <button type="button" className={"rm-mode-btn" + (f.mode === "lan" ? " is-on" : "")} onClick={() => setF({ ...f, mode: "lan", public: false })}>LAN / VPS</button>
           </div>
         </Field>
         <Field label="Name" htmlFor="rm-create-name">
@@ -714,8 +714,8 @@ function CreateDialog({ store }) {
           <Input id="rm-create-tags" placeholder="e.g. review rust" value={f.tags} onChange={(e) => setF({ ...f, tags: e.target.value })} />
         </Field>
         {f.mode === "lan" ? (
-          <Field label="LAN host:port (optional)" htmlFor="rm-lan-hp" hint="Leave blank to use this machine's LAN/Tailscale IP and embedded relay. Or pick a discovered peer.">
-            <Input id="rm-lan-hp" placeholder="100.x.x.x:7421" value={f.lanHostPort} onChange={(e) => setF({ ...f, lanHostPort: e.target.value })} />
+          <Field label="Relay host:port (optional)" htmlFor="rm-lan-hp" hint="Blank = this machine (LAN/Tailscale + mDNS). Or a VPS/custom Node relay, e.g. 62.234.113.56:80 (invite becomes collab://lan/host:port/room#key). Invite-only — no public directory on VPS yet.">
+            <Input id="rm-lan-hp" placeholder="62.234.113.56:80 or 100.x.x.x:7421" value={f.lanHostPort} onChange={(e) => setF({ ...f, lanHostPort: e.target.value })} />
             <div className="rm-lan-browse"><Button size="sm" variant="outline" onClick={browseLan}>Browse mDNS</Button>
               {lanPeers.map((p) => (
                 <button key={p.hostPort} type="button" className="rm-lan-peer" onClick={() => setF({ ...f, lanHostPort: p.hostPort })}>{p.hostPort}{p.name ? ` · ${p.name}` : ""}</button>
