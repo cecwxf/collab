@@ -44,6 +44,8 @@ export interface HostContext {
   effect(execute: () => () => void, label?: string): unknown;
   /** Non-throwing service lookup; used for the optional agent services. */
   get(name: string, strict?: boolean): any;
+  /** Cordis: run callback once the named services are available (optional deps). */
+  inject?(deps: string[], callback: (ctx: any) => void): unknown;
 }
 
 /** User message as dsh-llm `createUserMessage` builds it; unknown source kinds are allowed. */
@@ -54,8 +56,30 @@ export interface UserMessage {
   readonly source: { kind: string; form?: "notice"; summary?: string; [k: string]: unknown };
 }
 
+/** The subset of dsh-agent `Agent` the plugin uses. */
+export interface AgentLike {
+  session: unknown;
+  followup(message: UserMessage): void;
+  /** Queue model-facing context without waking (dsh-agent Agent.inject). */
+  inject?(message: UserMessage): void;
+}
+
+/** dsh-commands CommandInvocation subset. */
+export interface CommandInvocation {
+  agent: AgentLike;
+  rawInput: string;
+  signal: AbortSignal;
+}
+export type CommandResult = { kind: "success"; text?: string } | { kind: "error"; text: string };
+export interface CommandDefinition {
+  name: string;
+  description: string;
+  input?: { hint: string };
+  handler(invocation: CommandInvocation): CommandResult | Promise<CommandResult>;
+}
+
 export interface AgentHandle {
-  agent: { session: unknown; followup(message: UserMessage): void };
+  agent: AgentLike;
   dispose(): Promise<void>;
 }
 
@@ -88,6 +112,8 @@ export interface DshCollabConfig {
   relayUrl: string;
   /** Room to auto-join on start (collab://join/<roomId>#<roomKey>). */
   invite?: string;
+  /** Runtime room state (joined rooms + invites), mode 600. Default ~/.collab/state.json */
+  statePath: string;
   /** Identity file (Ed25519 key + agentId). Default ~/.collab/identity.json */
   identityPath: string;
   /** agentId used when the identity file is created for the first time (what peers @mention). */

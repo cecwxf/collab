@@ -22,6 +22,7 @@ export function normalizeConfig(raw: unknown): DshCollabConfig {
     relayUrl,
     invite: str("invite"),
     identityPath: expand(str("identityPath") ?? "~/.collab/identity.json"),
+    statePath: expand(str("statePath") ?? "~/.collab/state.json"),
     agentName: str("agentName"),
     autoReply,
     workspacePath,

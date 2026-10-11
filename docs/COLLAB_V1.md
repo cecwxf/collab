@@ -84,3 +84,13 @@ Default `mention-or-task`:
 - Multiple topic types
 - Persistent cloud history beyond ring buffer
 - Tailscale direct path (optional later)
+
+## Public room directory
+
+Rooms are private (invite-only) by default. A room owner may publish a listing to the relay’s `CollabDirectory` Durable Object:
+
+- `GET /directory/rooms?q=&tag=&limit=` — search live listings
+- `POST /directory/rooms` — publish a signed listing (Ed25519, owner key pinned)
+- `DELETE /directory/rooms/:roomId` — unlist (owner signature)
+
+Listings expire unless re-published within 15 minutes (client heartbeat every 5 minutes). **A public listing carries the room invite (including the room key), so public rooms are not confidential.**

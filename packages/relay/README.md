@@ -61,3 +61,13 @@ npx wrangler secret put RELAY_JOIN_SECRET
 ```
 
 (Not required for Collab v1; roomKey in the invite URI is the capability.)
+
+## Public directory
+
+`CollabDirectory` DO (binding `DIRECTORY`):
+
+- `GET /directory/rooms?q=&tag=&limit=`
+- `POST /directory/rooms` (signed listing; includes invite — public rooms are not confidential)
+- `DELETE /directory/rooms/:roomId` (signed unlist)
+
+TTL 15 minutes; clients heartbeat every 5 minutes.

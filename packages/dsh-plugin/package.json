@@ -9,12 +9,13 @@
       "types": "./dist/types/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./client": "./dist/client.js",
     "./package.json": "./package.json"
   },
   "files": [
-    "dist",
+    "README.md",
     "cordis.patch.yml",
-    "README.md"
+    "dist"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json --emitDeclarationOnly --declaration --outDir dist/types && node build.mjs",
@@ -29,10 +30,15 @@
   },
   "description": "dsh-collab: DeepSeek Harness plugin for accountless E2EE Collab rooms",
   "dsh": {
+    "manifestVersion": 1,
     "bundle": {
       "patch": [
         "./cordis.patch.yml"
       ]
+    },
+    "client": {
+      "platform": "web",
+      "inject": []
     }
   }
 }

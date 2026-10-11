@@ -7,9 +7,17 @@ compatibility_flags = ["nodejs_compat"]
 name = "ROOM"
 class_name = "CollabRoom"
 
+[[durable_objects.bindings]]
+name = "DIRECTORY"
+class_name = "CollabDirectory"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["CollabRoom"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["CollabDirectory"]
 
 # Optional: custom domain via CF dashboard or routes =
 # routes = [{ pattern = "collab-relay.example.com/*", custom_domain = true }]

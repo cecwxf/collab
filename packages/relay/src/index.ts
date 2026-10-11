@@ -15,8 +15,11 @@ import {
   type PeerInfo,
 } from "./room-logic.js";
 
+export { CollabDirectory } from "./directory.js";
+
 export interface Env {
   ROOM: DurableObjectNamespace;
+  DIRECTORY: DurableObjectNamespace;
   RELAY_JOIN_SECRET?: string;
 }
 
@@ -36,13 +39,20 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/health") {
-      return Response.json({ ok: true, service: "collab-relay", v: 1 });
+      return Response.json({ ok: true, service: "collab-relay", v: 1, directory: true });
+    }
+
+    if (url.pathname === "/directory/rooms" || url.pathname.startsWith("/directory/rooms/")) {
+      if (request.method === "OPTIONS") {
+        return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, DELETE", "access-control-allow-headers": "content-type" } });
+      }
+      return env.DIRECTORY.get(env.DIRECTORY.idFromName("global")).fetch(request);
     }
 
     const m = /^\/ws\/([^/]+)\/?$/.exec(url.pathname);
     if (!m) {
       return new Response(
-        "Collab Relay v1\nWS: /ws/:roomId\nHealth: /health\n",
+        "Collab Relay v1\nWS: /ws/:roomId\nDirectory: GET|POST /directory/rooms, DELETE /directory/rooms/:roomId\nHealth: /health\n",
         { status: 200, headers: { "content-type": "text/plain" } },
       );
     }

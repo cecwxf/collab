@@ -4,3 +4,4 @@ export * from "./crypto.js";
 export * from "./identity.js";
 export * from "./util.js";
 export * from "./schema.js";
+export * from "./directory.js";

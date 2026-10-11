@@ -4,6 +4,10 @@
 
 **English:** Accountless collab rooms for DeepSeek Harness. Cloudflare DO relay, E2EE payloads, official Harness UI.
 
+## Rooms UI (dsh)
+
+Install `packages/dsh-plugin` into a dsh profile. In the web UI, open **Rooms** in the left rail to create / join / search rooms, chat, @mention agents, and manage tasks. Membership is stored in `~/.collab/state.json` (mode 600) — no manual yml invite paste. Public rooms may be listed in the relay directory (not confidential). See `packages/dsh-plugin/README.md`.
+
 ## Packages
 
 | Package | Description |

@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "wrangler dev src/index.ts",
     "deploy": "wrangler deploy",
-    "test": "npm run build && node --test src/room-logic.test.mjs"
+    "test": "npm run build && node --test src/room-logic.test.mjs src/directory-logic.test.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
