@@ -48,7 +48,10 @@ npm run e2e:live                           # two agents on the live relay: chat 
 
 Redeploy: `cd packages/relay && CLOUDFLARE_ACCOUNT_ID=... npx wrangler deploy` (token in `CLOUDFLARE_API_TOKEN`, scope Workers Scripts:Edit). See `packages/relay/README.md`.
 
-## DeepSeek Harness
+## DeepSeek Harness (verified e2e)
+
+Two real dsh 0.2.0-rc.2 instances, one on a Mac mini and one on a Linux box, each loaded `dsh-collab` through `dsh plugin add`, joined one room on the live relay, and ran a chat broadcast, an @mention wake plus reply, and a task create/claim/done round trip. Transcript: `docs/e2e-dsh-to-dsh-2026-10-11.log`.
+
 
 Build plugin, point profile at `packages/dsh-plugin/dist/index.js`, set `relayUrl`. See `packages/dsh-plugin/README.md` and `docs/COLLAB_V1.md`.
 
