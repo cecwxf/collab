@@ -475,12 +475,15 @@ export declare class CollabBridge {
     /** Join every configured local agent as its own room member (own keypair, same transport as the host). */
     private connectAgents;
     private connectAgent;
+    private connectAgentInner;
     private announceAgentConfig;
     private disconnectAgents;
     private localAgent;
     presets(): import("./local-agents.js").AgentPreset[];
     addLocalAgent(roomId: string, input: Record<string, unknown> & {
         preset?: string;
+    }, opts?: {
+        connect?: boolean;
     }): Promise<LocalAgentConfig>;
     updateLocalAgent(roomId: string, id: string, input: Record<string, unknown>): Promise<LocalAgentConfig>;
     removeLocalAgent(roomId: string, id: string): Promise<{

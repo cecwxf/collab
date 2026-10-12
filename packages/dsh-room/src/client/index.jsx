@@ -736,10 +736,11 @@ function AgentDialog({ store, d }) {
       if (existing) await a.updateAgent(d.roomId, existing.agentId, body);
       else {
         const r = await a.addAgent(d.roomId, f.preset ? { ...body, preset: f.preset } : body);
-        a.toast(`${r.name} joined as @${r.agentId}`);
+        a.toast(`${r.name} added as @${r.agentId} (joining in background)`);
       }
       a.closeDialog();
-    } catch (e) { setErr(e.message); setBusy(false); }
+    } catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
   };
   const remove = async () => {
     setBusy(true);
@@ -1032,8 +1033,16 @@ function CreateDialog({ store, d }) {
         agents: f.agents.map((ag) => ag.key
           ? ag.key
           : { name: ag.name, persona: ag.persona, systemPrompt: ag.systemPrompt, scope: ag.scope, moderator: ag.moderator, reasoningEffort: ag.reasoningEffort, approvalRequired: ag.approvalRequired, model: ag.model || undefined }),
-      });
-    } catch (e) { setErr(e.message); setBusy(false); }
+      }, { timeoutMs: 35_000 });
+      // success swaps the dialog to the invite card via the store; busy clears on unmount
+    } catch (e) {
+      const msg = (e && e.message) || "Create failed";
+      setErr(/timed out|timeout|abort/i.test(msg)
+        ? `${msg}. Check transport (try Local only), relay host, and network — agent joins continue in the background after a successful create.`
+        : msg);
+    } finally {
+      setBusy(false);
+    }
   };
   const browseLan = async () => {
     try { const r = await a.browseLan(); setLanPeers(r.peers || []); } catch (e) { setErr(e.message); }

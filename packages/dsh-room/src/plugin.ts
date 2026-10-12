@@ -55,6 +55,15 @@ const AGENT_SERVICES = ["agents", "agentDefaultModel", "agentPresets", "permissi
 const text = (s: string): ContentBlock[] => [{ type: "text", text: s }];
 const jsonRender = (_args: unknown, value: unknown) => text(JSON.stringify(value));
 
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let t: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, rej) => {
+    t = setTimeout(() => rej(new Error(`${label} timed out after ${ms}ms`)), ms);
+    (t as { unref?: () => void }).unref?.();
+  });
+  return Promise.race([p, timeout]).finally(() => { if (t) clearTimeout(t); });
+}
+
 async function loadIdentity(path: string, agentName?: string): Promise<Identity> {
   try {
     const id = JSON.parse(await readFile(path, "utf8")) as Identity;
@@ -432,7 +441,7 @@ export class CollabBridge {
       this.log("info", `room ${roomId} connection ${status}${detail ? ` (${detail})` : ""}`);
     });
     if (this.disposed) return;
-    await client.join();
+    await client.join(loopback ? 5_000 : 15_000);
     if (this.disposed) {
       // dispose() ran while we were joining: never leave a live socket/ping timer behind
       await client.dispose().catch(() => {});
@@ -606,17 +615,29 @@ export class CollabBridge {
     };
     meta.local = normalizeLocalSettings(meta.local);
     // Local-only rooms keep a relay invite (same roomId + key) for a later one-click switch, but never touch the network.
-    const conn = await this.open(meta);
+    // Host join only (with transport timeouts). Local agents are registered without awaiting their joins.
+    const conn = await withTimeout(this.open(meta), 25_000, "create room join");
     for (const entry of opts.agents ?? []) {
       if (typeof entry === "string") {
-        if (AGENT_PRESETS.some((p) => p.key === entry)) await this.addLocalAgent(meta.roomId, { preset: entry });
+        if (AGENT_PRESETS.some((p) => p.key === entry)) await this.addLocalAgent(meta.roomId, { preset: entry }, { connect: false });
       } else if (entry && typeof entry === "object") {
-        await this.addLocalAgent(meta.roomId, entry);
+        await this.addLocalAgent(meta.roomId, entry, { connect: false });
       }
     }
     this.activeRoomId = meta.roomId;
     if (bindTo) this.bind(conn, bindTo);
     await this.persist();
+    // Loopback joins are cheap — await briefly so the room is ready. Relay/LAN joins run in the background
+    // so a slow/blocked WebSocket cannot leave the Create dialog stuck on "Creating…".
+    if (conn.local.agents.length) {
+      if (conn.local.loopback) {
+        await withTimeout(this.connectAgents(conn), 6_000, "local agents join").catch((e) =>
+          this.log("warn", `local agents for ${meta.roomId}: ${(e as Error).message}`),
+        );
+      } else {
+        void this.connectAgents(conn).catch((e) => this.log("warn", `background local agents for ${meta.roomId}: ${(e as Error).message}`));
+      }
+    }
     let listing: DirectoryEntry | undefined;
     if (meta.public) listing = await this.publish(conn).catch((e) => {
       this.log("warn", `directory publish failed: ${(e as Error).message}`);
@@ -1150,14 +1171,20 @@ export class CollabBridge {
 
   /** Join every configured local agent as its own room member (own keypair, same transport as the host). */
   private async connectAgents(conn: RoomConn) {
-    for (const a of conn.local.agents) {
-      if (conn.agents.get(a.agentId)?.isJoined()) continue;
-      await this.connectAgent(conn, a).catch((e) => this.log("warn", `local agent ${a.agentId} join failed: ${(e as Error).message}`));
-    }
+    const pending = conn.local.agents.filter((a) => !conn.agents.get(a.agentId)?.isJoined());
+    await Promise.all(
+      pending.map((a) =>
+        this.connectAgent(conn, a).catch((e) => this.log("warn", `local agent ${a.agentId} join failed: ${(e as Error).message}`)),
+      ),
+    );
     this.emit({ type: "rooms" });
   }
 
   private async connectAgent(conn: RoomConn, a: LocalAgentConfig) {
+    await withTimeout(this.connectAgentInner(conn, a), conn.local.loopback ? 8_000 : 20_000, `agent ${a.agentId} join`);
+  }
+
+  private async connectAgentInner(conn: RoomConn, a: LocalAgentConfig) {
     const parsed = parseInviteUri(conn.meta.invite);
     const identity = await loadIdentity(this.agentIdentityPath(a.agentId), a.agentId);
     const client = new CollabClient({
@@ -1175,7 +1202,7 @@ export class CollabBridge {
     });
     client.onPeers(() => this.emit({ type: "rooms" }));
     if (this.disposed) return;
-    await client.join();
+    await client.join(conn.local.loopback ? 5_000 : 12_000);
     if (this.disposed) {
       await client.dispose().catch(() => {});
       return;
@@ -1224,7 +1251,7 @@ export class CollabBridge {
     return AGENT_PRESETS;
   }
 
-  async addLocalAgent(roomId: string, input: Record<string, unknown> & { preset?: string }) {
+  async addLocalAgent(roomId: string, input: Record<string, unknown> & { preset?: string }, opts: { connect?: boolean } = {}) {
     const conn = this.room(roomId);
     const self = await this.self();
     const preset = AGENT_PRESETS.find((p) => p.key === input.preset);
@@ -1249,8 +1276,15 @@ export class CollabBridge {
     if (cfg.moderator) for (const a of conn.local.agents) a.moderator = false;
     conn.local.agents.push(cfg);
     await this.persist();
-    if (conn.client?.isJoined()) await this.connectAgent(conn, cfg);
     this.emit({ type: "rooms" });
+    // Collab join / keygen must not block the HTTP response. dsh model sessions stay deferred until first wake.
+    const shouldConnect = opts.connect !== false && !!conn.client?.isJoined();
+    if (shouldConnect) {
+      void this.connectAgent(conn, cfg).then(
+        () => this.emit({ type: "rooms" }),
+        (e) => this.log("warn", `local agent ${cfg.agentId} join failed: ${(e as Error).message}`),
+      );
+    }
     return cfg;
   }
 

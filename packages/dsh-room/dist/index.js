@@ -1224,7 +1224,7 @@ var WsTransport = class {
   get connected() {
     return this._connected;
   }
-  async connect() {
+  async connect(timeoutMs = 8e3) {
     if (this._connected && this.ws?.readyState === WebSocket.OPEN)
       return;
     this.teardownSocket();
@@ -1232,6 +1232,28 @@ var WsTransport = class {
     await new Promise((resolve3, reject) => {
       const ws = new WebSocket(this.url);
       this.ws = ws;
+      let settled = false;
+      const finish = (err) => {
+        if (settled || gen !== this.generation)
+          return;
+        settled = true;
+        clearTimeout(timer);
+        if (err) {
+          try {
+            ws.close(1e3, "connect-failed");
+          } catch {
+          }
+          if (this.ws === ws) {
+            this.ws = null;
+            this._connected = false;
+          }
+          reject(err);
+        } else {
+          this._connected = true;
+          resolve3();
+        }
+      };
+      const timer = setTimeout(() => finish(new Error(`WebSocket connect timeout (${timeoutMs}ms) to ${this.url}`)), timeoutMs);
       ws.addEventListener("open", () => {
         if (gen !== this.generation) {
           try {
@@ -1240,14 +1262,13 @@ var WsTransport = class {
           }
           return;
         }
-        this._connected = true;
-        resolve3();
+        finish();
       });
       ws.addEventListener("error", () => {
         if (gen !== this.generation)
           return;
         if (!this._connected)
-          reject(new Error(`WebSocket error connecting to ${this.url}`));
+          finish(new Error(`WebSocket error connecting to ${this.url}`));
       });
       ws.addEventListener("message", (ev) => {
         if (gen !== this.generation)
@@ -2752,6 +2773,16 @@ var MESSAGES_MAX = 300;
 var AGENT_SERVICES = ["agents", "agentDefaultModel", "agentPresets", "permissionPresets", "sessionTitle", "workspaceRegistry"];
 var text = (s) => [{ type: "text", text: s }];
 var jsonRender = (_args, value) => text(JSON.stringify(value));
+function withTimeout(p, ms, label) {
+  let t;
+  const timeout = new Promise((_, rej) => {
+    t = setTimeout(() => rej(new Error(`${label} timed out after ${ms}ms`)), ms);
+    t.unref?.();
+  });
+  return Promise.race([p, timeout]).finally(() => {
+    if (t) clearTimeout(t);
+  });
+}
 async function loadIdentity(path, agentName) {
   try {
     const id2 = JSON.parse(await readFile5(path, "utf8"));
@@ -3007,7 +3038,7 @@ var CollabBridge = class {
       this.log("info", `room ${roomId} connection ${status}${detail ? ` (${detail})` : ""}`);
     });
     if (this.disposed) return;
-    await client.join();
+    await client.join(loopback ? 5e3 : 15e3);
     if (this.disposed) {
       await client.dispose().catch(() => {
       });
@@ -3173,17 +3204,26 @@ var CollabBridge = class {
       }
     };
     meta.local = normalizeLocalSettings(meta.local);
-    const conn = await this.open(meta);
+    const conn = await withTimeout(this.open(meta), 25e3, "create room join");
     for (const entry of opts.agents ?? []) {
       if (typeof entry === "string") {
-        if (AGENT_PRESETS.some((p) => p.key === entry)) await this.addLocalAgent(meta.roomId, { preset: entry });
+        if (AGENT_PRESETS.some((p) => p.key === entry)) await this.addLocalAgent(meta.roomId, { preset: entry }, { connect: false });
       } else if (entry && typeof entry === "object") {
-        await this.addLocalAgent(meta.roomId, entry);
+        await this.addLocalAgent(meta.roomId, entry, { connect: false });
       }
     }
     this.activeRoomId = meta.roomId;
     if (bindTo) this.bind(conn, bindTo);
     await this.persist();
+    if (conn.local.agents.length) {
+      if (conn.local.loopback) {
+        await withTimeout(this.connectAgents(conn), 6e3, "local agents join").catch(
+          (e) => this.log("warn", `local agents for ${meta.roomId}: ${e.message}`)
+        );
+      } else {
+        void this.connectAgents(conn).catch((e) => this.log("warn", `background local agents for ${meta.roomId}: ${e.message}`));
+      }
+    }
     let listing;
     if (meta.public) listing = await this.publish(conn).catch((e) => {
       this.log("warn", `directory publish failed: ${e.message}`);
@@ -3680,13 +3720,18 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
   }
   /** Join every configured local agent as its own room member (own keypair, same transport as the host). */
   async connectAgents(conn) {
-    for (const a of conn.local.agents) {
-      if (conn.agents.get(a.agentId)?.isJoined()) continue;
-      await this.connectAgent(conn, a).catch((e) => this.log("warn", `local agent ${a.agentId} join failed: ${e.message}`));
-    }
+    const pending = conn.local.agents.filter((a) => !conn.agents.get(a.agentId)?.isJoined());
+    await Promise.all(
+      pending.map(
+        (a) => this.connectAgent(conn, a).catch((e) => this.log("warn", `local agent ${a.agentId} join failed: ${e.message}`))
+      )
+    );
     this.emit({ type: "rooms" });
   }
   async connectAgent(conn, a) {
+    await withTimeout(this.connectAgentInner(conn, a), conn.local.loopback ? 8e3 : 2e4, `agent ${a.agentId} join`);
+  }
+  async connectAgentInner(conn, a) {
     const parsed = parseInviteUri(conn.meta.invite);
     const identity = await loadIdentity(this.agentIdentityPath(a.agentId), a.agentId);
     const client = new CollabClient({
@@ -3703,7 +3748,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     });
     client.onPeers(() => this.emit({ type: "rooms" }));
     if (this.disposed) return;
-    await client.join();
+    await client.join(conn.local.loopback ? 5e3 : 12e3);
     if (this.disposed) {
       await client.dispose().catch(() => {
       });
@@ -3751,7 +3796,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
   presets() {
     return AGENT_PRESETS;
   }
-  async addLocalAgent(roomId, input) {
+  async addLocalAgent(roomId, input, opts = {}) {
     const conn = this.room(roomId);
     const self = await this.self();
     const preset = AGENT_PRESETS.find((p) => p.key === input.preset);
@@ -3776,8 +3821,14 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     if (cfg.moderator) for (const a of conn.local.agents) a.moderator = false;
     conn.local.agents.push(cfg);
     await this.persist();
-    if (conn.client?.isJoined()) await this.connectAgent(conn, cfg);
     this.emit({ type: "rooms" });
+    const shouldConnect = opts.connect !== false && !!conn.client?.isJoined();
+    if (shouldConnect) {
+      void this.connectAgent(conn, cfg).then(
+        () => this.emit({ type: "rooms" }),
+        (e) => this.log("warn", `local agent ${cfg.agentId} join failed: ${e.message}`)
+      );
+    }
     return cfg;
   }
   async updateLocalAgent(roomId, id, input) {

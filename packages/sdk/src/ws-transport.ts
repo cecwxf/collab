@@ -21,7 +21,7 @@ export class WsTransport implements Transport {
     return this._connected;
   }
 
-  async connect(): Promise<void> {
+  async connect(timeoutMs = 8_000): Promise<void> {
     if (this._connected && this.ws?.readyState === WebSocket.OPEN) return;
     // Drop any half-open socket before opening a new one
     this.teardownSocket();
@@ -29,21 +29,31 @@ export class WsTransport implements Transport {
     await new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(this.url);
       this.ws = ws;
+      let settled = false;
+      const finish = (err?: Error) => {
+        if (settled || gen !== this.generation) return;
+        settled = true;
+        clearTimeout(timer);
+        if (err) {
+          try { ws.close(1000, "connect-failed"); } catch { /* */ }
+          if (this.ws === ws) { this.ws = null; this._connected = false; }
+          reject(err);
+        } else {
+          this._connected = true;
+          resolve();
+        }
+      };
+      const timer = setTimeout(() => finish(new Error(`WebSocket connect timeout (${timeoutMs}ms) to ${this.url}`)), timeoutMs);
       ws.addEventListener("open", () => {
         if (gen !== this.generation) {
-          try {
-            ws.close(1000, "stale");
-          } catch {
-            /* */
-          }
+          try { ws.close(1000, "stale"); } catch { /* */ }
           return;
         }
-        this._connected = true;
-        resolve();
+        finish();
       });
       ws.addEventListener("error", () => {
         if (gen !== this.generation) return;
-        if (!this._connected) reject(new Error(`WebSocket error connecting to ${this.url}`));
+        if (!this._connected) finish(new Error(`WebSocket error connecting to ${this.url}`));
       });
       ws.addEventListener("message", (ev) => {
         if (gen !== this.generation) return;

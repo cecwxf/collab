@@ -2,12 +2,23 @@
 export const API = "/api/collab";
 
 async function call(path, init) {
-  const res = await fetch(API + path, { credentials: "same-origin", ...init, headers: { ...(init && init.body ? { "content-type": "application/json" } : {}), ...((init && init.headers) || {}) } });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `${res.status} ${res.statusText}`);
+  let res;
+  try {
+    res = await fetch(API + path, { credentials: "same-origin", ...init, headers: { ...(init && init.body ? { "content-type": "application/json" } : {}), ...((init && init.headers) || {}) } });
+  } catch (e) {
+    const msg = (e && e.name === "AbortError") ? "Request timed out or was cancelled" : ((e && e.message) || "network error");
+    throw new Error(msg);
+  }
+  const text = await res.text();
+  let body = {};
+  try { body = text ? JSON.parse(text) : {}; } catch { body = { error: text.slice(0, 300) || res.statusText }; }
+  if (!res.ok) {
+    const detail = body.error || body.message || (typeof body.raw === "string" ? body.raw : "") || `${res.status} ${res.statusText}`;
+    throw new Error(detail);
+  }
   return body;
 }
-const post = (path, body) => call(path, { method: "POST", body: JSON.stringify(body || {}) });
+const post = (path, body, init) => call(path, { method: "POST", body: JSON.stringify(body || {}), ...(init || {}) });
 
 export function createRoomsStore() {
   let snap = {
@@ -92,12 +103,19 @@ export function createRoomsStore() {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(() => void runSearch(query), 300);
     },
-    async create(form) {
-      const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? undefined : (form.workspaceId || snap.activeWorkspaceId) });
-      try { api.onRoomOpened && api.onRoomOpened(); } catch { /* layout busy */ }
-      set({ selected: r.roomId, dialog: { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } });
-      void loadMessages(r.roomId);
-      return r;
+    async create(form, opts) {
+      const ac = opts && opts.signal ? null : new AbortController();
+      const signal = (opts && opts.signal) || ac.signal;
+      const timer = ac ? setTimeout(() => ac.abort(), (opts && opts.timeoutMs) || 30_000) : null;
+      try {
+        const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? undefined : (form.workspaceId || snap.activeWorkspaceId) }, { signal });
+        try { api.onRoomOpened && api.onRoomOpened(); } catch { /* layout busy */ }
+        set({ selected: r.roomId, dialog: { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } });
+        void loadMessages(r.roomId);
+        return r;
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
     },
     async join(invite, info) {
       const r = await post("/join", { invite, ...(info && info.workspacePath ? {} : { workspaceId: snap.activeWorkspaceId }), ...(info || {}) });

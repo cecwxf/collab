@@ -42,12 +42,27 @@ var rooms_default = '/* Collab Rooms UI \u2014 original surface inside the dsh s
 // src/client/store.js
 var API = "/api/collab";
 async function call(path, init) {
-  const res = await fetch(API + path, { credentials: "same-origin", ...init, headers: { ...init && init.body ? { "content-type": "application/json" } : {}, ...init && init.headers || {} } });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `${res.status} ${res.statusText}`);
+  let res;
+  try {
+    res = await fetch(API + path, { credentials: "same-origin", ...init, headers: { ...init && init.body ? { "content-type": "application/json" } : {}, ...init && init.headers || {} } });
+  } catch (e) {
+    const msg = e && e.name === "AbortError" ? "Request timed out or was cancelled" : e && e.message || "network error";
+    throw new Error(msg);
+  }
+  const text = await res.text();
+  let body = {};
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    body = { error: text.slice(0, 300) || res.statusText };
+  }
+  if (!res.ok) {
+    const detail = body.error || body.message || (typeof body.raw === "string" ? body.raw : "") || `${res.status} ${res.statusText}`;
+    throw new Error(detail);
+  }
   return body;
 }
-var post = (path, body) => call(path, { method: "POST", body: JSON.stringify(body || {}) });
+var post = (path, body, init) => call(path, { method: "POST", body: JSON.stringify(body || {}), ...init || {} });
 function createRoomsStore() {
   let snap = {
     self: null,
@@ -152,15 +167,22 @@ function createRoomsStore() {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(() => void runSearch(query), 300);
     },
-    async create(form) {
-      const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? void 0 : form.workspaceId || snap.activeWorkspaceId });
+    async create(form, opts) {
+      const ac = opts && opts.signal ? null : new AbortController();
+      const signal = opts && opts.signal || ac.signal;
+      const timer = ac ? setTimeout(() => ac.abort(), opts && opts.timeoutMs || 3e4) : null;
       try {
-        api.onRoomOpened && api.onRoomOpened();
-      } catch {
+        const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? void 0 : form.workspaceId || snap.activeWorkspaceId }, { signal });
+        try {
+          api.onRoomOpened && api.onRoomOpened();
+        } catch {
+        }
+        set({ selected: r.roomId, dialog: { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } });
+        void loadMessages(r.roomId);
+        return r;
+      } finally {
+        if (timer) clearTimeout(timer);
       }
-      set({ selected: r.roomId, dialog: { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } });
-      void loadMessages(r.roomId);
-      return r;
     },
     async join(invite, info) {
       const r = await post("/join", { invite, ...info && info.workspacePath ? {} : { workspaceId: snap.activeWorkspaceId }, ...info || {} });
@@ -1117,11 +1139,12 @@ function AgentDialog({ store, d }) {
       if (existing) await a.updateAgent(d.roomId, existing.agentId, body);
       else {
         const r = await a.addAgent(d.roomId, f.preset ? { ...body, preset: f.preset } : body);
-        a.toast(`${r.name} joined as @${r.agentId}`);
+        a.toast(`${r.name} added as @${r.agentId} (joining in background)`);
       }
       a.closeDialog();
     } catch (e) {
       setErr(e.message);
+    } finally {
       setBusy(false);
     }
   };
@@ -1521,9 +1544,11 @@ function CreateDialog({ store, d }) {
         concurrency: f.concurrency,
         isolation: f.isolation,
         agents: f.agents.map((ag) => ag.key ? ag.key : { name: ag.name, persona: ag.persona, systemPrompt: ag.systemPrompt, scope: ag.scope, moderator: ag.moderator, reasoningEffort: ag.reasoningEffort, approvalRequired: ag.approvalRequired, model: ag.model || void 0 })
-      });
+      }, { timeoutMs: 35e3 });
     } catch (e) {
-      setErr(e.message);
+      const msg = e && e.message || "Create failed";
+      setErr(/timed out|timeout|abort/i.test(msg) ? `${msg}. Check transport (try Local only), relay host, and network \u2014 agent joins continue in the background after a successful create.` : msg);
+    } finally {
       setBusy(false);
     }
   };
@@ -2197,12 +2222,27 @@ var rooms_default = '/* Collab Rooms UI \u2014 original surface inside the dsh s
 // src/client/store.js
 var API = "/api/collab";
 async function call(path, init) {
-  const res = await fetch(API + path, { credentials: "same-origin", ...init, headers: { ...init && init.body ? { "content-type": "application/json" } : {}, ...init && init.headers || {} } });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `${res.status} ${res.statusText}`);
+  let res;
+  try {
+    res = await fetch(API + path, { credentials: "same-origin", ...init, headers: { ...init && init.body ? { "content-type": "application/json" } : {}, ...init && init.headers || {} } });
+  } catch (e) {
+    const msg = e && e.name === "AbortError" ? "Request timed out or was cancelled" : e && e.message || "network error";
+    throw new Error(msg);
+  }
+  const text = await res.text();
+  let body = {};
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    body = { error: text.slice(0, 300) || res.statusText };
+  }
+  if (!res.ok) {
+    const detail = body.error || body.message || (typeof body.raw === "string" ? body.raw : "") || `${res.status} ${res.statusText}`;
+    throw new Error(detail);
+  }
   return body;
 }
-var post = (path, body) => call(path, { method: "POST", body: JSON.stringify(body || {}) });
+var post = (path, body, init) => call(path, { method: "POST", body: JSON.stringify(body || {}), ...init || {} });
 function createRoomsStore() {
   let snap = {
     self: null,
@@ -2307,15 +2347,22 @@ function createRoomsStore() {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(() => void runSearch(query), 300);
     },
-    async create(form) {
-      const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? void 0 : form.workspaceId || snap.activeWorkspaceId });
+    async create(form, opts) {
+      const ac = opts && opts.signal ? null : new AbortController();
+      const signal = opts && opts.signal || ac.signal;
+      const timer = ac ? setTimeout(() => ac.abort(), opts && opts.timeoutMs || 3e4) : null;
       try {
-        api.onRoomOpened && api.onRoomOpened();
-      } catch {
+        const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? void 0 : form.workspaceId || snap.activeWorkspaceId }, { signal });
+        try {
+          api.onRoomOpened && api.onRoomOpened();
+        } catch {
+        }
+        set({ selected: r.roomId, dialog: { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } });
+        void loadMessages(r.roomId);
+        return r;
+      } finally {
+        if (timer) clearTimeout(timer);
       }
-      set({ selected: r.roomId, dialog: { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } });
-      void loadMessages(r.roomId);
-      return r;
     },
     async join(invite, info) {
       const r = await post("/join", { invite, ...info && info.workspacePath ? {} : { workspaceId: snap.activeWorkspaceId }, ...info || {} });
@@ -3272,11 +3319,12 @@ function AgentDialog({ store, d }) {
       if (existing) await a.updateAgent(d.roomId, existing.agentId, body);
       else {
         const r = await a.addAgent(d.roomId, f.preset ? { ...body, preset: f.preset } : body);
-        a.toast(`${r.name} joined as @${r.agentId}`);
+        a.toast(`${r.name} added as @${r.agentId} (joining in background)`);
       }
       a.closeDialog();
     } catch (e) {
       setErr(e.message);
+    } finally {
       setBusy(false);
     }
   };
@@ -3676,9 +3724,11 @@ function CreateDialog({ store, d }) {
         concurrency: f.concurrency,
         isolation: f.isolation,
         agents: f.agents.map((ag) => ag.key ? ag.key : { name: ag.name, persona: ag.persona, systemPrompt: ag.systemPrompt, scope: ag.scope, moderator: ag.moderator, reasoningEffort: ag.reasoningEffort, approvalRequired: ag.approvalRequired, model: ag.model || void 0 })
-      });
+      }, { timeoutMs: 35e3 });
     } catch (e) {
-      setErr(e.message);
+      const msg = e && e.message || "Create failed";
+      setErr(/timed out|timeout|abort/i.test(msg) ? `${msg}. Check transport (try Local only), relay host, and network \u2014 agent joins continue in the background after a successful create.` : msg);
+    } finally {
       setBusy(false);
     }
   };

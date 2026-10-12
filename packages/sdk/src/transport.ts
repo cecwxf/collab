@@ -5,7 +5,7 @@ export type CloseHandler = (reason: string) => void;
 
 /** Abstract duplex transport for Collab frames */
 export interface Transport {
-  connect(): Promise<void>;
+  connect(timeoutMs?: number): Promise<void>;
   send(frame: WireFrame): void;
   onFrame(handler: FrameHandler): void;
   onClose(handler: CloseHandler): void;
