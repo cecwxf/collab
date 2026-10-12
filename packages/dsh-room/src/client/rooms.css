@@ -282,6 +282,7 @@
 .rm-composer-tools, .rm-composer-modes, .rm-composer-trailing {
   display: flex; align-items: center; min-width: 0; gap: 8px;
 }
+.rm-composer-modes { flex-wrap: wrap; gap: 4px; }
 .rm-composer-trailing { flex: none; margin-left: auto; }
 .rm-composer-add {
   width: 28px; height: 28px; border: none; border-radius: 999px;
@@ -303,10 +304,7 @@
 .rm-composer-select:disabled { opacity: .5; cursor: default; }
 .rm-composer-model-text { display: inline; }
 .rm-composer-model-icon { display: none; font-size: 10px; }
-.rm-composer-effort {
-  margin-left: 6px; font-size: 11px; opacity: .75;
-  text-transform: uppercase; letter-spacing: .02em;
-}
+
 .rm-composer-send {
   width: 34px; height: 34px; border: none; border-radius: 999px;
   background: var(--rm-accent, #5b8cff); color: #fff; cursor: pointer;

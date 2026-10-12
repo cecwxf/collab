@@ -2921,7 +2921,7 @@ var PLUGIN_VERSION = (() => {
   try {
     return requirePkg("../package.json").version;
   } catch {
-    return "0.3.4";
+    return "0.3.5";
   }
 })();
 var SUMMARY_MAX = 120;

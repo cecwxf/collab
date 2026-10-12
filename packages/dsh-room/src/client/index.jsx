@@ -282,6 +282,7 @@ function Composer({ room, store, draft, setDraft }) {
   const [mode, setMode] = useState("chat");
   const [busy, setBusy] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
+  const [effortOpen, setEffortOpen] = useState(false);
   const [permOpen, setPermOpen] = useState(false);
   const [peerOpen, setPeerOpen] = useState(false);
   const [mentionActive, setMentionActive] = useState(0);
@@ -326,22 +327,12 @@ function Composer({ room, store, draft, setDraft }) {
   })();
   useEffect(() => { setMentionActive(0); setMentionDismissed(false); }, [mqRaw && mqRaw.query, mqRaw && mqRaw.start]);
   const MODELS = catalog;
-  const EFFORTS = ["low", "medium", "high", "max"];
+  const EFFORTS = [["low", "Low"], ["medium", "Medium"], ["high", "High"], ["max", "Max"]];
+  const effortLabel = EFFORTS.find(([value]) => value === effort)?.[1] || effort;
 
   const patchConfig = async (patch) => {
     try {
-      const next = {
-        model: mc.model,
-        provider: mc.provider,
-        reasoningEffort: mc.reasoningEffort || "medium",
-        workspacePath: mc.workspacePath,
-        workspaceLabel: mc.workspaceLabel,
-        mcpEnabled: mc.mcpEnabled !== false,
-        ...patch,
-        permissions: { ...(mc.permissions || { autoRead: true, autoWrite: false, autoShell: false, autoNetwork: false }), ...(patch.permissions || {}) },
-        peerGrants: patch.peerGrants !== undefined ? patch.peerGrants : mc.peerGrants,
-      };
-      await a.saveConfig(room.roomId, next);
+      await a.saveConfig(room.roomId, patch);
     } catch (e) { a.toast(e.message); }
   };
 
@@ -403,27 +394,35 @@ function Composer({ room, store, draft, setDraft }) {
         </div>
         <div className="rm-composer-modes">
           <div className="rm-composer-popwrap">
-            <button type="button" className="rm-composer-select" disabled={offline} onClick={() => { setModelOpen(!modelOpen); setPermOpen(false); setPeerOpen(false); }} title="Room agent model">
+            <button type="button" className="rm-composer-select" disabled={offline} onClick={() => { setModelOpen(!modelOpen); setEffortOpen(false); setPermOpen(false); setPeerOpen(false); }} aria-label={`Model: ${modelLabel}`} aria-expanded={modelOpen} title="Room agent model">
               <span className="rm-composer-model-text">{modelLabel}</span>
               <span className="rm-composer-model-icon" aria-hidden>◆</span>
-              <span className="rm-composer-effort">{effort}</span>
             </button>
             {modelOpen ? (
-              <div className="rm-composer-menu" role="menu">
+              <div className="rm-composer-menu" role="menu" aria-label="Model">
                 <div className="rm-composer-menu-label">Model</div>
                 {MODELS.map((m) => (
                   <button key={`${m.provider}/${m.model}`} type="button" role="menuitem" className={mc.resolvedModel?.model === m.model && mc.resolvedModel?.provider === m.provider ? "is-active" : ""} onClick={() => { void patchConfig({ model: m.model, provider: m.provider }); setModelOpen(false); }}>{m.name}</button>
-                ))}
-                <div className="rm-composer-menu-label">Reasoning</div>
-                {EFFORTS.map((e) => (
-                  <button key={e} type="button" role="menuitem" className={effort === e ? "is-active" : ""} onClick={() => { void patchConfig({ reasoningEffort: e }); setModelOpen(false); }}>{e}</button>
                 ))}
                 <button type="button" role="menuitem" onClick={() => { setModelOpen(false); a.openDialog({ kind: "config", roomId: room.roomId }); }}>More agent settings…</button>
               </div>
             ) : null}
           </div>
           <div className="rm-composer-popwrap">
-            <button type="button" className="rm-composer-select" disabled={offline} onClick={() => { setPermOpen(!permOpen); setModelOpen(false); setPeerOpen(false); }} title="Your auto-permissions">
+            <button type="button" className="rm-composer-select" disabled={offline} onClick={() => { setEffortOpen(!effortOpen); setModelOpen(false); setPermOpen(false); setPeerOpen(false); }} aria-label={`Reasoning effort: ${effortLabel}`} aria-expanded={effortOpen} title="Room reasoning effort">
+              Reasoning · {effortLabel}
+            </button>
+            {effortOpen ? (
+              <div className="rm-composer-menu" role="menu" aria-label="Reasoning effort">
+                <div className="rm-composer-menu-label">Reasoning effort</div>
+                {EFFORTS.map(([value, label]) => (
+                  <button key={value} type="button" role="menuitem" className={effort === value ? "is-active" : ""} onClick={() => { void patchConfig({ reasoningEffort: value }); setEffortOpen(false); }}>{label}</button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <div className="rm-composer-popwrap">
+            <button type="button" className="rm-composer-select" disabled={offline} onClick={() => { setPermOpen(!permOpen); setModelOpen(false); setEffortOpen(false); setPeerOpen(false); }} title="Your auto-permissions">
               {permSummary}
             </button>
             {permOpen ? (
@@ -441,7 +440,7 @@ function Composer({ room, store, draft, setDraft }) {
             ) : null}
           </div>
           <div className="rm-composer-popwrap">
-            <button type="button" className="rm-composer-select rm-composer-peers" disabled={offline} onClick={() => { setPeerOpen(!peerOpen); setModelOpen(false); setPermOpen(false); }} title="Peer MCP limits on this workspace">
+            <button type="button" className="rm-composer-select rm-composer-peers" disabled={offline} onClick={() => { setPeerOpen(!peerOpen); setModelOpen(false); setEffortOpen(false); setPermOpen(false); }} title="Peer MCP limits on this workspace">
               Peer MCP
             </button>
             {peerOpen ? (

@@ -50,7 +50,7 @@ import { loadState, saveState, createWorkspaceMeta, type RoomMeta, type Workspac
 import { extractMentions } from "./commands.js";
 import { createRequire } from "node:module";
 const requirePkg = createRequire(import.meta.url);
-export const PLUGIN_VERSION: string = (() => { try { return requirePkg("../package.json").version as string; } catch { return "0.3.4"; } })();
+export const PLUGIN_VERSION: string = (() => { try { return requirePkg("../package.json").version as string; } catch { return "0.3.5"; } })();
 
 const SUMMARY_MAX = 120;
 const MESSAGES_MAX = 300;

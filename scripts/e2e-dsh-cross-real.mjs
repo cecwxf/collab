@@ -4,11 +4,12 @@
 import assert from 'node:assert/strict';
 import {readFile,writeFile} from 'node:fs/promises';
 assert.ok(process.env.DSH_MAC_CONTROL && process.env.DSH_VPS_CONTROL,'DSH_MAC_CONTROL and DSH_VPS_CONTROL required');
+const version=JSON.parse(await readFile(new URL('../packages/dsh-room/package.json',import.meta.url),'utf8')).version;
 const mac=JSON.parse(await readFile(process.env.DSH_MAC_CONTROL,'utf8')),vps=JSON.parse(await readFile(process.env.DSH_VPS_CONTROL,'utf8'));
 async function api(h,path,body){const r=await fetch(h.base+'/api/collab'+path,{method:body===undefined?'GET':'POST',headers:{cookie:h.cookie,'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});const v=await r.json();assert.ok(r.ok,`${path}: ${r.status} ${v.error||''}`);return v;}
 async function until(f,label){const end=Date.now()+240000;while(Date.now()<end){if(await f())return;await new Promise(r=>setTimeout(r,500));}throw Error('timeout: '+label);}
 const p='/rooms/'+encodeURIComponent(mac.roomId);
-const state=await api(vps,'/state');assert.equal(state.version,'0.3.4');assert.equal(state.defaultModel.model,'deepseek-flash');
+const state=await api(vps,'/state');assert.equal(state.version,version);assert.equal(state.defaultModel.model,'deepseek-flash');
 await api(vps,'/join',{invite:mac.invite});
 const joined=(await api(vps,'/state')).rooms.find(r=>r.roomId===mac.roomId);
 const remote=joined.local.agents.find(a=>a.name==='VpsCalculator') || await api(vps,p+'/agents',{name:'VpsCalculator',scope:'read',reasoningEffort:'low',systemPrompt:'First call collab_history and collab_rooms and verify their results are readable. For this test, when asked by coder.lmac to calculate 7+8, use collab_send with text VPS_RESULT_15 and mentions ["coder.lmac"]. Do not mention others. Do not use any shell or file tools.'});
