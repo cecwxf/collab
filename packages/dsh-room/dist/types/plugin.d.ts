@@ -68,6 +68,8 @@ export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId" | "membe
     runs?: RunInfo[];
 }
 export interface LocalAgentView extends LocalAgentConfig {
+    connectionStatus: RoomStatus;
+    error?: string;
     resolvedModel?: ModelChoice | null;
     sessionId?: string;
     online: boolean;
@@ -120,6 +122,8 @@ declare class RoomConn {
     }>;
     mcpServing: Map<string, AbortController>;
     client: CollabClient | null;
+    hostJoin?: Promise<void>;
+    agentErrors: Map<string, string>;
     status: RoomStatus;
     error?: string;
     messages: RoomMessage[];
@@ -253,6 +257,63 @@ export declare class CollabBridge {
     persist(): Promise<void>;
     private open;
     private connect;
+    updateRoom(roomId: string, patch: {
+        name?: string;
+        description?: string;
+        tags?: string[];
+    }): Promise<{
+        directoryWarning: string | undefined;
+        /** dsh Session woken for this room (shown nested under its workspace in the native sidebar). */
+        sessionId?: string;
+        status: RoomStatus;
+        error?: string;
+        members: {
+            agentId: string;
+            self: boolean;
+            online?: boolean;
+            local?: boolean;
+            name?: string;
+            persona?: string;
+            hostedBy?: string;
+            moderator?: boolean;
+        }[];
+        last?: {
+            from: string;
+            text: string;
+            ts: number;
+        };
+        sessionTitle: string;
+        bound: boolean;
+        transport?: "relay" | "lan" | "local";
+        /** Public member config (no secrets / no absolute path). */
+        memberConfig?: (ReturnType<typeof publicMemberConfig> & {
+            workspacePath?: string;
+            resolvedModel?: ModelChoice | null;
+            effectiveReasoningEffort?: string;
+            peerGrants?: RoomMemberConfig["peerGrants"];
+        }) | null;
+        peerConfigs?: Record<string, ReturnType<typeof publicMemberConfig> & {
+            displayName?: string;
+            persona?: string;
+            hostedBy?: string;
+        }>;
+        /** Local multi-agent state (agents hosted by this dsh). */
+        local?: LocalView;
+        /** Local agent runs: running, queued, waiting for approval, recent. */
+        runs?: RunInfo[];
+        roomId: string;
+        public: boolean;
+        name: string;
+        owner: boolean;
+        description: string;
+        tags: string[];
+        joinedAt: number;
+        workspaceId?: string | undefined;
+        agentSessions?: Record<string, string> | undefined;
+        agentNoEffort?: string[] | undefined;
+    }>;
+    reconnectRoom(roomId: string): Promise<RoomView>;
+    private connectInner;
     listWorkspaces(): WorkspaceMeta[];
     ensureWorkspace(opts: {
         name?: string;
@@ -379,6 +440,11 @@ export declare class CollabBridge {
     leave(roomId: string): Promise<{
         ok: boolean;
         left: boolean;
+        directoryWarning?: undefined;
+    } | {
+        ok: boolean;
+        left: boolean;
+        directoryWarning: string | undefined;
     }>;
     /** Room by id, else the active one. */
     room(roomId?: string): RoomConn;

@@ -10,7 +10,7 @@ The same package supports **dsh web** and the official **DeepSeek Harness Deskto
 ### Web
 
 ```sh
-dsh plugin --profile web add @cecwxf/dsh-room@0.3.9
+dsh plugin --profile web add @cecwxf/dsh-room@0.3.10
 dsh web
 ```
 
@@ -18,12 +18,12 @@ Open the printed URL and select **DSH Room** in the sidebar.
 
 ### Desktop
 
-Install `@cecwxf/dsh-room@0.3.9` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
+Install `@cecwxf/dsh-room@0.3.10` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
 
 The npm-installed `dsh` command rejects `--profile desktop` with `profile "desktop" is managed exclusively by the Electron application`. For a command-line installation, launch Desktop once, fully quit it, and use **its bundled command**, not the npm CLI. For a macOS app in `/Applications`:
 
 ```sh
-"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.9
+"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.10
 ```
 
 Reopen Desktop and select **DSH Room**. **Manage dsh Command…** in Desktop's application menu can register that bundled command on PATH.
@@ -177,3 +177,17 @@ Room chat and task results use dsh's native Markdown renderer for headings, tabl
 The host APIs `POST /api/collab/rooms/:id/session`, `/preview`, and `/files` reuse the dsh connection fence. File resolution checks real paths against the room workspace and its owned agent worktree, rejecting outside links. Session navigation cancels stale preview responses. Reasoning labels display the effective inherited effort separately from the model name.
 
 Validation: `DSH_PREVIEW_HOST=/private/control.json DSH_PREVIEW_CONTROL=/private/ui-control.json DSH_PREVIEW_EVIDENCE=/path/evidence.json node scripts/e2e-dsh-preview-real.mjs` asks a real DeepSeek agent to produce HTML, Markdown and SVG in an unmerged worktree and verifies native-session/file resolution and boundary rejection. The disposable host utility described above provides the private control file. UI interaction was verified in Safari Web and the official macOS Desktop 0.2.0-rc.2, including actual HTML/Markdown/image previews. Workspace groups use owned DOM decorations because that dsh version has no workspace-child extension seat; dsh upgrades should rerun the sidebar integration tests. Preview navigation itself uses the public `uiWorkspace` and `sidebarRight` services.
+
+## Connection recovery (0.3.10)
+
+Offline rooms allow draft editing and show the connection error plus **Retry connection**; Send and Enter submissions wait until the room is online. Drafts survive reconnects. Local agent cards distinguish connecting/online/offline and show their join error; **Retry offline agents** retries failed member connections.
+
+A pending host client stays owned after the first join fails, so reconnect and plugin disposal can manage it. Every host reconnect also joins agents added while offline. Selecting the current transport retries its connection instead of returning a no-op. These changes share the Web/Desktop client and backend.
+
+The Node host uses the package's `ws` implementation for relay sockets, avoiding incompatibilities between Node's built-in WebSocket and dsh's process-wide HTTP dispatcher. The SDK still defaults to the browser/global WebSocket, and accepts an explicit constructor for Node hosts. Model HTTP requests retain dsh's existing network configuration.
+
+`DSH_RECOVERY_HOSTS=/private/web-control.json,/private/desktop-control.json DSH_RECOVERY_EVIDENCE=/path/evidence.json node scripts/e2e-dsh-recovery-real.mjs` verifies an initial refused relay connection, agents added offline, automatic recovery, real Author/Reviewer model turns, native file preview, and VPS host/agent membership plus chat in both hosts.
+
+Room headers provide **Edit room settings** for name, description and tags. Changes persist without replacing the room, agents or workspace; names are local labels, and owned public rooms also refresh their directory listing. The native workspace toolbar has a **New room** shortcut, and every expanded workspace has a visible **New room** row preselecting that workspace. Original native controls and rows remain owned by dsh and are restored on plugin unload.
+
+Room rows provide an **⋯** menu with **Edit room** and **Delete room**. Deletion requires its confirmation dialog and removes the room from this host, stops its local tasks, disconnects hosted members and releases background session handles. Native conversation history and workspace/worktree files are retained, and remote hosts keep their membership. An owned public listing is unlisted as part of removal.

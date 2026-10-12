@@ -1,3 +1,4 @@
+import NodeWebSocket from "ws";
 import { resolveSelection, describeModel, type ModelChoice, type ModelSelection } from "./models.js";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile, appendFile, rename, rm } from "node:fs/promises";
@@ -167,6 +168,8 @@ export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId" | "membe
 }
 
 export interface LocalAgentView extends LocalAgentConfig {
+  connectionStatus: RoomStatus;
+  error?: string;
   resolvedModel?: ModelChoice | null;
   sessionId?: string;
   online: boolean;
@@ -210,6 +213,8 @@ class RoomConn {
   mcpCalls = new Map<string, { target: string; caller: string; settle: (result: McpResultPayload) => void; cancel: (error: Error) => void }>();
   mcpServing = new Map<string, AbortController>();
   client: CollabClient | null = null;
+  hostJoin?: Promise<void>;
+  agentErrors = new Map<string, string>();
   status: RoomStatus = "connecting";
   error?: string;
   messages: RoomMessage[] = [];
@@ -446,16 +451,75 @@ export class CollabBridge {
     try {
       await this.connect(conn);
     } catch (e) {
-      conn.status = "offline";
-      conn.error = (e as Error).message;
-      this.emit({ type: "rooms" });
+      if (!this.disposed && this.rooms.get(conn.meta.roomId) === conn && !conn.client?.isJoined()) {
+        conn.status = "offline";
+        conn.error = (e as Error).message;
+        this.emit({ type: "rooms" });
+      }
       throw e;
     }
     if (meta.owner && meta.public) this.startHeartbeat(conn);
     return conn;
   }
 
-  private async connect(conn: RoomConn) {
+  private connect(conn: RoomConn): Promise<void> {
+    if (conn.hostJoin) return conn.hostJoin;
+    const job = this.connectInner(conn).catch((error) => {
+      if (!this.disposed && this.rooms.get(conn.meta.roomId) === conn && !conn.client?.isJoined()) {
+        conn.status = "offline";
+        conn.error = (error as Error).message;
+        this.emit({ type: "rooms" });
+      }
+      throw error;
+    }).finally(() => { if (conn.hostJoin === job) conn.hostJoin = undefined; });
+    conn.hostJoin = job;
+    return job;
+  }
+
+  async updateRoom(roomId: string, patch: { name?: string; description?: string; tags?: string[] }) {
+    const conn = this.room(roomId);
+    const name = patch.name === undefined ? conn.meta.name : patch.name.trim();
+    if (!name || name.length > 60) throw new Error("room name must contain 1–60 characters");
+    const description = patch.description === undefined ? conn.meta.description : patch.description.trim();
+    if (description.length > 280) throw new Error("room description must be at most 280 characters");
+    conn.meta.name = name;
+    conn.meta.description = description;
+    if (patch.tags !== undefined) conn.meta.tags = normalizeTags(patch.tags);
+    await this.persist();
+    this.emit({ type: "rooms" });
+    const titles = this.ctx.get("sessionTitle") as AgentServices["sessionTitle"] | undefined;
+    if (titles) {
+      const host = this.sessions.get(roomId);
+      if (host) void host.then(h => titles.rename(h.agent.session, `collab:${name}`)).catch(() => {});
+      for (const a of conn.local.agents) {
+        const handle = this.agentHandles.get(`${roomId}:${a.agentId}`);
+        if (handle) void handle.then(h => titles.rename(h.agent.session, `room:${name} · ${a.name}`)).catch(() => {});
+      }
+    }
+    let directoryWarning: string | undefined;
+    if (conn.meta.public && conn.meta.owner) {
+      try { await this.publish(conn); } catch (e) { directoryWarning = "Room saved; public directory refresh failed"; this.log("warn", `${directoryWarning}: ${(e as Error).message}`); }
+    }
+    return { ...this.view(conn), directoryWarning };
+  }
+
+  async reconnectRoom(roomId: string) {
+    const conn = this.room(roomId);
+    if (conn.client?.isJoined()) await this.connectAgents(conn);
+    else await this.connect(conn);
+    return this.view(conn);
+  }
+
+  private async connectInner(conn: RoomConn) {
+    // Keep every pending client owned; otherwise an initial join failure leaves
+    // an orphan reconnect loop and later agent additions can never join it.
+    const previous = conn.client;
+    conn.client = null;
+    await previous?.dispose().catch(() => {});
+    if (this.disposed || this.rooms.get(conn.meta.roomId) !== conn) return;
+    conn.status = "connecting";
+    conn.error = undefined;
+    this.emit({ type: "rooms" });
     const identity = await this.self();
     const parsed = parseInviteUri(conn.meta.invite);
     const roomId = parsed.roomId;
@@ -479,8 +543,10 @@ export class CollabBridge {
       reconnect: !loopback,
       capabilities: caps,
     });
-    client.onPayload((p, meta) => void this.onPayload(conn, p, meta.from, meta.seq));
+    const active = () => !this.disposed && this.rooms.get(conn.meta.roomId) === conn && conn.client === client;
+    client.onPayload((p, meta) => { if (active()) void this.onPayload(conn, p, meta.from, meta.seq); });
     client.onPeers((peers, ev) => {
+      if (!active()) return;
       const now = Date.now();
       for (const peer of peers) if (!conn.removedAgentIds.has(peer.agentId)) conn.lastSeenPeers.set(peer.agentId, now);
       if (ev?.type === "joined" && !conn.removedAgentIds.has(ev.agentId)) conn.lastSeenPeers.set(ev.agentId, now);
@@ -498,28 +564,38 @@ export class CollabBridge {
       this.emit({ type: "rooms" });
     });
     client.onStatus((status, detail) => {
+      if (!active()) return;
       if (status === "connected") {
         conn.status = "online";
         conn.error = undefined;
+        // Includes recovery after an initial join failure, and agents configured
+        // while disconnected. Pending joins are deduplicated by connectAgent().
+        void this.connectAgents(conn).then(() => {
+          if (active() && client.isJoined()) return this.announceMemberConfig(conn);
+        }).catch((e) => this.log("warn", `room recovery ${roomId}: ${(e as Error).message}`));
       } else if (status === "connecting") {
         conn.status = "connecting";
-        conn.error = detail;
+        if (!conn.error && detail && detail !== "reconnect") conn.error = detail;
       } else {
         conn.status = "offline";
-        conn.error = detail ?? "disconnected";
+        conn.error ??= detail ?? "disconnected";
         this.cancelMcp(conn, new Error("MCP room disconnected"));
       }
       this.emit({ type: "rooms" });
       this.log("info", `room ${roomId} connection ${status}${detail ? ` (${detail})` : ""}`);
     });
-    if (this.disposed) return;
+    if (this.disposed || this.rooms.get(conn.meta.roomId) !== conn) { await client.dispose(); return; }
+    conn.client = client;
+    if (!conn.presenceTimer) {
+      conn.presenceTimer = setInterval(() => this.emit({ type: "rooms" }), 5_000);
+      (conn.presenceTimer as { unref?: () => void }).unref?.();
+    }
     await client.join(loopback ? 5_000 : 15_000);
-    if (this.disposed) {
+    if (!active()) {
       // dispose() ran while we were joining: never leave a live socket/ping timer behind
       await client.dispose().catch(() => {});
       return;
     }
-    conn.client = client;
     conn.status = "online";
     conn.error = undefined;
     // Refresh presence map with current peers + self
@@ -734,9 +810,11 @@ export class CollabBridge {
       }
       this.log("info", `createRoom connected ${conn.meta.roomId} status=${conn.status}`);
     } catch (e) {
-      conn.status = "offline";
-      conn.error = (e as Error).message;
-      this.emit({ type: "rooms" });
+      if (!this.disposed && this.rooms.get(conn.meta.roomId) === conn && !conn.client?.isJoined()) {
+        conn.status = "offline";
+        conn.error = (e as Error).message;
+        this.emit({ type: "rooms" });
+      }
       throw e;
     }
     this.emit({ type: "rooms" });
@@ -783,16 +861,22 @@ export class CollabBridge {
     this.cancelMcp(conn, new Error("MCP room left"));
     if (conn.heartbeat) clearInterval(conn.heartbeat);
       if (conn.presenceTimer) clearInterval(conn.presenceTimer);
-    if (conn.meta.owner && conn.meta.public) {
-      await this.directory.unlist(await this.self(), roomId).catch((e) => this.log("warn", `unlist failed: ${(e as Error).message}`));
-    }
+    let directoryWarning: string | undefined;
     this.scheduler.stop(roomId);
     await this.disconnectAgents(conn);
     await conn.client?.dispose().catch(() => {});
+    void Promise.all(conn.local.agents.map(a => this.resetAgentSession(conn, a))).catch(e => this.log("warn", `room session cleanup: ${(e as Error).message}`));
+    const host = this.sessions.get(roomId);this.sessions.delete(roomId);
+    if (host) void host.then(h => h.dispose()).catch(() => {});
+    this.mcpByRoom.delete(roomId);this.peerConfigs.delete(roomId);
+    if (conn.meta.owner && conn.meta.public) {
+      try { await withTimeout(this.directory.unlist(await this.self(), roomId), 5_000, "public listing removal"); }
+      catch (e) { directoryWarning = "Public listing removal failed"; this.log("warn", `unlist failed: ${(e as Error).message}`); }
+    }
     if (this.activeRoomId === roomId) this.activeRoomId = this.rooms.keys().next().value ?? null;
     await this.persist();
     this.emit({ type: "rooms" });
-    return { ok: true, left: true };
+    return { ok: true, left: true, directoryWarning };
   }
 
   /** Room by id, else the active one. */
@@ -907,7 +991,7 @@ export class CollabBridge {
           return {
             agentId,
             self: agentId === self,
-            online: (conn.client?.getPeers() ?? []).some((p) => p.agentId === agentId) || agentId === self || !!conn.agents.get(agentId)?.isJoined(),
+            online: la ? !!conn.agents.get(agentId)?.isJoined() : agentId === self ? !!conn.client?.isJoined() : (conn.client?.getPeers() ?? []).some((p) => p.agentId === agentId),
             local: !!la,
             name: la?.name ?? pc?.displayName,
             persona: la?.persona ?? pc?.persona,
@@ -1322,7 +1406,7 @@ export class CollabBridge {
   }
 
   private transportFor(conn: RoomConn, wsUrl: string) {
-    return conn.local.loopback ? new MockTransport(this.hub, `loopback:${conn.meta.roomId}`) : new WsTransport(wsUrl);
+    return conn.local.loopback ? new MockTransport(this.hub, `loopback:${conn.meta.roomId}`) : new WsTransport(wsUrl, NodeWebSocket as unknown as typeof globalThis.WebSocket);
   }
 
   private agentIdentityPath(agentId: string) {
@@ -1345,9 +1429,15 @@ export class CollabBridge {
     if (existing) return existing.promise;
     const job = { promise: Promise.resolve() };
     conn.agentJoins.set(a.agentId, job);
+    conn.agentErrors.delete(a.agentId);
+    this.emit({ type: "rooms" });
     const active = () => !this.disposed && this.rooms.get(conn.meta.roomId) === conn && conn.local.agents.includes(a) && conn.agentJoins.get(a.agentId) === job;
-    job.promise = withTimeout(this.connectAgentInner(conn, a, active), conn.local.loopback ? 8_000 : 20_000, `agent ${a.agentId} join`).finally(() => {
+    job.promise = withTimeout(this.connectAgentInner(conn, a, active), conn.local.loopback ? 8_000 : 20_000, `agent ${a.agentId} join`).catch((error) => {
+      if (active()) conn.agentErrors.set(a.agentId, (error as Error).message);
+      throw error;
+    }).finally(() => {
       if (conn.agentJoins.get(a.agentId) === job) conn.agentJoins.delete(a.agentId);
+      this.emit({ type: "rooms" });
     });
     return job.promise;
   }
@@ -1415,6 +1505,7 @@ export class CollabBridge {
 
   private async disconnectAgents(conn: RoomConn) {
     conn.agentJoins.clear();
+    conn.agentErrors.clear();
     const list = [...conn.agents.values()];
     conn.agents.clear();
     await Promise.all(list.map((c) => c.dispose().catch(() => {})));
@@ -1494,6 +1585,7 @@ export class CollabBridge {
     conn.local.agents = conn.local.agents.filter((x) => x !== a);
     conn.removedAgentIds.add(a.agentId);
     conn.agentJoins.delete(a.agentId);
+    conn.agentErrors.delete(a.agentId);
     const client = conn.agents.get(a.agentId);
     conn.agents.delete(a.agentId);
     await client?.dispose().catch(() => {});
@@ -1536,7 +1628,10 @@ export class CollabBridge {
       conn.meta.invite = `collab://lan/${hp}/${parsed.roomId}#${parsed.roomKeyB64}`;
     }
     const wantLoopback = target === "local";
-    if (wantLoopback === conn.local.loopback && target !== "lan") return { ...this.view(conn), invite: conn.meta.invite };
+    if (wantLoopback === conn.local.loopback && target !== "lan") {
+      await this.reconnectRoom(roomId);
+      return { ...this.view(conn), invite: conn.meta.invite };
+    }
     await this.saveLocalHistory(conn);
     this.cancelMcp(conn, new Error("MCP room transport changed"));
     await this.disconnectAgents(conn);
@@ -2057,10 +2152,9 @@ export class CollabBridge {
     const root = conn.meta.memberConfig?.workspacePath?.trim() || this.config.workspacePath;
     const top = await gitTop(root).catch(() => null);
     if (!top) return null;
-    const { worktreeBranch, worktreeDir } = await import("./isolation.js");
-    const wt = { repo: top, path: worktreeDir(top, conn.meta.roomId, a.agentId), branch: worktreeBranch(conn.meta.name, conn.meta.roomId, a.agentId) };
-    const { stat } = await import("node:fs/promises");
-    if (!(await stat(join(wt.path, ".git")).then(() => true, () => false))) return null;
+    const { readWorktree } = await import("./isolation.js");
+    const wt = await readWorktree(top, conn.meta.roomId, a.agentId);
+    if (!wt) return null;
     conn.worktrees.set(a.agentId, wt);
     return wt;
   }
@@ -2117,7 +2211,6 @@ export class CollabBridge {
 
   localView(conn: RoomConn): LocalView {
     const runs = this.scheduler.list(conn.meta.roomId, 0);
-    const online = new Set((conn.client?.getPeers() ?? []).map((p) => p.agentId));
     return {
       agents: conn.local.agents.map((a) => {
         const r = runs.find((x) => x.agentId === a.agentId && x.state === "running") ?? runs.find((x) => x.agentId === a.agentId);
@@ -2126,7 +2219,9 @@ export class CollabBridge {
           ...a,
           resolvedModel: this.resolvedModel(conn, a),
           sessionId: conn.meta.agentSessions?.[a.agentId],
-          online: online.has(a.agentId) || !!conn.agents.get(a.agentId)?.isJoined(),
+          online: !!conn.agents.get(a.agentId)?.isJoined(),
+          connectionStatus: conn.agents.get(a.agentId)?.isJoined() ? "online" : conn.agentJoins.has(a.agentId) || conn.status === "connecting" ? "connecting" : "offline",
+          error: conn.agentErrors.get(a.agentId),
           state: (r?.state as LocalAgentView["state"]) ?? "idle",
           worktree: wt ? { branch: wt.branch, path: wt.path } : null,
           isolation: a.scope !== "write" ? "read-only" : wt ? "worktree" : conn.locks ? "locks" : conn.git === false || conn.local.isolation === "locks" ? "locks" : conn.local.isolation === "off" ? "shared" : "worktree",

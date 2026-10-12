@@ -132,6 +132,12 @@ export function createRoomsStore() {
       toast(`Joined ${r.name}`);
       return r;
     },
+    async deleteRoom(roomId) {
+      const result = await post(`/rooms/${encodeURIComponent(roomId)}/delete`);
+      navigation++;
+      set(s => { const messages = { ...s.messages }; delete messages[roomId]; const rooms = s.rooms.filter(r => r.roomId !== roomId); return { rooms, messages, selected: s.selected === roomId ? rooms[0]?.roomId || null : s.selected, dialog: null }; });
+      toast(result.directoryWarning ? `Room deleted from this dsh · ${result.directoryWarning}` : "Room deleted from this dsh");
+    },
     async leave(roomId) {
       await post(`/rooms/${encodeURIComponent(roomId)}/leave`);
       set((s) => { const m = { ...s.messages }; delete m[roomId]; return { messages: m, selected: s.selected === roomId ? null : s.selected, dialog: null }; });
@@ -162,6 +168,16 @@ export function createRoomsStore() {
     async updateAgent(roomId, id, body) { return post(`/rooms/${encodeURIComponent(roomId)}/agents/${encodeURIComponent(id)}`, body); },
     async removeAgent(roomId, id) { return post(`/rooms/${encodeURIComponent(roomId)}/agents/${encodeURIComponent(id)}?op=delete`); },
     async saveLocal(roomId, patch) { return post(`/rooms/${encodeURIComponent(roomId)}/local`, patch); },
+    async saveRoom(roomId, patch) {
+      const room = await post(`/rooms/${encodeURIComponent(roomId)}/settings`, patch);
+      set(s => ({ rooms: s.rooms.map(r => r.roomId === roomId ? room : r) }));
+      return room;
+    },
+    async reconnect(roomId) {
+      const room = await post(`/rooms/${encodeURIComponent(roomId)}/reconnect`);
+      set(s => ({ rooms: s.rooms.map(r => r.roomId === roomId ? room : r) }));
+      return room;
+    },
     async setTransport(roomId, target, force) { return post(`/rooms/${encodeURIComponent(roomId)}/transport`, { target, force: !!force }); },
     async stop(roomId, agentId) { return post(`/rooms/${encodeURIComponent(roomId)}/stop`, agentId ? { agentId } : {}); },
     async diffs(roomId) { return call(`/rooms/${encodeURIComponent(roomId)}/diffs`); },

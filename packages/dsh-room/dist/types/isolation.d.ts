@@ -15,6 +15,8 @@ export interface WorktreeInfo {
     path: string;
     branch: string;
 }
+/** Read the stable worktree path and its actual branch; room names are editable labels. */
+export declare function readWorktree(repo: string, roomId: string, agentId: string): Promise<WorktreeInfo | null>;
 /** Create (or reuse) the agent's worktree on its own branch from the repo's current HEAD. */
 export declare function ensureWorktree(repo: string, roomName: string, roomId: string, agentId: string): Promise<WorktreeInfo>;
 /** Commit whatever the agent left uncommitted in its worktree (attributed to the agent). */

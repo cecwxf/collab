@@ -100,7 +100,7 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
         if (!invite || !/^collab:\/\/(join|lan|relay)\//.test(invite) || !/#\S+$/.test(invite)) throw new HttpError(400, "invite must be collab://join/…, collab://lan/…, or collab://relay/… with #key");
         return sendJson(res, 200, await bridge.joinInvite(invite, { name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName) }));
       }
-      const m = /^\/rooms\/([^/]+)\/(messages|invite|leave|send|task|active)$/.exec(path);
+      const m = /^\/rooms\/([^/]+)\/(messages|invite|leave|delete|send|task|active)$/.exec(path);
       if (m) {
         const roomId = decodeURIComponent(m[1]!);
         const action = m[2]!;
@@ -108,7 +108,7 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
         if (method === "GET" && action === "invite") return sendJson(res, 200, { roomId, invite: bridge.room(roomId).meta.invite });
         if (method === "POST") {
           const b = await readJson(req);
-          if (action === "leave") return sendJson(res, 200, await bridge.leave(roomId));
+          if (action === "leave" || action === "delete") return sendJson(res, 200, await bridge.leave(roomId));
           if (action === "active") return sendJson(res, 200, (bridge.setActive(roomId), { ok: true }));
           if (action === "send") {
             const t = str(b.text);
@@ -156,7 +156,7 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
         if (url.searchParams.get("op") === "delete") return sendJson(res, 200, await bridge.removeLocalAgent(roomId, id));
         return sendJson(res, 200, await bridge.updateLocalAgent(roomId, id, b));
       }
-      const lm = /^\/rooms\/([^/]+)\/(local|transport|stop|runs|diffs|merge|discard|session|preview|files)$/.exec(path);
+      const lm = /^\/rooms\/([^/]+)\/(local|transport|reconnect|settings|stop|runs|diffs|merge|discard|session|preview|files)$/.exec(path);
       if (lm) {
         const roomId = decodeURIComponent(lm[1]!);
         const action = lm[2]!;
@@ -164,6 +164,13 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
         if (method === "GET" && action === "diffs") return sendJson(res, 200, await bridge.agentDiffs(roomId));
         if (method === "POST") {
           const b = await readJson(req);
+          if (action === "settings") {
+            if (("name" in b && typeof b.name !== "string") || ("description" in b && typeof b.description !== "string") || ("tags" in b && (!Array.isArray(b.tags) || b.tags.some(t => typeof t !== "string")))) throw new HttpError(400, "invalid room settings");
+            if (typeof b.name === "string" && (!b.name.trim() || b.name.trim().length > 60)) throw new HttpError(400, "room name must contain 1–60 characters");
+            if (typeof b.description === "string" && b.description.trim().length > 280) throw new HttpError(400, "room description must be at most 280 characters");
+            return sendJson(res, 200, await bridge.updateRoom(roomId, { name: typeof b.name === "string" ? b.name : undefined, description: typeof b.description === "string" ? b.description : undefined, tags: strs(b.tags) }));
+          }
+          if (action === "reconnect") return sendJson(res, 200, await bridge.reconnectRoom(roomId));
           if (action === "files") {
             if (!Array.isArray(b.paths) || b.paths.length > 50 || b.paths.some(p => typeof p !== "string" || p.length > 4096)) throw new HttpError(400, "up to 50 file paths required");
             return sendJson(res, 200, await bridge.inspectFiles(roomId, b.paths as string[], str(b.agentId)));

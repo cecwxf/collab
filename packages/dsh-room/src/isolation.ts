@@ -69,12 +69,21 @@ export interface WorktreeInfo {
   branch: string;
 }
 
+/** Read the stable worktree path and its actual branch; room names are editable labels. */
+export async function readWorktree(repo: string, roomId: string, agentId: string): Promise<WorktreeInfo | null> {
+  const path = worktreeDir(repo, roomId, agentId);
+  if (!(await exists(join(path, ".git")))) return null;
+  const branch = (await gitOk(path, ["symbolic-ref", "--short", "HEAD"])).trim();
+  return { repo, path, branch };
+}
+
 /** Create (or reuse) the agent's worktree on its own branch from the repo's current HEAD. */
 export async function ensureWorktree(repo: string, roomName: string, roomId: string, agentId: string): Promise<WorktreeInfo> {
   const branch = worktreeBranch(roomName, roomId, agentId);
   const path = worktreeDir(repo, roomId, agentId);
   await ensureExcluded(repo);
-  if (await exists(join(path, ".git"))) return { repo, path, branch };
+  const existing = await readWorktree(repo, roomId, agentId);
+  if (existing) return existing;
   await git(repo, ["worktree", "prune"]);
   await mkdir(join(repo, ".dsh-room", "worktrees"), { recursive: true });
   const has = (await git(repo, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;

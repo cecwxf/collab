@@ -11,12 +11,16 @@ export function installRoomGroups(store, native, layout, sessions) {
   const panelInfo=layout?.panelInfo,sessionList=sessions?.list;
   let frame=0,alive=true;
   const wrappers=new Set();
+  const closeMenus=()=>{for(const menu of document.querySelectorAll('[data-rm-room-menu]')){menu.previousElementSibling?.setAttribute('aria-expanded','false');menu.remove();}};
+  const closeOutside=e=>{if(!e.target.closest?.('[data-rm-room-menu], [data-rm-room-menu-button]'))closeMenus();};
+  const closeEscape=e=>{const menu=document.querySelector('[data-rm-room-menu]');if(e.key==='Escape'&&menu){const trigger=menu.previousElementSibling;closeMenus();trigger?.focus();e.preventDefault();e.stopPropagation();}};
+  document.addEventListener('click',closeOutside);document.addEventListener('keydown',closeEscape);
   const markHidden=(row,hidden)=>{if(hidden)row.setAttribute('data-rm-grouped-session','');else row.removeAttribute('data-rm-grouped-session');};
   const decorate=()=>{
     const state=store.getSnapshot(),workspaces=native.list.getSnapshot()?.items||[];
     const panelActive=panelInfo?.getSnapshot?.()?.activePanelId==='collab';
     const current=Object.values(sessionList?.getSnapshot?.()?.byId||{}).find(s=>(s.retainedBy?.mainView||0)>0)?.id;
-    const hidden=new Set();
+    const hidden=new Set(),decorated=new Set();
     for(const row of document.querySelectorAll('[data-row-key^="workspace:"]')) {
       const key=row.getAttribute('data-row-key').slice('workspace:'.length);
       const ws=workspaces.find(w=>w.workspaceId===key);
@@ -26,12 +30,15 @@ export function installRoomGroups(store, native, layout, sessions) {
       const parent=anchor.parentElement;
       if(!parent)continue;
       let group=[...parent.children].find(e=>e.getAttribute('data-rm-workspace-rooms')===key);
-      if(!rooms.length){group?.remove();continue;}
+      if(!ws){group?.remove();continue;}
       if(!group){group=document.createElement('div');group.className='rm-root rm-native-rooms';group.setAttribute('data-rm-workspace-rooms',key);group.setAttribute('role','group');parent.insertBefore(group,anchor.nextSibling);wrappers.add(group);}
+      decorated.add(group);
       group.hidden=row.getAttribute('aria-expanded')==='false';
-      const signature=JSON.stringify([panelActive,state.selected,current,rooms.map(r=>[r.roomId,r.name,r.status,r.sessionId,r.local?.agents.map(a=>[a.agentId,a.name,a.sessionId,a.state,a.online]),state.expandedRooms[r.roomId]!==false])]);
+      const signature=JSON.stringify([ws.title,ws.path,panelActive,state.selected,current,rooms.map(r=>[r.roomId,r.name,r.status,r.sessionId,r.local?.agents.map(a=>[a.agentId,a.name,a.sessionId,a.state,a.online]),state.expandedRooms[r.roomId]!==false])]);
       if(group.getAttribute('data-rm-signature')!==signature){
         group.setAttribute('data-rm-signature',signature);group.replaceChildren();
+        const create=document.createElement('button');create.type='button';create.className='rm-native-row rm-native-create-room';create.setAttribute('data-rm-new-room-shortcut',key);create.setAttribute('aria-label',`New room in ${ws.title || ws.path.split('/').filter(Boolean).at(-1) || 'workspace'}`);
+        const createIcon=document.createElement('span');createIcon.innerHTML=ROOM_ICON;const createLabel=document.createElement('span');createLabel.textContent='New room';create.append(createIcon,createLabel);create.onclick=()=>store.actions.openDialog({kind:'create',workspace:{id:ws.workspaceId,path:ws.path,title:ws.title || ws.path.split('/').filter(Boolean).at(-1)}});group.append(create);
         for(const room of rooms){
           const expanded=state.expandedRooms[room.roomId]!==false;
           const section=document.createElement('div');section.setAttribute('data-rm-room-group',room.roomId);
@@ -41,7 +48,11 @@ export function installRoomGroups(store, native, layout, sessions) {
           const icon=document.createElement('span');icon.innerHTML=ROOM_ICON;
           const label=document.createElement('span');label.className='rm-native-row-label';label.textContent=room.name;open.title=room.name;
           const count=document.createElement('span');count.className='rm-native-row-count';count.textContent=String((room.local?.agents.length||0)+(room.sessionId?1:0));
-          open.append(icon,label,count);open.onclick=()=>store.actions.select(room.roomId);heading.append(caret,open);section.append(heading);
+          open.append(icon,label,count);open.onclick=()=>store.actions.select(room.roomId);heading.append(caret,open);
+          const actions=document.createElement('button');actions.type='button';actions.className='rm-native-room-menu-button';actions.textContent='⋯';actions.setAttribute('data-rm-room-menu-button',room.roomId);actions.setAttribute('aria-label',`Room actions: ${room.name}`);actions.setAttribute('aria-haspopup','menu');actions.setAttribute('aria-expanded','false');
+          actions.onclick=e=>{e.stopPropagation();const wasOpen=actions.getAttribute('aria-expanded')==='true';closeMenus();if(wasOpen)return;actions.setAttribute('aria-expanded','true');const menu=document.createElement('div');menu.className='rm-root rm-room-menu';menu.setAttribute('role','menu');menu.setAttribute('data-rm-room-menu',room.roomId);
+            for(const [label,kind] of [['Edit room','room-settings'],['Delete room','delete-room']]){const item=document.createElement('button');item.type='button';item.setAttribute('role','menuitem');item.textContent=label;if(kind==='delete-room')item.className='rm-danger';item.onclick=event=>{event.stopPropagation();closeMenus();store.actions.openDialog({kind,roomId:room.roomId,name:room.name});};menu.append(item);}heading.append(menu);menu.firstElementChild?.focus();};
+          heading.append(actions);section.append(heading);
           if(expanded&&room.sessionId){
             const host=document.createElement('button');host.type='button';host.className='rm-native-row rm-native-agent';host.textContent='Room session';host.setAttribute('data-rm-open-host',room.roomId);host.setAttribute('aria-current',String(!panelActive&&current===room.sessionId));host.onclick=()=>{try{store.actions.openRoomSession(room.roomId);}catch(e){store.actions.toast(e.message);}};section.append(host);
           }
@@ -64,7 +75,7 @@ export function installRoomGroups(store, native, layout, sessions) {
     }
     for(const row of document.querySelectorAll('[data-rm-grouped-session]'))if(!hidden.has(row))markHidden(row,false);
     for(const row of hidden)if(!row.hasAttribute('data-rm-grouped-session'))markHidden(row,true);
-    for(const wrapper of wrappers)if(!wrapper.isConnected)wrappers.delete(wrapper);
+    for(const wrapper of wrappers)if(!wrapper.isConnected || !decorated.has(wrapper)){wrapper.remove();wrappers.delete(wrapper);}
   };
   const schedule=()=>{if(alive&&!frame)frame=requestAnimationFrame(()=>{frame=0;decorate();});};
   const observer=new MutationObserver(schedule);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['aria-expanded']});
@@ -72,5 +83,5 @@ export function installRoomGroups(store, native, layout, sessions) {
     .filter(source=>typeof source?.subscribe==='function')
     .map(source=>source.subscribe(schedule)).filter(off=>typeof off==='function');
   schedule();
-  return ()=>{alive=false;observer.disconnect();for(const off of unsubscribers)off();if(frame)cancelAnimationFrame(frame);for(const wrapper of wrappers)wrapper.remove();for(const row of document.querySelectorAll('[data-rm-grouped-session]'))markHidden(row,false);};
+  return ()=>{alive=false;observer.disconnect();closeMenus();document.removeEventListener('click',closeOutside);document.removeEventListener('keydown',closeEscape);for(const off of unsubscribers)off();if(frame)cancelAnimationFrame(frame);for(const wrapper of wrappers)wrapper.remove();for(const row of document.querySelectorAll('[data-rm-grouped-session]'))markHidden(row,false);};
 }

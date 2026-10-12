@@ -32,3 +32,13 @@ test('published client loader applies with absent optional snapshot stores and d
   }
 });
 
+
+test('native workspace toolbar has a persistent New room shortcut in Chinese and English and restores on unload',async()=>{
+ const code=(await readFile(new URL('../dist/client.js',import.meta.url),'utf8')).replaceAll('return module.exports;','return { ...module.exports, installWorkspaceDecorator };');
+ for(const label of ['添加工作区','Add workspace']){
+  const dom=new JSDOM(`<body><div class="native_headerActions"><button aria-label="${label}">Add</button></div></body>`,{pretendToBeVisual:true});let client,dialog;
+  const sandbox={window:{__ModuleLoader__:{load({id,factory}){if(id==='@cecwxf/dsh-room')client=factory(()=>({}));}}},document:dom.window.document,Element:dom.window.Element,MutationObserver:dom.window.MutationObserver,requestAnimationFrame:dom.window.requestAnimationFrame.bind(dom.window),cancelAnimationFrame:dom.window.cancelAnimationFrame.bind(dom.window)};
+  vm.runInNewContext(code,sandbox);const off=client.installWorkspaceDecorator({}, {}, ws=>{dialog={kind:'create',workspace:ws};});
+  try {await new Promise(r=>setTimeout(r,40));const button=dom.window.document.querySelector('[data-rm-ws-global-room]');assert.ok(button,'toolbar shortcut must exist even in flat session view');button.click();assert.equal(dialog.kind,'create');assert.equal(dialog.workspace,undefined);}finally{off();assert.equal(dom.window.document.querySelector('[data-rm-ws-global-room]'),null);assert.ok(dom.window.document.querySelector(`[aria-label="${label}"]`));dom.window.close();}
+ }
+});

@@ -9,7 +9,8 @@ async function exerciseGroups(sessions, overrides = {}) {
   Object.assign(globalThis,{document:dom.window.document,MutationObserver:dom.window.MutationObserver,requestAnimationFrame:dom.window.requestAnimationFrame.bind(dom.window),cancelAnimationFrame:dom.window.cancelAnimationFrame.bind(dom.window),CSS:{escape:s=>s}});
   const callbacks=new Set();const sub=fn=>{callbacks.add(fn);return()=>callbacks.delete(fn);};const tick=()=>new Promise(r=>setTimeout(r,40));
   let state={rooms:[{roomId:'r',name:'Research room',status:'online',sessionId:'h',memberConfig:{workspacePath:'/var/project'},local:{agents:[{agentId:'a',name:'Author',sessionId:'s',state:'idle',online:true}]}}],expandedRooms:{},selected:'r'};
-  const actions={select(id){state.selected=id;},toggleRoom(id){state.expandedRooms[id]=state.expandedRooms[id]===false;for(const f of callbacks)f();},async openSession(){}};
+  let dialog;
+  const actions={openDialog(value){dialog=value;},select(id){state.selected=id;},toggleRoom(id){state.expandedRooms[id]=state.expandedRooms[id]===false;for(const f of callbacks)f();},async openSession(){}};
   const store={getSnapshot:()=>state,subscribe:sub,actions},native={list:{getSnapshot:()=>({items:[{workspaceId:'w',path:'/private/var/project'}]}),subscribe:sub}},layout={panelInfo:{getSnapshot:()=>({activePanelId:'collab'}),subscribe:sub}};
   Object.assign(native, overrides.native);Object.assign(layout, overrides.layout);
   let dispose;
@@ -26,6 +27,10 @@ async function exerciseGroups(sessions, overrides = {}) {
     assert.ok(original.hasAttribute('data-rm-grouped-session'));
     assert.ok(document.querySelector('#host').hasAttribute('data-rm-grouped-session'));
     assert.ok(document.querySelector('[data-rm-open-host]'));
+    document.querySelector('[data-rm-new-room-shortcut]').click();
+    assert.equal(dialog.kind,'create');assert.equal(dialog.workspace.id,'w');assert.equal(dialog.workspace.path,'/private/var/project');
+    document.querySelector('[data-rm-room-menu-button]').click();assert.equal(document.querySelector('[role=menuitem]').textContent,'Edit room');document.querySelector('[role=menuitem]').click();assert.equal(dialog.kind,'room-settings');assert.equal(dialog.roomId,'r');
+    document.querySelector('[data-rm-room-menu-button]').click();[...document.querySelectorAll('[role=menuitem]')].find(e=>e.textContent==='Delete room').click();assert.equal(dialog.kind,'delete-room');assert.equal(document.querySelector('[data-rm-room-menu]'),null);
     await overrides.verify?.(tick);
     document.querySelector('[aria-label="Collapse room Research room"]').click();await tick();
     assert.equal(document.querySelector('[data-rm-open-agent]'),null);assert.ok(original.isConnected);
@@ -35,6 +40,9 @@ async function exerciseGroups(sessions, overrides = {}) {
     const replacement=original.cloneNode(true);original.replaceWith(replacement);await tick();
     assert.ok(replacement.hasAttribute('data-rm-grouped-session'));assert.equal(document.querySelectorAll('[data-rm-room-group]').length,1);
     document.querySelector('[data-row-key="workspace:w"]').setAttribute('aria-expanded','false');await tick();assert.equal(document.querySelector('[data-rm-workspace-rooms]').hidden,true);
+    document.querySelector('[data-row-key="workspace:w"]').parentElement.remove();await tick();
+    assert.equal(document.querySelector('[data-rm-workspace-rooms]'),null,'flat/sidebar rerenders remove orphan shortcuts');
+    assert.ok(!replacement.hasAttribute('data-rm-grouped-session'));
     dispose();dispose=null;assert.equal(document.querySelector('[data-rm-workspace-rooms]'),null);assert.ok(!replacement.hasAttribute('data-rm-grouped-session'));assert.ok(replacement.firstElementChild.isSameNode(nativeRow)===false);
   } finally {dispose?.();dom.window.close();for(const key of Object.keys(saved)){if(saved[key]===undefined)delete globalThis[key];else globalThis[key]=saved[key];}}
 

@@ -182,6 +182,7 @@ __export(isolation_exports, {
   mainStatus: () => mainStatus,
   mergeConflicts: () => mergeConflicts,
   mergeWorktree: () => mergeWorktree,
+  readWorktree: () => readWorktree,
   worktreeBranch: () => worktreeBranch,
   worktreeDiff: () => worktreeDiff,
   worktreeDir: () => worktreeDir
@@ -228,11 +229,18 @@ async function ensureExcluded(repo) {
   if (!cur.split("\n").includes(".dsh-room/")) await appendFile(f, `${cur && !cur.endsWith("\n") ? "\n" : ""}.dsh-room/
 `);
 }
+async function readWorktree(repo, roomId, agentId) {
+  const path = worktreeDir(repo, roomId, agentId);
+  if (!await exists(join(path, ".git"))) return null;
+  const branch = (await gitOk(path, ["symbolic-ref", "--short", "HEAD"])).trim();
+  return { repo, path, branch };
+}
 async function ensureWorktree(repo, roomName, roomId, agentId) {
   const branch = worktreeBranch(roomName, roomId, agentId);
   const path = worktreeDir(repo, roomId, agentId);
   await ensureExcluded(repo);
-  if (await exists(join(path, ".git"))) return { repo, path, branch };
+  const existing = await readWorktree(repo, roomId, agentId);
+  if (existing) return existing;
   await git(repo, ["worktree", "prune"]);
   await mkdir2(join(repo, ".dsh-room", "worktrees"), { recursive: true });
   const has = (await git(repo, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;
@@ -651,6 +659,9 @@ var init_mcp_workspace = __esm({
 
 // src/index.ts
 import { join as join5 } from "node:path";
+
+// src/plugin.ts
+import NodeWebSocket from "ws";
 
 // src/models.ts
 function resolveSelection(defaults, room = {}, agent = {}) {
@@ -1247,25 +1258,27 @@ var MockTransport = class {
 // ../sdk/dist/ws-transport.js
 var WsTransport = class {
   url;
+  Socket;
   ws = null;
   frameHandlers = [];
   closeHandlers = [];
   buf = "";
   _connected = false;
   generation = 0;
-  constructor(url) {
+  constructor(url, Socket = globalThis.WebSocket) {
     this.url = url;
+    this.Socket = Socket;
   }
   get connected() {
     return this._connected;
   }
   async connect(timeoutMs = 8e3) {
-    if (this._connected && this.ws?.readyState === WebSocket.OPEN)
+    if (this._connected && this.ws?.readyState === this.Socket.OPEN)
       return;
     this.teardownSocket();
     const gen = ++this.generation;
     await new Promise((resolve5, reject) => {
-      const ws = new WebSocket(this.url);
+      const ws = new this.Socket(this.url);
       this.ws = ws;
       let settled = false;
       const finish = (err) => {
@@ -1529,8 +1542,7 @@ var CollabClient = class _CollabClient {
     }
     this.joined = true;
     this.hasJoined = true;
-    this.peers = joined.peers;
-    this.seq = joined.seq;
+    this.seq = Math.max(this.seq, joined.seq);
     this.setConnStatus("connected");
     for (const h of this.peerHandlers)
       h(this.peers);
@@ -1663,6 +1675,10 @@ var CollabClient = class _CollabClient {
   }
   // --- internals ---
   onFrame(frame) {
+    if (frame.type === "ctrl" && frame.method === "joined") {
+      this.peers = frame.peers;
+      this.seq = Math.max(this.seq, frame.seq);
+    }
     const remaining = [];
     for (const w of this.waiters) {
       if (w.pred(frame)) {
@@ -2011,7 +2027,7 @@ import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 
 // ../lan-relay/dist/room.js
-import { WebSocket as WebSocket2 } from "ws";
+import { WebSocket } from "ws";
 var RING = 1e3;
 var RATE = 40;
 var MAX_CIPHERTEXT = 256 * 1024;
@@ -2038,7 +2054,7 @@ var LanRoom = class {
     return [...this.socks].filter((s) => s.joined && s.agentId && s.publicKey).map((s) => ({ agentId: s.agentId, publicKey: s.publicKey, capabilities: s.capabilities }));
   }
   send(ws, frame) {
-    if (ws.readyState === WebSocket2.OPEN)
+    if (ws.readyState === WebSocket.OPEN)
       ws.send(JSON.stringify(frame) + "\n");
   }
   broadcast(frame, except) {
@@ -3034,6 +3050,8 @@ var RoomConn = class {
   mcpCalls = /* @__PURE__ */ new Map();
   mcpServing = /* @__PURE__ */ new Map();
   client = null;
+  hostJoin;
+  agentErrors = /* @__PURE__ */ new Map();
   status = "connecting";
   error;
   messages = [];
@@ -3227,15 +3245,79 @@ var CollabBridge = class {
     try {
       await this.connect(conn);
     } catch (e) {
-      conn.status = "offline";
-      conn.error = e.message;
-      this.emit({ type: "rooms" });
+      if (!this.disposed && this.rooms.get(conn.meta.roomId) === conn && !conn.client?.isJoined()) {
+        conn.status = "offline";
+        conn.error = e.message;
+        this.emit({ type: "rooms" });
+      }
       throw e;
     }
     if (meta.owner && meta.public) this.startHeartbeat(conn);
     return conn;
   }
-  async connect(conn) {
+  connect(conn) {
+    if (conn.hostJoin) return conn.hostJoin;
+    const job = this.connectInner(conn).catch((error) => {
+      if (!this.disposed && this.rooms.get(conn.meta.roomId) === conn && !conn.client?.isJoined()) {
+        conn.status = "offline";
+        conn.error = error.message;
+        this.emit({ type: "rooms" });
+      }
+      throw error;
+    }).finally(() => {
+      if (conn.hostJoin === job) conn.hostJoin = void 0;
+    });
+    conn.hostJoin = job;
+    return job;
+  }
+  async updateRoom(roomId, patch) {
+    const conn = this.room(roomId);
+    const name2 = patch.name === void 0 ? conn.meta.name : patch.name.trim();
+    if (!name2 || name2.length > 60) throw new Error("room name must contain 1\u201360 characters");
+    const description = patch.description === void 0 ? conn.meta.description : patch.description.trim();
+    if (description.length > 280) throw new Error("room description must be at most 280 characters");
+    conn.meta.name = name2;
+    conn.meta.description = description;
+    if (patch.tags !== void 0) conn.meta.tags = normalizeTags(patch.tags);
+    await this.persist();
+    this.emit({ type: "rooms" });
+    const titles = this.ctx.get("sessionTitle");
+    if (titles) {
+      const host = this.sessions.get(roomId);
+      if (host) void host.then((h) => titles.rename(h.agent.session, `collab:${name2}`)).catch(() => {
+      });
+      for (const a of conn.local.agents) {
+        const handle = this.agentHandles.get(`${roomId}:${a.agentId}`);
+        if (handle) void handle.then((h) => titles.rename(h.agent.session, `room:${name2} \xB7 ${a.name}`)).catch(() => {
+        });
+      }
+    }
+    let directoryWarning;
+    if (conn.meta.public && conn.meta.owner) {
+      try {
+        await this.publish(conn);
+      } catch (e) {
+        directoryWarning = "Room saved; public directory refresh failed";
+        this.log("warn", `${directoryWarning}: ${e.message}`);
+      }
+    }
+    return { ...this.view(conn), directoryWarning };
+  }
+  async reconnectRoom(roomId) {
+    const conn = this.room(roomId);
+    if (conn.client?.isJoined()) await this.connectAgents(conn);
+    else await this.connect(conn);
+    return this.view(conn);
+  }
+  async connectInner(conn) {
+    const previous = conn.client;
+    conn.client = null;
+    await previous?.dispose().catch(() => {
+    });
+    if (this.disposed || this.rooms.get(conn.meta.roomId) !== conn) return;
+    conn.status = "connecting";
+    conn.error = void 0;
+    this.emit({ type: "rooms" });
     const identity = await this.self();
     const parsed = parseInviteUri(conn.meta.invite);
     const roomId = parsed.roomId;
@@ -3258,8 +3340,12 @@ var CollabBridge = class {
       reconnect: !loopback,
       capabilities: caps
     });
-    client.onPayload((p, meta) => void this.onPayload(conn, p, meta.from, meta.seq));
+    const active = () => !this.disposed && this.rooms.get(conn.meta.roomId) === conn && conn.client === client;
+    client.onPayload((p, meta) => {
+      if (active()) void this.onPayload(conn, p, meta.from, meta.seq);
+    });
     client.onPeers((peers, ev) => {
+      if (!active()) return;
       const now2 = Date.now();
       for (const peer of peers) if (!conn.removedAgentIds.has(peer.agentId)) conn.lastSeenPeers.set(peer.agentId, now2);
       if (ev?.type === "joined" && !conn.removedAgentIds.has(ev.agentId)) conn.lastSeenPeers.set(ev.agentId, now2);
@@ -3277,28 +3363,39 @@ var CollabBridge = class {
       this.emit({ type: "rooms" });
     });
     client.onStatus((status, detail) => {
+      if (!active()) return;
       if (status === "connected") {
         conn.status = "online";
         conn.error = void 0;
+        void this.connectAgents(conn).then(() => {
+          if (active() && client.isJoined()) return this.announceMemberConfig(conn);
+        }).catch((e) => this.log("warn", `room recovery ${roomId}: ${e.message}`));
       } else if (status === "connecting") {
         conn.status = "connecting";
-        conn.error = detail;
+        if (!conn.error && detail && detail !== "reconnect") conn.error = detail;
       } else {
         conn.status = "offline";
-        conn.error = detail ?? "disconnected";
+        conn.error ??= detail ?? "disconnected";
         this.cancelMcp(conn, new Error("MCP room disconnected"));
       }
       this.emit({ type: "rooms" });
       this.log("info", `room ${roomId} connection ${status}${detail ? ` (${detail})` : ""}`);
     });
-    if (this.disposed) return;
+    if (this.disposed || this.rooms.get(conn.meta.roomId) !== conn) {
+      await client.dispose();
+      return;
+    }
+    conn.client = client;
+    if (!conn.presenceTimer) {
+      conn.presenceTimer = setInterval(() => this.emit({ type: "rooms" }), 5e3);
+      conn.presenceTimer.unref?.();
+    }
     await client.join(loopback ? 5e3 : 15e3);
-    if (this.disposed) {
+    if (!active()) {
       await client.dispose().catch(() => {
       });
       return;
     }
-    conn.client = client;
     conn.status = "online";
     conn.error = void 0;
     const now = Date.now();
@@ -3502,9 +3599,11 @@ var CollabBridge = class {
       }
       this.log("info", `createRoom connected ${conn.meta.roomId} status=${conn.status}`);
     } catch (e) {
-      conn.status = "offline";
-      conn.error = e.message;
-      this.emit({ type: "rooms" });
+      if (!this.disposed && this.rooms.get(conn.meta.roomId) === conn && !conn.client?.isJoined()) {
+        conn.status = "offline";
+        conn.error = e.message;
+        this.emit({ type: "rooms" });
+      }
       throw e;
     }
     this.emit({ type: "rooms" });
@@ -3552,17 +3651,30 @@ var CollabBridge = class {
     this.cancelMcp(conn, new Error("MCP room left"));
     if (conn.heartbeat) clearInterval(conn.heartbeat);
     if (conn.presenceTimer) clearInterval(conn.presenceTimer);
-    if (conn.meta.owner && conn.meta.public) {
-      await this.directory.unlist(await this.self(), roomId).catch((e) => this.log("warn", `unlist failed: ${e.message}`));
-    }
+    let directoryWarning;
     this.scheduler.stop(roomId);
     await this.disconnectAgents(conn);
     await conn.client?.dispose().catch(() => {
     });
+    void Promise.all(conn.local.agents.map((a) => this.resetAgentSession(conn, a))).catch((e) => this.log("warn", `room session cleanup: ${e.message}`));
+    const host = this.sessions.get(roomId);
+    this.sessions.delete(roomId);
+    if (host) void host.then((h) => h.dispose()).catch(() => {
+    });
+    this.mcpByRoom.delete(roomId);
+    this.peerConfigs.delete(roomId);
+    if (conn.meta.owner && conn.meta.public) {
+      try {
+        await withTimeout(this.directory.unlist(await this.self(), roomId), 5e3, "public listing removal");
+      } catch (e) {
+        directoryWarning = "Public listing removal failed";
+        this.log("warn", `unlist failed: ${e.message}`);
+      }
+    }
     if (this.activeRoomId === roomId) this.activeRoomId = this.rooms.keys().next().value ?? null;
     await this.persist();
     this.emit({ type: "rooms" });
-    return { ok: true, left: true };
+    return { ok: true, left: true, directoryWarning };
   }
   /** Room by id, else the active one. */
   room(roomId) {
@@ -3671,7 +3783,7 @@ var CollabBridge = class {
           return {
             agentId,
             self: agentId === self,
-            online: (conn.client?.getPeers() ?? []).some((p) => p.agentId === agentId) || agentId === self || !!conn.agents.get(agentId)?.isJoined(),
+            online: la ? !!conn.agents.get(agentId)?.isJoined() : agentId === self ? !!conn.client?.isJoined() : (conn.client?.getPeers() ?? []).some((p) => p.agentId === agentId),
             local: !!la,
             name: la?.name ?? pc?.displayName,
             persona: la?.persona ?? pc?.persona,
@@ -4050,7 +4162,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     return inviteWsUrl(parsed.uri.startsWith("collab://join/") ? { ...parsed, wsBase: this.config.relayUrl } : parsed);
   }
   transportFor(conn, wsUrl) {
-    return conn.local.loopback ? new MockTransport(this.hub, `loopback:${conn.meta.roomId}`) : new WsTransport(wsUrl);
+    return conn.local.loopback ? new MockTransport(this.hub, `loopback:${conn.meta.roomId}`) : new WsTransport(wsUrl, NodeWebSocket);
   }
   agentIdentityPath(agentId) {
     return join3(dirname4(this.config.identityPath), "agents", `${agentId.replace(/[^A-Za-z0-9._-]/g, "_")}.json`);
@@ -4070,9 +4182,15 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     if (existing) return existing.promise;
     const job = { promise: Promise.resolve() };
     conn.agentJoins.set(a.agentId, job);
+    conn.agentErrors.delete(a.agentId);
+    this.emit({ type: "rooms" });
     const active = () => !this.disposed && this.rooms.get(conn.meta.roomId) === conn && conn.local.agents.includes(a) && conn.agentJoins.get(a.agentId) === job;
-    job.promise = withTimeout(this.connectAgentInner(conn, a, active), conn.local.loopback ? 8e3 : 2e4, `agent ${a.agentId} join`).finally(() => {
+    job.promise = withTimeout(this.connectAgentInner(conn, a, active), conn.local.loopback ? 8e3 : 2e4, `agent ${a.agentId} join`).catch((error) => {
+      if (active()) conn.agentErrors.set(a.agentId, error.message);
+      throw error;
+    }).finally(() => {
       if (conn.agentJoins.get(a.agentId) === job) conn.agentJoins.delete(a.agentId);
+      this.emit({ type: "rooms" });
     });
     return job.promise;
   }
@@ -4143,6 +4261,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
   }
   async disconnectAgents(conn) {
     conn.agentJoins.clear();
+    conn.agentErrors.clear();
     const list = [...conn.agents.values()];
     conn.agents.clear();
     await Promise.all(list.map((c) => c.dispose().catch(() => {
@@ -4218,6 +4337,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     conn.local.agents = conn.local.agents.filter((x) => x !== a);
     conn.removedAgentIds.add(a.agentId);
     conn.agentJoins.delete(a.agentId);
+    conn.agentErrors.delete(a.agentId);
     const client = conn.agents.get(a.agentId);
     conn.agents.delete(a.agentId);
     await client?.dispose().catch(() => {
@@ -4259,7 +4379,10 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
       conn.meta.invite = `collab://lan/${hp}/${parsed.roomId}#${parsed.roomKeyB64}`;
     }
     const wantLoopback = target === "local";
-    if (wantLoopback === conn.local.loopback && target !== "lan") return { ...this.view(conn), invite: conn.meta.invite };
+    if (wantLoopback === conn.local.loopback && target !== "lan") {
+      await this.reconnectRoom(roomId);
+      return { ...this.view(conn), invite: conn.meta.invite };
+    }
     await this.saveLocalHistory(conn);
     this.cancelMcp(conn, new Error("MCP room transport changed"));
     await this.disconnectAgents(conn);
@@ -4766,10 +4889,9 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
     const root = conn.meta.memberConfig?.workspacePath?.trim() || this.config.workspacePath;
     const top = await gitTop(root).catch(() => null);
     if (!top) return null;
-    const { worktreeBranch: worktreeBranch2, worktreeDir: worktreeDir2 } = await Promise.resolve().then(() => (init_isolation(), isolation_exports));
-    const wt = { repo: top, path: worktreeDir2(top, conn.meta.roomId, a.agentId), branch: worktreeBranch2(conn.meta.name, conn.meta.roomId, a.agentId) };
-    const { stat: stat4 } = await import("node:fs/promises");
-    if (!await stat4(join3(wt.path, ".git")).then(() => true, () => false)) return null;
+    const { readWorktree: readWorktree2 } = await Promise.resolve().then(() => (init_isolation(), isolation_exports));
+    const wt = await readWorktree2(top, conn.meta.roomId, a.agentId);
+    if (!wt) return null;
     conn.worktrees.set(a.agentId, wt);
     return wt;
   }
@@ -4819,7 +4941,6 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
   }
   localView(conn) {
     const runs = this.scheduler.list(conn.meta.roomId, 0);
-    const online = new Set((conn.client?.getPeers() ?? []).map((p) => p.agentId));
     return {
       agents: conn.local.agents.map((a) => {
         const r = runs.find((x) => x.agentId === a.agentId && x.state === "running") ?? runs.find((x) => x.agentId === a.agentId);
@@ -4828,7 +4949,9 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
           ...a,
           resolvedModel: this.resolvedModel(conn, a),
           sessionId: conn.meta.agentSessions?.[a.agentId],
-          online: online.has(a.agentId) || !!conn.agents.get(a.agentId)?.isJoined(),
+          online: !!conn.agents.get(a.agentId)?.isJoined(),
+          connectionStatus: conn.agents.get(a.agentId)?.isJoined() ? "online" : conn.agentJoins.has(a.agentId) || conn.status === "connecting" ? "connecting" : "offline",
+          error: conn.agentErrors.get(a.agentId),
           state: r?.state ?? "idle",
           worktree: wt ? { branch: wt.branch, path: wt.path } : null,
           isolation: a.scope !== "write" ? "read-only" : wt ? "worktree" : conn.locks ? "locks" : conn.git === false || conn.local.isolation === "locks" ? "locks" : conn.local.isolation === "off" ? "shared" : "worktree"
@@ -5287,7 +5410,7 @@ function createApiHandler(bridge, connection) {
         if (!invite || !/^collab:\/\/(join|lan|relay)\//.test(invite) || !/#\S+$/.test(invite)) throw new HttpError(400, "invite must be collab://join/\u2026, collab://lan/\u2026, or collab://relay/\u2026 with #key");
         return sendJson2(res, 200, await bridge.joinInvite(invite, { name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName) }));
       }
-      const m = /^\/rooms\/([^/]+)\/(messages|invite|leave|send|task|active)$/.exec(path);
+      const m = /^\/rooms\/([^/]+)\/(messages|invite|leave|delete|send|task|active)$/.exec(path);
       if (m) {
         const roomId = decodeURIComponent(m[1]);
         const action = m[2];
@@ -5295,7 +5418,7 @@ function createApiHandler(bridge, connection) {
         if (method === "GET" && action === "invite") return sendJson2(res, 200, { roomId, invite: bridge.room(roomId).meta.invite });
         if (method === "POST") {
           const b = await readJson2(req);
-          if (action === "leave") return sendJson2(res, 200, await bridge.leave(roomId));
+          if (action === "leave" || action === "delete") return sendJson2(res, 200, await bridge.leave(roomId));
           if (action === "active") return sendJson2(res, 200, (bridge.setActive(roomId), { ok: true }));
           if (action === "send") {
             const t = str(b.text);
@@ -5342,7 +5465,7 @@ function createApiHandler(bridge, connection) {
         if (url.searchParams.get("op") === "delete") return sendJson2(res, 200, await bridge.removeLocalAgent(roomId, id));
         return sendJson2(res, 200, await bridge.updateLocalAgent(roomId, id, b));
       }
-      const lm = /^\/rooms\/([^/]+)\/(local|transport|stop|runs|diffs|merge|discard|session|preview|files)$/.exec(path);
+      const lm = /^\/rooms\/([^/]+)\/(local|transport|reconnect|settings|stop|runs|diffs|merge|discard|session|preview|files)$/.exec(path);
       if (lm) {
         const roomId = decodeURIComponent(lm[1]);
         const action = lm[2];
@@ -5350,6 +5473,13 @@ function createApiHandler(bridge, connection) {
         if (method === "GET" && action === "diffs") return sendJson2(res, 200, await bridge.agentDiffs(roomId));
         if (method === "POST") {
           const b = await readJson2(req);
+          if (action === "settings") {
+            if ("name" in b && typeof b.name !== "string" || "description" in b && typeof b.description !== "string" || "tags" in b && (!Array.isArray(b.tags) || b.tags.some((t) => typeof t !== "string"))) throw new HttpError(400, "invalid room settings");
+            if (typeof b.name === "string" && (!b.name.trim() || b.name.trim().length > 60)) throw new HttpError(400, "room name must contain 1\u201360 characters");
+            if (typeof b.description === "string" && b.description.trim().length > 280) throw new HttpError(400, "room description must be at most 280 characters");
+            return sendJson2(res, 200, await bridge.updateRoom(roomId, { name: typeof b.name === "string" ? b.name : void 0, description: typeof b.description === "string" ? b.description : void 0, tags: strs(b.tags) }));
+          }
+          if (action === "reconnect") return sendJson2(res, 200, await bridge.reconnectRoom(roomId));
           if (action === "files") {
             if (!Array.isArray(b.paths) || b.paths.length > 50 || b.paths.some((p) => typeof p !== "string" || p.length > 4096)) throw new HttpError(400, "up to 50 file paths required");
             return sendJson2(res, 200, await bridge.inspectFiles(roomId, b.paths, str(b.agentId)));

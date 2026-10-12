@@ -178,3 +178,14 @@ describe("CollabClient mock relay", () => {
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
+
+it('keeps a peer update received immediately after joined before the join promise resumes',async()=>{
+  const hub=new RoomHub(),room=CollabClient.createRoom(),identity=await generateIdentity('batch-owner'),newcomer=await generateIdentity('batch-peer');
+  const transport=CollabClient.mockTransport(hub),onFrame=transport.onFrame.bind(transport);
+  transport.onFrame=handler=>onFrame(frame=>{
+    handler(frame);
+    if(frame.type==='ctrl'&&frame.method==='joined')handler({v:1,type:'ctrl',method:'peer_update',roomId:room.roomId,peers:[...frame.peers,{...frame.peers[0]!,agentId:newcomer.agentId,publicKey:newcomer.publicKey}],event:'joined',agentId:newcomer.agentId});
+  });
+  const client=new CollabClient({identity,roomId:room.roomId,roomKey:room.roomKey,transport});
+  try {await client.join();assert.ok(client.getPeers().some(p=>p.agentId===newcomer.agentId),'join must not overwrite newer presence with its older response snapshot');}finally{await client.dispose();}
+});

@@ -262,8 +262,7 @@ export class CollabClient {
     }
     this.joined = true;
     this.hasJoined = true;
-    this.peers = joined.peers;
-    this.seq = joined.seq;
+    this.seq = Math.max(this.seq, joined.seq);
     this.setConnStatus("connected");
     for (const h of this.peerHandlers) h(this.peers);
 
@@ -422,6 +421,12 @@ export class CollabClient {
   // --- internals ---
 
   private onFrame(frame: WireFrame): void {
+    // Apply snapshots in wire order, before waking the join promise. A socket
+    // can deliver joined and a newer peer_update in the same event-loop turn.
+    if (frame.type === "ctrl" && frame.method === "joined") {
+      this.peers = frame.peers;
+      this.seq = Math.max(this.seq, frame.seq);
+    }
     // resolve waiters
     const remaining: Waiter[] = [];
     for (const w of this.waiters) {

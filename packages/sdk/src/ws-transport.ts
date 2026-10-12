@@ -15,19 +15,19 @@ export class WsTransport implements Transport {
   private _connected = false;
   private generation = 0;
 
-  constructor(readonly url: string) {}
+  constructor(readonly url: string, private readonly Socket: typeof WebSocket = globalThis.WebSocket) {}
 
   get connected() {
     return this._connected;
   }
 
   async connect(timeoutMs = 8_000): Promise<void> {
-    if (this._connected && this.ws?.readyState === WebSocket.OPEN) return;
+    if (this._connected && this.ws?.readyState === this.Socket.OPEN) return;
     // Drop any half-open socket before opening a new one
     this.teardownSocket();
     const gen = ++this.generation;
     await new Promise<void>((resolve, reject) => {
-      const ws = new WebSocket(this.url);
+      const ws = new this.Socket(this.url);
       this.ws = ws;
       let settled = false;
       const finish = (err?: Error) => {

@@ -299,6 +299,7 @@ function Composer({ room, store, draft, setDraft }) {
   const a = store.actions;
   const [mode, setMode] = useState("chat");
   const [busy, setBusy] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [effortOpen, setEffortOpen] = useState(false);
   const [permOpen, setPermOpen] = useState(false);
@@ -366,7 +367,7 @@ function Composer({ room, store, draft, setDraft }) {
   };
   const submit = async () => {
     const text = draft.trim();
-    if (!text || busy) return;
+    if (!text || busy || offline) return;
     setBusy(true);
     try {
       if (mode === "task") {
@@ -381,12 +382,20 @@ function Composer({ room, store, draft, setDraft }) {
 
   return (
     <div className="rm-composer-card" data-rm-composer="">
+      {offline ? <div className="rm-connection-notice" role="status">
+        <span>{room.status === "connecting" ? "Connecting to room…" : "Room is offline"}{room.error ? ` · ${room.error}` : ""}. You can edit your draft; reconnect to send.</span>
+        <button type="button" className="rm-mini" disabled={retrying} onClick={async () => {
+          setRetrying(true);
+          try { await a.reconnect(room.roomId); } catch (e) { a.toast(e.message); }
+          finally { setRetrying(false); }
+        }}>{retrying ? "Connecting…" : "Retry connection"}</button>
+      </div> : null}
       <div className="rm-composer-grow">
         {mq && mentionItems.length ? (
           <MentionMenu items={mentionItems} active={mentionActive} onHover={setMentionActive} onPick={insertMention} />
         ) : null}
-        <textarea ref={taRef} rows={1} disabled={offline} aria-label="Message the room"
-          placeholder={offline ? "Room is offline" : mode === "task" ? "Task: @assignee title (optional assignee)" : `Message ${room.name} · @agent or @all`}
+        <textarea ref={taRef} rows={1} aria-label="Message the room"
+          placeholder={offline ? "Draft a message · reconnect to send" : mode === "task" ? "Task: @assignee title (optional assignee)" : `Message ${room.name} · @agent or @all`}
           value={draft}
           onChange={(e) => { setDraft(e.target.value); syncCaret(e.target); }}
           onClick={(e) => syncCaret(e.target)}
@@ -626,6 +635,7 @@ function LocalAgentsSection({ room, store, mention }) {
           <span className="rm-agent-main">
             <span className="rm-agent-name">{ag.name}{ag.moderator ? <span className="rm-agent-tag">moderator</span> : null}</span>
             <span className="rm-agent-sub rm-mono">@{ag.agentId}</span>
+            <span className="rm-agent-sub">{ag.connectionStatus || (ag.online ? "online" : "offline")}{ag.error ? ` · ${ag.error}` : !ag.online && room.status !== "online" ? " · waiting for room connection" : ""}</span>
             <span className="rm-agent-sub">{ag.scope === "write" ? (ag.isolation === "worktree" ? "writes · own worktree" : ag.isolation === "locks" ? "writes · file locks" : "writes") : "read-only"}{ag.approvalRequired ? " · approval" : ""}{ag.resolvedModel?.name ? ` · ${ag.resolvedModel.name}` : ag.model ? ` · ${ag.model}` : ""}{ag.reasoningEffort ? ` · ${ag.reasoningEffort}` : ""}</span>
           </span>
           {ag.state !== "idle" ? <Tag tone={RUN_TONE[ag.state] || "neutral"}>{ag.state}</Tag> : null}
@@ -720,6 +730,8 @@ function IsolationSection({ room, store }) {
   );
 }
 
+const localOffline = room => room.local?.agents.some(a => !a.online);
+
 function TransportSection({ room, store }) {
   const a = store.actions;
   const [busy, setBusy] = useState(null);
@@ -735,6 +747,7 @@ function TransportSection({ room, store }) {
   return (
     <div className="rm-detail-section" data-rm-transport="">
       <div className="rm-detail-h">Transport</div>
+      {room.status === "online" && localOffline(room) ? <button type="button" className="rm-mini" onClick={() => a.reconnect(room.roomId).catch(e => a.toast(e.message))}>Retry offline agents</button> : null}
       <div className="rm-mode-row">
         <button type="button" disabled={!!busy || room.public} className={"rm-mode-btn" + (cur === "local" ? " is-on" : "")} onClick={() => go("local")} title={room.public ? "Public rooms need a relay" : "In-process loopback: no network"}>{busy === "local" ? "…" : "Local only"}</button>
         <button type="button" disabled={!!busy} className={"rm-mode-btn" + (cur === "relay" && room.transport !== "local" ? " is-on" : "")} onClick={() => go("relay")}>{busy === "relay" ? "…" : "Relay (VPS)"}</button>
@@ -969,7 +982,7 @@ function RoomsMain({ store }) {
           <header className="rm-chat-header">
             <Avatar name={room.name} size={28} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="rm-chat-header-title">{room.name}</div>
+              <div className="rm-chat-header-title">{room.name}<button type="button" className="rm-mini rm-room-edit" aria-label="Edit room settings" title="Edit room name, description and tags" onClick={() => store.actions.openDialog({ kind: "room-settings", roomId: room.roomId })}>✎</button></div>
               <div className="rm-chat-header-sub">{room.members.filter((m) => m.online !== false).length} online{room.local && room.local.agents.length ? ` · ${room.local.agents.length} local agent${room.local.agents.length === 1 ? "" : "s"}` : ""} · {room.public ? "public" : "private"}{room.status !== "online" ? ` · room ${room.status}` : ""}</div>
             </div>
             {(() => {
@@ -1295,12 +1308,35 @@ function LeaveDialog({ store, d }) {
   const a = store.actions;
   const [busy, setBusy] = useState(false);
   return (
-    <Modal open onClose={a.closeDialog} title={`Leave "${d.name}"?`} closeLabel="Close"
-      description="This machine forgets the room and its invite. If you listed it publicly, the listing is removed."
-      footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={busy} onClick={async () => { setBusy(true); try { await a.leave(d.roomId); } catch (e) { a.toast(e.message); setBusy(false); } }}>{busy ? "Leaving…" : "Leave"}</Button></>} />
+    <Modal open onClose={a.closeDialog} title={`${d.kind === "delete-room" ? "Delete" : "Leave"} "${d.name}"?`} closeLabel="Close"
+      description="Remove this room from this dsh, disconnect its local agents and stop their room tasks. Existing conversations and output files are kept. Other hosts can continue using the room; an owned public listing is removed."
+      footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={busy} onClick={async () => { setBusy(true); try { if (d.kind === "delete-room") await a.deleteRoom(d.roomId); else await a.leave(d.roomId); } catch (e) { a.toast(e.message); setBusy(false); } }}>{busy ? "Removing…" : d.kind === "delete-room" ? "Delete room" : "Leave"}</Button></>} />
   );
 }
 
+
+function RoomSettingsDialog({ store, d }) {
+  const room = useStore(store).rooms.find(r => r.roomId === d.roomId);
+  const [f, setF] = useState(() => ({ name: room?.name || "", description: room?.description || "", tags: (room?.tags || []).join(" ") }));
+  const [busy, setBusy] = useState(false), [error, setError] = useState(null);
+  const submit = async () => {
+    if (busy || !f.name.trim()) return;
+    setBusy(true); setError(null);
+    try {
+      const saved = await store.actions.saveRoom(d.roomId, { name: f.name.trim(), description: f.description.trim(), tags: f.tags.split(/[\s,]+/).filter(Boolean) });
+      store.actions.closeDialog(); store.actions.toast(saved.directoryWarning || "Room updated");
+    } catch (e) { setError(e.message); setBusy(false); }
+  };
+  return <Modal open onClose={store.actions.closeDialog} title="Edit room" description="Edit the name and labels saved on this host. Public rooms owned here also update their directory listing."
+    footer={<><Button variant="ghost" className="rm-danger" onClick={() => store.actions.openDialog({ kind: "delete-room", roomId: d.roomId, name: room?.name })}>Delete room</Button><span style={{ flex: 1 }} /><Button variant="outline" onClick={store.actions.closeDialog}>Cancel</Button><Button variant="primary" disabled={busy || !f.name.trim()} onClick={submit}>{busy ? "Saving…" : "Save"}</Button></>}>
+    <div className="rm-root rm-form">
+      <Field label="Name" htmlFor="rm-room-name"><Input id="rm-room-name" autoFocus value={f.name} maxLength={60} onChange={e => setF({ ...f, name: e.target.value })} /></Field>
+      <Field label="Description" htmlFor="rm-room-description"><Input id="rm-room-description" value={f.description} maxLength={280} onChange={e => setF({ ...f, description: e.target.value })} /></Field>
+      <Field label="Tags" htmlFor="rm-room-tags" hint="Separate tags with spaces or commas."><Input id="rm-room-tags" value={f.tags} onChange={e => setF({ ...f, tags: e.target.value })} /></Field>
+      {error ? <div className="rm-error">{error}</div> : null}
+    </div>
+  </Modal>;
+}
 
 function ConfigDialog({ store, d }) {
   const s = useStore(store);
@@ -1480,7 +1516,9 @@ function Overlay({ store }) {
       {d?.kind === "create" ? <CreateDialog store={store} d={d} /> : null}
       {d?.kind === "join" ? <JoinDialog store={store} /> : null}
       {d?.kind === "invite" ? <InviteDialog store={store} d={d} /> : null}
+      {d?.kind === "delete-room" ? <LeaveDialog store={store} d={d} /> : null}
       {d?.kind === "leave" ? <LeaveDialog store={store} d={d} /> : null}
+      {d?.kind === "room-settings" ? <RoomSettingsDialog key={d.roomId} store={store} d={d} /> : null}
       {d?.kind === "config" ? <ConfigDialog store={store} d={d} /> : null}
       {d?.kind === "workspace" ? <WorkspaceDialog store={store} /> : null}
       {d?.kind === "browse" ? <BrowseDialog store={store} /> : null}
@@ -1509,8 +1547,8 @@ function installStyles() {
  * appended to the workspace "…" menu. Nothing native is hidden or replaced. */
 const ROOM_SVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="2"/><path d="M5.5 6.5h5M5.5 9.5h3.5"/></svg>';
 function installWorkspaceDecorator(store, native, onNewRoom) {
-  if (typeof document === "undefined" || typeof native?.list?.getSnapshot !== "function") return () => {};
-  const wsFor = (key) => (native.list.getSnapshot()?.items || []).find((w) => w.workspaceId === key);
+  if (typeof document === "undefined") return () => {};
+  const wsFor = (key) => (typeof native?.list?.getSnapshot === "function" ? native.list.getSnapshot()?.items || [] : []).find((w) => w.workspaceId === key);
   const rowKey = (row) => (row.getAttribute("data-row-key") || "").slice("workspace:".length);
   const open = (key) => { const w = wsFor(key); if (w) onNewRoom({ id: w.workspaceId, path: w.path, title: wsTitle(w) }); };
   const newSessionButton = row => {
@@ -1518,6 +1556,13 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
     return buttons.find(b => /New session in|中新建会话/.test(b.getAttribute("aria-label") || "")) || buttons[buttons.length - 1];
   };
   const decorate = () => {
+    const add = document.querySelector('button[aria-label="Add workspace"], button[aria-label="添加工作区"]');
+    const toolbar = add?.closest('[class*="_headerActions"]') || add?.parentElement;
+    if (toolbar && !toolbar.querySelector('[data-rm-ws-global-room]')) {
+      const button = document.createElement("button");button.type = "button";button.className = add.className;
+      button.setAttribute("data-rm-ws-global-room", "");button.setAttribute("aria-label", "New room");button.title = "New room";button.innerHTML = ROOM_SVG;
+      button.onclick = e => { e.preventDefault(); e.stopPropagation(); onNewRoom(undefined); };toolbar.insertBefore(button, toolbar.firstChild);
+    }
     for (const row of document.querySelectorAll('[data-row-key^="workspace:"]')) {
       const key = rowKey(row);
       if (!key || row.querySelector("[data-rm-ws-new-room]")) continue;
@@ -1586,7 +1631,7 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
     mo.disconnect();
     document.removeEventListener("click", onClickCapture, true);
     if (raf) cancelAnimationFrame(raf);
-    for (const b of document.querySelectorAll("[data-rm-ws-new-room]")) b.remove();
+    for (const b of document.querySelectorAll("[data-rm-ws-new-room], [data-rm-ws-global-room]")) b.remove();
   };
 }
 

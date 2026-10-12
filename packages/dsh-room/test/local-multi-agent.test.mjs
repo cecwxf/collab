@@ -562,3 +562,84 @@ test("removing an agent during its background join never leaves an online ghost"
     assert.ok(!b.view(b.room(room.roomId)).members.some(p=>p.agentId===agent.agentId));
   } finally { release?.();await b.dispose(); }
 });
+
+test('relay recovery joins agents added while the room was offline and keeps the host client owned', async()=>{
+  const {LanRelayServer}=await import('@collab/lan-relay');
+  const relay=new LanRelayServer({host:'127.0.0.1',port:0,mdns:false});const {port}=await relay.listen();
+  const dir=await mkdtemp(join(tmpdir(),'lma-recovery-'));const b=await bridgeIn(dir,join(dir,'ws'));
+  b.config.relayUrl=`ws://127.0.0.1:${port}`;
+  const original=b.transportFor.bind(b);let fail=true;
+  b.transportFor=(...args)=>{const transport=original(...args),connect=transport.connect.bind(transport);transport.connect=async(...a)=>{if(fail)throw Error('initial relay unavailable');return connect(...a);};return transport;};
+  try {
+    const room=await b.createRoom({mode:'relay'});const conn=b.room(room.roomId);
+    for(let i=0;conn.status!=='offline'&&i<100;i++)await sleep(10);
+    assert.equal(conn.status,'offline');
+    const added=await b.addLocalAgent(room.roomId,{name:'Added offline'});
+    assert.ok(conn.client,'failed initial join must retain the managed host connection for recovery and disposal');
+    conn.client.setConnStatus('connecting','reconnect');
+    assert.match(conn.error,/initial relay unavailable/,'reconnect status must preserve the actual failure reason');
+    conn.client.setConnStatus('disconnected','ws_closed');
+    assert.match(conn.error,/initial relay unavailable/);
+    fail=false;await conn.client.join();await waitConnected(b,room.roomId,2500);
+    assert.equal(b.view(conn).local.agents.find(a=>a.agentId===added.agentId).online,true);
+  } finally {await b.dispose();await relay.close();}
+});
+
+test('relay socket reconnect picks up an agent added during the outage', async()=>{
+  const {LanRelayServer}=await import('@collab/lan-relay');let relay=new LanRelayServer({host:'127.0.0.1',port:0,mdns:false});const {port}=await relay.listen();
+  const dir=await mkdtemp(join(tmpdir(),'lma-socket-recovery-'));const b=await bridgeIn(dir,join(dir,'ws'));b.config.relayUrl=`ws://127.0.0.1:${port}`;
+  try {
+    const room=await b.createRoom({mode:'relay'});await waitConnected(b,room.roomId);
+    await relay.close();const conn=b.room(room.roomId);for(let i=0;conn.client.isJoined()&&i<100;i++)await sleep(10);
+    assert.equal(conn.client.isJoined(),false);
+    const added=await b.addLocalAgent(room.roomId,{name:'Recovery Reviewer'});
+    relay=new LanRelayServer({host:'127.0.0.1',port,mdns:false});await relay.listen();
+    await waitConnected(b,room.roomId,8000);
+    assert.equal(b.view(conn).local.agents.find(a=>a.agentId===added.agentId).online,true);
+    await b.send(room.roomId,'@all recovery marker');await b.scheduler.whenIdle();
+    assert.ok(conn.messages.some(m=>m.from===added.agentId&&m.kind==='chat'));
+  } finally {await b.dispose();await relay.close();}
+});
+
+test('retrying the current relay reconnects the offline room and reports agent join errors', async()=>{
+  const {LanRelayServer}=await import('@collab/lan-relay');const relay=new LanRelayServer({host:'127.0.0.1',port:0,mdns:false});await relay.listen();
+  const dir=await mkdtemp(join(tmpdir(),'lma-explicit-retry-'));const b=await bridgeIn(dir,join(dir,'ws'));b.config.relayUrl=`ws://127.0.0.1:${relay.port}`;
+  const original=b.transportFor.bind(b);let fail=true;
+  b.transportFor=(...args)=>{const transport=original(...args),connect=transport.connect.bind(transport);transport.connect=async(...a)=>{if(fail)throw Error('test relay unavailable');return connect(...a);};return transport;};
+  try {
+    const room=await b.createRoom({mode:'relay'});const conn=b.room(room.roomId);for(let i=0;conn.status!=='offline'&&i<100;i++)await sleep(10);
+    fail=false;await b.setTransport(room.roomId,'relay');await waitConnected(b,room.roomId);
+    fail=true;const agent=await b.addLocalAgent(room.roomId,{name:'Retry agent'});
+    for(let i=0;!conn.agentErrors.has(agent.agentId)&&i<100;i++)await sleep(10);
+    const offline=b.view(conn).local.agents.find(a=>a.agentId===agent.agentId);
+    assert.equal(offline.connectionStatus,'offline');assert.match(offline.error,/test relay unavailable/);assert.equal(offline.online,false);
+    fail=false;await b.reconnectRoom(room.roomId);await waitConnected(b,room.roomId);
+    assert.equal(b.view(conn).local.agents.find(a=>a.agentId===agent.agentId).error,undefined);
+  } finally {await b.dispose();await relay.close();}
+});
+
+test('host and local agents use Node WebSocket independently of the harness fetch dispatcher',async()=>{
+  const {LanRelayServer}=await import('@collab/lan-relay');const relay=new LanRelayServer({host:'127.0.0.1',port:0,mdns:false});await relay.listen();
+  const dir=await mkdtemp(join(tmpdir(),'lma-node-ws-'));const b=await bridgeIn(dir,join(dir,'ws'));b.config.relayUrl=`ws://127.0.0.1:${relay.port}`;
+  const saved=globalThis.WebSocket;let inheritedCalls=0;globalThis.WebSocket=class{static OPEN=1;constructor(){inheritedCalls++;throw Error('simulated incompatible harness fetch dispatcher');}};
+  try{const room=await b.createRoom({mode:'relay',agents:['reviewer']});await waitConnected(b,room.roomId,500);assert.equal(inheritedCalls,0);assert.ok(b.view(b.room(room.roomId)).local.agents[0].online);}finally{globalThis.WebSocket=saved;await b.dispose();await relay.close();}
+});
+
+test('editing room labels persists without changing room identity, membership or workspace',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'lma-room-settings-'));const b=await bridgeIn(dir,join(dir,'ws'));
+ try{const room=await b.createRoom({name:'Before',localOnly:true,agents:['reviewer']});await waitConnected(b,room.roomId);const conn=b.room(room.roomId),invite=conn.meta.invite,agentId=conn.local.agents[0].agentId,path=conn.meta.memberConfig.workspacePath;
+ const updated=await b.updateRoom(room.roomId,{name:'  After  ',description:'Shared notes',tags:['review','review','agent']});assert.equal(updated.name,'After');assert.equal(updated.description,'Shared notes');assert.deepEqual(updated.tags,['review','agent']);assert.equal(conn.meta.invite,invite);assert.equal(conn.local.agents[0].agentId,agentId);assert.equal(conn.meta.memberConfig.workspacePath,path);
+ const saved=JSON.parse(await readFile(b.config.statePath,'utf8'));assert.equal(saved.rooms[0].name,'After');await assert.rejects(b.updateRoom(room.roomId,{name:' '}),/name/);assert.equal(conn.meta.name,'After');
+ }finally{await b.dispose();}
+});
+
+test('renaming a room then restarting preserves and merges the writing agent original worktree branch',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'lma-rename-worktree-')),ws=join(dir,'ws');await mkdir(ws);execFileSync('git',['init','-q','-b','main'],{cwd:ws});execFileSync('git',['-c','user.name=test','-c','user.email=test@local','commit','--allow-empty','-qm','fixture'],{cwd:ws});
+ let b=await bridgeIn(dir,ws);
+ try {const room=await b.createRoom({name:'Before rename',localOnly:true,agents:['coder']});await waitConnected(b,room.roomId);const agent=b.room(room.roomId).local.agents[0];await b.createTask(room.roomId,'Write rename proof',undefined,agent.agentId);await b.scheduler.whenIdle();const original=(await b.agentDiffs(room.roomId)).agents[0];assert.ok(original.files.length);await b.updateRoom(room.roomId,{name:'After rename'});await b.dispose();b=await bridgeIn(dir,ws);await waitConnected(b,room.roomId);const restored=(await b.agentDiffs(room.roomId)).agents[0];assert.equal(restored.branch,original.branch,'display name changes must not invent another git branch');assert.equal((await b.mergeAgent(room.roomId,agent.agentId,true)).merged,true);assert.match(await readFile(join(ws,'room-notes/coder.md'),'utf8'),/Written by coder/);}finally{await b.dispose();}
+});
+
+test('removing a room releases its hosted sessions and keeps workspace output files',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'lma-delete-room-')),ws=join(dir,'ws');await mkdir(ws);await writeFile(join(ws,'output.md'),'keep this output');const b=await bridgeIn(dir,ws);let disposed=0;
+ try {const room=await b.createRoom({localOnly:true,agents:['reviewer']});await waitConnected(b,room.roomId);const agent=b.room(room.roomId).local.agents[0];b.agentHandles.set(`${room.roomId}:${agent.agentId}`,Promise.resolve({agent:{session:{id:'kept-native-session'}},dispose:async()=>{disposed++;}}));b.room(room.roomId).meta.public=true;b.directory.unlist=async()=>{throw Error('offline directory');};const removed=await b.leave(room.roomId);assert.match(removed.directoryWarning,/listing/);await sleep(10);assert.equal(disposed,1);assert.ok(!b.state().rooms.some(r=>r.roomId===room.roomId));assert.equal(JSON.parse(await readFile(b.config.statePath,'utf8')).rooms.length,0);assert.equal(await readFile(join(ws,'output.md'),'utf8'),'keep this output');}finally{await b.dispose();}
+});
