@@ -1,6 +1,6 @@
 import { DirectoryClient, type CollabPayload, type Identity } from "@collab/protocol";
 import { CollabClient, RoomHub } from "@collab/sdk";
-import { type LocalAgentConfig, type RoomLocalSettings } from "./local-agents.js";
+import { type LocalAgentConfig, type RoomLocalSettings, type IsolationMode } from "./local-agents.js";
 import { RunScheduler, ThreadTracker, type RunInfo } from "./orchestrator.js";
 import { FileLocks, type WorktreeInfo } from "./isolation.js";
 import { ApprovalQueue } from "./approval-queue.js";
@@ -162,8 +162,14 @@ export interface CreateRoomOptions {
     workspaceName?: string;
     /** Start as a local-only room: in-process loopback transport, no network (switch to relay/LAN later). */
     localOnly?: boolean;
-    /** Preset keys of local agents to add right away (e.g. ["architect","coder","reviewer"]). */
-    agents?: string[];
+    /** Preset keys and/or full agent drafts to add right away. */
+    agents?: Array<string | (Record<string, unknown> & {
+        preset?: string;
+    })>;
+    /** Initial orchestration settings (local multi-agent). */
+    turnLimit?: number;
+    concurrency?: number;
+    isolation?: IsolationMode;
 }
 /**
  * The live collab bridge: any number of joined rooms (each one-to-many, E2EE),
@@ -485,7 +491,7 @@ export declare class CollabBridge {
     updateLocalSettings(roomId: string, patch: Partial<Pick<RoomLocalSettings, "turnLimit" | "concurrency" | "isolation">>): Promise<{
         turnLimit: number;
         concurrency: number;
-        isolation: import("./local-agents.js").IsolationMode;
+        isolation: IsolationMode;
     }>;
     /**
      * Switch a room's transport keeping every local agent as a member:

@@ -482,3 +482,52 @@
 .rm-diff-addn { color: #2bb673; }
 .rm-diff-deln { color: #e5484d; }
 .rm-ok { padding: 8px 10px; border-radius: 8px; font-size: 12.5px; color: var(--dsw-alias-state-success-primary, #2bb673); background: color-mix(in srgb, #2bb673 10%, transparent); }
+
+/* ── create-room dialog (0.3.1): wide, scrollable, tabbed ───────────────── */
+.rm-modal-scrollable {
+  width: min(920px, calc(100vw - 48px)) !important;
+  max-width: 96vw !important;
+  /* Bound height so the flex child (.rm-modal-scroll) can scroll instead of clipping. */
+  height: min(720px, 100%) !important;
+  max-height: 100% !important;
+}
+.rm-modal-create { width: min(960px, calc(100vw - 48px)) !important; }
+.rm-modal-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.rm-create { display: flex; flex-direction: column; gap: 12px; }
+.rm-tabs {
+  display: flex; gap: 4px; padding: 2px; border-radius: 10px;
+  background: color-mix(in srgb, var(--rm-border) 55%, transparent);
+  flex-wrap: wrap;
+}
+.rm-tab {
+  flex: 1 1 auto; min-width: 88px; height: 32px; padding: 0 12px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--rm-muted); font: inherit; font-size: 13px; font-weight: 560;
+  cursor: pointer;
+}
+.rm-tab.is-on { background: var(--rm-panel, var(--dsw-alias-bg-layer-2)); color: var(--rm-label); box-shadow: 0 0 0 1px var(--rm-border); }
+.rm-create-pane { min-height: 280px; }
+.rm-mode-wrap { flex-wrap: wrap; }
+.rm-preset-sub { display: block; color: var(--rm-muted); font-size: 11px; font-weight: 400; line-height: 1.35; margin-top: 1px; }
+.rm-create-custom {
+  margin-top: 14px; padding: 12px; border: 1px dashed var(--rm-border); border-radius: 12px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.rm-create-custom-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.rm-draft-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rm-draft-item {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px;
+  border: 1px solid var(--rm-border); background: var(--rm-panel);
+}
+.rm-draft-main { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 12.5px; }
+.rm-draft-main span { color: var(--rm-muted); font-size: 11px; }
+.rm-draft-form { margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--rm-border); }
+.rm-linkish { background: none; border: 0; color: var(--rm-accent, #5b8cff); cursor: pointer; font: inherit; font-size: inherit; padding: 0; text-decoration: underline; }
+@media (max-width: 720px) {
+  .rm-modal-create, .rm-modal-scrollable { width: min(100vw - 24px, 520px) !important; }
+}

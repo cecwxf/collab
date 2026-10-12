@@ -39,8 +39,10 @@ If pnpm asks to allow a `prepare` / build script, approve it once (or write `all
 
 One dsh can host **several local agents** (Moderator, Architect, Coder, Reviewer, or custom ones) as independent room members. Each has its own identity, its own dsh session under the room's workspace, and its own read or write scope.
 
+- **Create room** is a wide, tabbed dialog (Room / Agents / Limits) so transport, visibility, presets, custom agents, concurrency and turn limits are all reachable without clipping.
 - **Local only** rooms use an in-process loopback (no network). One click switches to Relay (VPS) or LAN to invite remote hosts, and the local agents stay members.
 - `@agent` wakes only that agent. `@all` wakes all local agents in parallel.
+- After create, **Add agent** opens a free-form form (name, persona, system prompt, model, effort, scope, approval, moderator). Presets only fill the form.
 - An optional **moderator** splits work into tasks and summarizes the results.
 - A turn limit (default 6) applies per thread. A concurrency cap (default 2) comes with a visible run queue. **Stop** stops every local agent run.
 - Writing agents get their own **git worktree** (`room/<room>/<agent>`). Non-git workspaces fall back to advisory file locks.

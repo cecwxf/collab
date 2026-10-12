@@ -19,9 +19,12 @@ compatible because the protocol is unchanged. Extra fields on `member.config`
 
 ## Create
 
-- **UI**: *New room* (workspace row icon or DSH Room panel). Under **Local agents**,
-  tick presets (Moderator, Architect, Coder, Reviewer). Turn on **Local only** for an
-  in-process loopback room that never touches the network.
+- **UI**: *New room* (workspace row icon or DSH Room panel). The create dialog is wide and
+  tabbed (**Room** / **Agents** / **Limits**) so every option stays reachable on a 1280×800
+  screen: transport (Local only / Relay VPS / LAN / Cloudflare), visibility, workspace,
+  preset checkboxes, **Add custom** free-form agents, concurrency, turn limit, isolation.
+- After create, room settings → **Add agent** opens the same free-form form (presets only
+  fill fields). Edit ✎ / Remove stay on each agent row.
 - **Slash**: `/collab create local <name>`, then `/collab agent add coder`, etc.
 - **API**: `POST /api/collab/rooms {name, workspacePath, localOnly: true, agents: ["moderator","coder","reviewer"]}`
 

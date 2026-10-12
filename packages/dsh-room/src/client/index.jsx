@@ -603,8 +603,8 @@ function LocalAgentsSection({ room, store, mention }) {
           </span>
         </div>
       ))}
-      {!local.agents.length ? <p className="rm-note">Host several agents from this dsh as separate members — each with its own identity, session and scope.</p> : null}
-      <div className="rm-actions"><Button size="sm" variant="outline" icon={<PlusIcon />} onClick={() => a.openDialog({ kind: "agent", roomId: room.roomId })}>Add local agent</Button></div>
+      {!local.agents.length ? <p className="rm-note">Add a custom agent (free-form name, prompt, model, scope) or start from a preset. Each gets its own identity, session and scope.</p> : null}
+      <div className="rm-actions"><Button size="sm" variant="outline" icon={<PlusIcon />} onClick={() => a.openDialog({ kind: "agent", roomId: room.roomId })}>Add agent</Button></div>
     </div>
   );
 }
@@ -719,20 +719,25 @@ function AgentDialog({ store, d }) {
   const room = (s.rooms || []).find((r) => r.roomId === d.roomId);
   const existing = room && room.local ? room.local.agents.find((x) => x.agentId === d.agentId) : null;
   const [presets, setPresets] = useState([]);
+  const blank = () => ({ preset: "", name: "", persona: "", systemPrompt: "", model: "", reasoningEffort: "medium", scope: "read", approvalRequired: false, moderator: false });
   const [f, setF] = useState(() => existing
-    ? { name: existing.name, persona: existing.persona || "", systemPrompt: existing.systemPrompt || "", model: existing.model || "", reasoningEffort: existing.reasoningEffort || "medium", scope: existing.scope, approvalRequired: !!existing.approvalRequired, moderator: !!existing.moderator }
-    : { preset: "", name: "", persona: "", systemPrompt: "", model: "", reasoningEffort: "medium", scope: "read", approvalRequired: false, moderator: false });
+    ? { preset: "", name: existing.name, persona: existing.persona || "", systemPrompt: existing.systemPrompt || "", model: existing.model || "", reasoningEffort: existing.reasoningEffort || "medium", scope: existing.scope, approvalRequired: !!existing.approvalRequired, moderator: !!existing.moderator }
+    : blank());
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { a.presets().then(setPresets).catch(() => {}); }, []);
-  const pick = (p) => setF({ ...f, preset: p.key, name: p.name, persona: p.persona, systemPrompt: p.systemPrompt, scope: p.scope, moderator: !!p.moderator, reasoningEffort: p.reasoningEffort || "medium" });
+  const pick = (p) => setF({ ...f, preset: p.key, name: p.name, persona: p.persona || "", systemPrompt: p.systemPrompt || "", scope: p.scope, moderator: !!p.moderator, reasoningEffort: p.reasoningEffort || "medium" });
+  const clearPreset = () => setF({ ...f, preset: "" });
   const submit = async () => {
     if (!f.name.trim()) { setErr("Name required"); return; }
     setBusy(true); setErr(null);
     try {
-      const body = { name: f.name, persona: f.persona, systemPrompt: f.systemPrompt, model: f.model, reasoningEffort: f.reasoningEffort, scope: f.scope, approvalRequired: f.approvalRequired, moderator: f.moderator, preset: f.preset || undefined };
+      const body = { name: f.name.trim(), persona: f.persona, systemPrompt: f.systemPrompt, model: f.model || undefined, reasoningEffort: f.reasoningEffort, scope: f.scope, approvalRequired: f.approvalRequired, moderator: f.moderator };
       if (existing) await a.updateAgent(d.roomId, existing.agentId, body);
-      else { const r = await a.addAgent(d.roomId, body); a.toast(`${r.name} joined as @${r.agentId}`); }
+      else {
+        const r = await a.addAgent(d.roomId, f.preset ? { ...body, preset: f.preset } : body);
+        a.toast(`${r.name} joined as @${r.agentId}`);
+      }
       a.closeDialog();
     } catch (e) { setErr(e.message); setBusy(false); }
   };
@@ -742,14 +747,19 @@ function AgentDialog({ store, d }) {
     catch (e) { setErr(e.message); setBusy(false); }
   };
   return (
-    <Modal open onClose={a.closeDialog} title={existing ? `Edit ${existing.name}` : "Add local agent"} closeLabel="Close" className="rm-modal-wide"
-      description={existing ? `Member @${existing.agentId} · own identity and dsh session in this room's workspace.` : "Runs on this dsh as a separate room member: own keypair, own session, own scope. Remote peers see it as a member."}
+    <Modal open onClose={a.closeDialog} title={existing ? `Edit ${existing.name}` : "Add local agent"} closeLabel="Close" className="rm-modal-wide rm-modal-scrollable"
+      contentClassName="rm-modal-scroll"
+      description={existing ? `Member @${existing.agentId} · own identity and dsh session in this room's workspace.` : "Free-form agent: own name, persona, prompt, model, scope. Presets only fill the form — you can edit every field. Remote peers see it as a separate member."}
       footer={<>{existing ? <Button variant="ghost" className="rm-danger" disabled={busy} onClick={remove}>Remove</Button> : null}<span style={{ flex: 1 }} /><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={busy} onClick={submit}>{busy ? "Saving…" : existing ? "Save" : "Add agent"}</Button></>}>
       <div className="rm-root rm-form rm-form-wide" data-rm-agent-form="">
         {!existing ? (
           <div className="rm-span-2">
-            <div className="rm-field-label">Preset</div>
+            <div className="rm-field-label">Start from</div>
+            <div className="rm-field-hint">Presets fill the fields below; switch to Custom anytime and edit freely.</div>
             <div className="rm-preset-row">
+              <button type="button" className={"rm-preset" + (!f.preset ? " is-on" : "")} onClick={() => setF(blank())}>
+                <b>Custom</b><span>Blank form — your name, prompt, model</span>
+              </button>
               {presets.map((p) => (
                 <button key={p.key} type="button" className={"rm-preset" + (f.preset === p.key ? " is-on" : "")} onClick={() => pick(p)}>
                   <b>{p.name}</b><span>{p.persona}</span>
@@ -758,10 +768,10 @@ function AgentDialog({ store, d }) {
             </div>
           </div>
         ) : null}
-        <Field label="Name" htmlFor="rm-ag-name" hint="Member id is derived from it (e.g. coder.ab12)."><Input id="rm-ag-name" value={f.name} maxLength={40} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Coder" /></Field>
-        <Field label="Persona" htmlFor="rm-ag-persona" hint="One line other members see."><Input id="rm-ag-persona" value={f.persona} maxLength={200} onChange={(e) => setF({ ...f, persona: e.target.value })} placeholder="e.g. Implements changes" /></Field>
+        <Field label="Name" htmlFor="rm-ag-name" hint="Member id is derived from it (e.g. coder.ab12)."><Input id="rm-ag-name" value={f.name} maxLength={40} onChange={(e) => { const name = e.target.value; const presetName = (presets.find((p) => p.key === f.preset) || {}).name; setF({ ...f, name, preset: f.preset && name !== presetName ? "" : f.preset }); }} placeholder="e.g. Data wrangler" /></Field>
+        <Field label="Persona" htmlFor="rm-ag-persona" hint="One line other members see."><Input id="rm-ag-persona" value={f.persona} maxLength={200} onChange={(e) => setF({ ...f, persona: e.target.value, ...(f.preset ? { preset: "" } : {}) })} placeholder="e.g. Cleans CSVs and writes summaries" /></Field>
         <div className="rm-span-2"><Field label="System prompt" htmlFor="rm-ag-sp" hint="Prepended to every wake of this agent.">
-          <textarea id="rm-ag-sp" className="rm-input rm-textarea" rows={4} value={f.systemPrompt} maxLength={4000} onChange={(e) => setF({ ...f, systemPrompt: e.target.value })} />
+          <textarea id="rm-ag-sp" className="rm-input rm-textarea" rows={4} value={f.systemPrompt} maxLength={4000} onChange={(e) => setF({ ...f, systemPrompt: e.target.value, ...(f.preset ? { preset: "" } : {}) })} placeholder="You are … Focus on … Report back with …" />
         </Field></div>
         <Field label="Model">
           <select className="rm-input" aria-label="Model" value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })}>
@@ -785,6 +795,7 @@ function AgentDialog({ store, d }) {
           <div className="rm-switch-row"><div><div className="rm-field-label">Moderator</div><div className="rm-field-hint">Splits requests into tasks and summarizes. One per room.</div></div><Switch checked={f.moderator} onChange={(v) => setF({ ...f, moderator: v })} label="Moderator" /></div>
         </div>
         {f.scope === "write" ? <div className="rm-span-2 rm-note">Writes go to its own git worktree (branch room/&lt;room&gt;/&lt;agent&gt;) when the workspace is a git repo; you merge from “Review &amp; merge”. Non-git workspaces use file locks.</div> : null}
+        {f.preset ? <div className="rm-span-2 rm-note">Filled from the <b>{f.preset}</b> preset — editing any field switches to Custom. <button type="button" className="rm-linkish" onClick={clearPreset}>Clear preset tag</button></div> : null}
         {err ? <div className="rm-span-2 rm-error">{err}</div> : null}
       </div>
     </Modal>
@@ -965,97 +976,232 @@ function Field({ label, hint, children, htmlFor }) {
 function CreateDialog({ store, d }) {
   const s = useStore(store);
   const a = store.actions;
-  const [f, setF] = useState({ name: "", description: "", tags: "", public: false, mode: "lan", lanHostPort: "62.234.113.56:80", localOnly: false, agents: [] });
+  const [tab, setTab] = useState("room"); // room | agents | limits
+  const [f, setF] = useState({
+    name: "", description: "", tags: "", public: false,
+    transport: "relay", // local | relay | lan | cloudflare
+    lanHostPort: "62.234.113.56:80",
+    turnLimit: 6, concurrency: 2, isolation: "auto",
+    agents: [], // draft agents: { key?, name, persona, systemPrompt, scope, moderator, reasoningEffort, approvalRequired, model }
+  });
+  const [draft, setDraft] = useState({ name: "", persona: "", systemPrompt: "", scope: "read", moderator: false, reasoningEffort: "medium", approvalRequired: false, model: "" });
+  const [showCustom, setShowCustom] = useState(false);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const [lanPeers, setLanPeers] = useState([]);
+  const [presets, setPresets] = useState([]);
   const ok = f.name.trim() && !busy;
   const [ws, setWs] = useState(d && d.workspace ? d.workspace : null);
+  useEffect(() => { a.presets().then(setPresets).catch(() => {}); }, []);
+  const togglePreset = (p) => {
+    const has = f.agents.some((x) => x.key === p.key);
+    setF({
+      ...f,
+      agents: has
+        ? f.agents.filter((x) => x.key !== p.key)
+        : [...f.agents, { key: p.key, name: p.name, persona: p.persona, systemPrompt: p.systemPrompt, scope: p.scope, moderator: !!p.moderator, reasoningEffort: p.reasoningEffort || "medium", approvalRequired: false, model: "" }],
+    });
+  };
+  const addCustomDraft = () => {
+    if (!draft.name.trim()) { setErr("Custom agent needs a name"); setTab("agents"); return; }
+    setF({
+      ...f,
+      agents: [...f.agents, { ...draft, name: draft.name.trim(), key: undefined }],
+    });
+    setDraft({ name: "", persona: "", systemPrompt: "", scope: "read", moderator: false, reasoningEffort: "medium", approvalRequired: false, model: "" });
+    setShowCustom(false);
+    setErr(null);
+  };
+  const removeDraft = (i) => setF({ ...f, agents: f.agents.filter((_, j) => j !== i) });
   const submit = async () => {
     if (!ok) return;
-    if (!ws) { setErr("Pick a workspace"); return; }
+    if (!ws) { setErr("Pick a workspace"); setTab("room"); return; }
     setBusy(true); setErr(null);
+    const transport = f.transport;
+    const localOnly = transport === "local";
+    const mode = transport === "cloudflare" ? "relay" : "lan";
+    const lanHostPort = transport === "relay" ? (f.lanHostPort.trim() || "62.234.113.56:80") : transport === "lan" ? "" : undefined;
     try {
       await a.create({
         name: f.name.trim(), description: f.description.trim(), tags: f.tags,
-        public: f.public, mode: f.mode,
-        lanHostPort: f.mode === "lan" ? f.lanHostPort.trim() : undefined,
+        public: localOnly ? false : f.public, mode,
+        lanHostPort,
         workspacePath: ws.path, workspaceName: ws.title,
-        localOnly: f.localOnly, agents: f.agents,
+        localOnly,
+        turnLimit: f.turnLimit, concurrency: f.concurrency, isolation: f.isolation,
+        agents: f.agents.map((ag) => ag.key
+          ? ag.key
+          : { name: ag.name, persona: ag.persona, systemPrompt: ag.systemPrompt, scope: ag.scope, moderator: ag.moderator, reasoningEffort: ag.reasoningEffort, approvalRequired: ag.approvalRequired, model: ag.model || undefined }),
       });
     } catch (e) { setErr(e.message); setBusy(false); }
   };
   const browseLan = async () => {
     try { const r = await a.browseLan(); setLanPeers(r.peers || []); } catch (e) { setErr(e.message); }
   };
+  const tabs = [
+    { id: "room", label: "Room" },
+    { id: "agents", label: `Agents${f.agents.length ? ` (${f.agents.length})` : ""}` },
+    { id: "limits", label: "Limits" },
+  ];
   return (
-    <Modal open onClose={a.closeDialog} title="Create room" closeLabel="Close" className="rm-modal-wide"
-      description={ws ? `In workspace “${ws.title}” (${ws.path}). Agent cwd + MCP sandbox = this path. Default relay 62.234.113.56:80 · E2EE.` : "Pick a dsh workspace. Default relay 62.234.113.56:80 · E2EE."}
+    <Modal open onClose={a.closeDialog} title="Create room" closeLabel="Close" className="rm-modal-wide rm-modal-create rm-modal-scrollable"
+      contentClassName="rm-modal-scroll"
+      description={ws ? `Workspace “${ws.title}” · default VPS relay 62.234.113.56:80 · E2EE. Every option below is editable.` : "Pick a dsh workspace. Every create option is on these tabs — nothing is hidden off-screen."}
       footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={!ok} onClick={submit}>{busy ? "Creating…" : "Create"}</Button></>}>
-      <div className="rm-root rm-form rm-form-wide" onKeyDown={(e) => e.key === "Enter" && e.target.tagName === "INPUT" && submit()}>
-        <Field label="Workspace" htmlFor="rm-create-ws" hint="Native dsh workspace this room belongs to.">
-          <WorkspaceSelect store={store} id="rm-create-ws" value={ws} onChange={setWs} />
-        </Field>
-        <Field label="Name" htmlFor="rm-create-name">
-          <div className="rm-name-row"><Avatar name={f.name || "room"} size={36} /><Input id="rm-create-name" autoFocus placeholder="e.g. release-crew" maxLength={60} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
-        </Field>
-        <Field label="Transport" hint="VPS directory works on LAN/VPS. Cloudflare is optional.">
-          <div className="rm-mode-row">
-            <button type="button" className={"rm-mode-btn" + (f.mode === "lan" ? " is-on" : "")} onClick={() => setF({ ...f, mode: "lan", lanHostPort: f.lanHostPort || "62.234.113.56:80" })}>LAN / VPS</button>
-            <button type="button" className={"rm-mode-btn" + (f.mode === "relay" ? " is-on" : "")} onClick={() => setF({ ...f, mode: "relay" })}>Cloudflare</button>
-          </div>
-        </Field>
-        <Field label="Description" htmlFor="rm-create-desc" hint="Shown to members and in public search.">
-          <Input id="rm-create-desc" placeholder="e.g. Agents that review and ship releases" maxLength={280} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
-        </Field>
-        <Field label="Tags" htmlFor="rm-create-tags" hint="Spaces or commas, up to 8.">
-          <Input id="rm-create-tags" placeholder="e.g. review rust" value={f.tags} onChange={(e) => setF({ ...f, tags: e.target.value })} />
-        </Field>
-        {f.mode === "lan" ? (
-          <div className="rm-span-2">
-            <Field label="Relay host:port" htmlFor="rm-lan-hp" hint="Default 62.234.113.56:80. Blank = this machine + mDNS.">
-              <Input id="rm-lan-hp" placeholder="62.234.113.56:80 or 100.x.x.x:7421" value={f.lanHostPort} onChange={(e) => setF({ ...f, lanHostPort: e.target.value })} />
-              <div className="rm-lan-browse"><Button size="sm" variant="outline" onClick={browseLan}>Browse mDNS</Button>
-                {lanPeers.map((p) => (
-                  <button key={p.hostPort} type="button" className="rm-lan-peer" onClick={() => setF({ ...f, lanHostPort: p.hostPort })}>{p.hostPort}{p.name ? ` · ${p.name}` : ""}</button>
-                ))}
-              </div>
+      <div className="rm-root rm-create" data-rm-create="" onKeyDown={(e) => e.key === "Enter" && e.target.tagName === "INPUT" && tab === "room" && submit()}>
+        <div className="rm-tabs" role="tablist" aria-label="Create room sections">
+          {tabs.map((t) => (
+            <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={"rm-tab" + (tab === t.id ? " is-on" : "")} onClick={() => setTab(t.id)}>{t.label}</button>
+          ))}
+        </div>
+        {tab === "room" ? (
+          <div className="rm-form rm-form-wide rm-create-pane" role="tabpanel">
+            <Field label="Workspace" htmlFor="rm-create-ws" hint="Native dsh workspace this room belongs to.">
+              <WorkspaceSelect store={store} id="rm-create-ws" value={ws} onChange={setWs} />
             </Field>
+            <Field label="Name" htmlFor="rm-create-name">
+              <div className="rm-name-row"><Avatar name={f.name || "room"} size={36} /><Input id="rm-create-name" autoFocus placeholder="e.g. release-crew" maxLength={60} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
+            </Field>
+            <div className="rm-span-2">
+              <Field label="Transport" hint="Local only = in-process (no network). Relay / LAN / Cloudflare for remote hosts.">
+                <div className="rm-mode-row rm-mode-wrap">
+                  <button type="button" className={"rm-mode-btn" + (f.transport === "local" ? " is-on" : "")} onClick={() => setF({ ...f, transport: "local", public: false })}>Local only</button>
+                  <button type="button" className={"rm-mode-btn" + (f.transport === "relay" ? " is-on" : "")} onClick={() => setF({ ...f, transport: "relay", lanHostPort: f.lanHostPort || "62.234.113.56:80" })}>Relay (VPS)</button>
+                  <button type="button" className={"rm-mode-btn" + (f.transport === "lan" ? " is-on" : "")} onClick={() => setF({ ...f, transport: "lan" })}>LAN (this machine)</button>
+                  <button type="button" className={"rm-mode-btn" + (f.transport === "cloudflare" ? " is-on" : "")} onClick={() => setF({ ...f, transport: "cloudflare" })}>Cloudflare</button>
+                </div>
+              </Field>
+            </div>
+            {f.transport === "relay" ? (
+              <div className="rm-span-2">
+                <Field label="Relay host:port" htmlFor="rm-lan-hp" hint="Default 62.234.113.56:80 (public directory).">
+                  <Input id="rm-lan-hp" placeholder="62.234.113.56:80" value={f.lanHostPort} onChange={(e) => setF({ ...f, lanHostPort: e.target.value })} />
+                </Field>
+              </div>
+            ) : null}
+            {f.transport === "lan" ? (
+              <div className="rm-span-2">
+                <Field label="LAN relay" hint="Blank host embeds a relay on this machine and advertises it over mDNS.">
+                  <div className="rm-lan-browse"><Button size="sm" variant="outline" onClick={browseLan}>Browse mDNS</Button>
+                    {lanPeers.map((p) => (
+                      <button key={p.hostPort} type="button" className="rm-lan-peer" onClick={() => setF({ ...f, transport: "relay", lanHostPort: p.hostPort })}>{p.hostPort}{p.name ? ` · ${p.name}` : ""}</button>
+                    ))}
+                  </div>
+                </Field>
+              </div>
+            ) : null}
+            <Field label="Description" htmlFor="rm-create-desc" hint="Shown to members and in public search.">
+              <Input id="rm-create-desc" placeholder="e.g. Agents that review and ship releases" maxLength={280} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
+            </Field>
+            <Field label="Tags" htmlFor="rm-create-tags" hint="Spaces or commas, up to 8.">
+              <Input id="rm-create-tags" placeholder="e.g. review rust" value={f.tags} onChange={(e) => setF({ ...f, tags: e.target.value })} />
+            </Field>
+            <div className="rm-span-2 rm-switch-row">
+              <div>
+                <div className="rm-field-label">List in public directory</div>
+                <div className="rm-field-hint">{f.transport === "local" ? "Local-only rooms stay private (no network)." : f.public ? "Anyone can find and join — key is published with the listing." : "Private: invite only."}</div>
+              </div>
+              <Switch checked={f.public && f.transport !== "local"} onChange={(v) => setF({ ...f, public: v })} label="List in public directory" disabled={f.transport === "local"} title={f.transport === "local" ? "Local-only rooms stay private" : undefined} />
+            </div>
           </div>
         ) : null}
-        <div className="rm-span-2 rm-local-box">
-          <div className="rm-switch-row">
-            <div>
-              <div className="rm-field-label">Local agents</div>
-              <div className="rm-field-hint">Host several agents from this dsh as separate members (own identity, session, scope). Edit them later in room details.</div>
+        {tab === "agents" ? (
+          <div className="rm-create-pane" role="tabpanel">
+            <div className="rm-field-label">Presets</div>
+            <div className="rm-field-hint">Shortcuts that seed a local agent. You can still add free-form agents below, and edit anyone after create.</div>
+            <div className="rm-preset-row">
+              {(presets.length ? presets : [
+                { key: "moderator", name: "Moderator", persona: "Breaks requests into tasks and summarizes", scope: "read", moderator: true, reasoningEffort: "medium", systemPrompt: "" },
+                { key: "architect", name: "Architect", persona: "Designs the approach", scope: "read", reasoningEffort: "high", systemPrompt: "" },
+                { key: "coder", name: "Coder", persona: "Implements in its own worktree", scope: "write", reasoningEffort: "medium", systemPrompt: "" },
+                { key: "reviewer", name: "Reviewer", persona: "Reviews diffs", scope: "read", reasoningEffort: "high", systemPrompt: "" },
+              ]).map((p) => (
+                <label key={p.key} className={"rm-preset rm-preset-check" + (f.agents.some((x) => x.key === p.key) ? " is-on" : "")}>
+                  <input type="checkbox" checked={f.agents.some((x) => x.key === p.key)} onChange={() => togglePreset(p)} />
+                  <span><b>{p.name}</b><span className="rm-preset-sub">{p.persona}</span></span>
+                </label>
+              ))}
             </div>
-          </div>
-          <div className="rm-preset-row">
-            {[["moderator", "Moderator"], ["architect", "Architect"], ["coder", "Coder"], ["reviewer", "Reviewer"]].map(([k, label]) => (
-              <label key={k} className={"rm-preset rm-preset-check" + (f.agents.includes(k) ? " is-on" : "")}>
-                <input type="checkbox" checked={f.agents.includes(k)} onChange={(e) => setF({ ...f, agents: e.target.checked ? [...f.agents, k] : f.agents.filter((x) => x !== k) })} />
-                <b>{label}</b>
-              </label>
-            ))}
-          </div>
-          <div className="rm-switch-row">
-            <div>
-              <div className="rm-field-label">Local only (no network)</div>
-              <div className="rm-field-hint">In-process loopback — nothing leaves this machine. One click to switch to Relay/LAN later.</div>
+            <div className="rm-create-custom">
+              <div className="rm-create-custom-head">
+                <div>
+                  <div className="rm-field-label">Custom agents</div>
+                  <div className="rm-field-hint">Free-form name, persona, system prompt, model, scope, approval, moderator.</div>
+                </div>
+                <Button size="sm" variant="outline" icon={<PlusIcon />} onClick={() => { setShowCustom(true); setErr(null); }}>Add custom</Button>
+              </div>
+              {f.agents.filter((x) => !x.key).length ? (
+                <ul className="rm-draft-list">
+                  {f.agents.map((ag, i) => ag.key ? null : (
+                    <li key={i} className="rm-draft-item">
+                      <Avatar name={ag.name} size={24} />
+                      <span className="rm-draft-main"><b>{ag.name}</b><span>{ag.persona || "custom"} · {ag.scope}{ag.moderator ? " · moderator" : ""}</span></span>
+                      <button type="button" className="rm-mini" aria-label={`Remove ${ag.name}`} onClick={() => removeDraft(i)}>×</button>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="rm-note">No custom agents yet — presets above, or Add custom.</p>}
+              {showCustom ? (
+                <div className="rm-draft-form rm-form rm-form-wide">
+                  <Field label="Name" htmlFor="rm-create-ag-name"><Input id="rm-create-ag-name" value={draft.name} maxLength={40} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="e.g. Data wrangler" /></Field>
+                  <Field label="Persona" htmlFor="rm-create-ag-persona"><Input id="rm-create-ag-persona" value={draft.persona} maxLength={200} onChange={(e) => setDraft({ ...draft, persona: e.target.value })} placeholder="One-line role" /></Field>
+                  <div className="rm-span-2"><Field label="System prompt" htmlFor="rm-create-ag-sp">
+                    <textarea id="rm-create-ag-sp" className="rm-input rm-textarea" rows={3} value={draft.systemPrompt} maxLength={4000} onChange={(e) => setDraft({ ...draft, systemPrompt: e.target.value })} />
+                  </Field></div>
+                  <Field label="Model">
+                    <select className="rm-input" aria-label="Model" value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })}>
+                      {MODEL_CHOICES.map((m) => <option key={m} value={m}>{m || "dsh default model"}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Reasoning effort">
+                    <select className="rm-input" aria-label="Reasoning effort" value={draft.reasoningEffort} onChange={(e) => setDraft({ ...draft, reasoningEffort: e.target.value })}>
+                      {["low", "medium", "high", "max"].map((x) => <option key={x} value={x}>{x}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Workspace scope">
+                    <div className="rm-mode-row">
+                      <button type="button" className={"rm-mode-btn" + (draft.scope === "read" ? " is-on" : "")} onClick={() => setDraft({ ...draft, scope: "read" })}>Read-only</button>
+                      <button type="button" className={"rm-mode-btn" + (draft.scope === "write" ? " is-on" : "")} onClick={() => setDraft({ ...draft, scope: "write" })}>Read + write</button>
+                    </div>
+                  </Field>
+                  <div className="rm-switch-col">
+                    <div className="rm-switch-row"><div><div className="rm-field-label">Approval required</div></div><Switch checked={draft.approvalRequired} onChange={(v) => setDraft({ ...draft, approvalRequired: v })} label="Approval required" /></div>
+                    <div className="rm-switch-row"><div><div className="rm-field-label">Moderator</div></div><Switch checked={draft.moderator} onChange={(v) => setDraft({ ...draft, moderator: v })} label="Moderator" /></div>
+                  </div>
+                  <div className="rm-span-2 rm-actions">
+                    <Button size="sm" variant="outline" onClick={() => setShowCustom(false)}>Cancel</Button>
+                    <Button size="sm" variant="primary" onClick={addCustomDraft}>Add to room</Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
-            <Switch checked={f.localOnly} onChange={(v) => setF({ ...f, localOnly: v, public: v ? false : f.public })} label="Local only" />
+            {f.agents.length ? (
+              <div className="rm-note" style={{ marginTop: 10 }}>Will create: {f.agents.map((x) => x.name).join(", ")}. Edit or add more after create from Local agents → Add local agent.</div>
+            ) : null}
           </div>
-        </div>
-        <div className="rm-span-2 rm-switch-row">
-          <div>
-            <div className="rm-field-label">List in public directory</div>
-            <div className="rm-field-hint">{f.public
-              ? "Anyone can find and join — key is published with the listing."
-              : "Private: invite only."}</div>
+        ) : null}
+        {tab === "limits" ? (
+          <div className="rm-form rm-form-wide rm-create-pane" role="tabpanel">
+            <Field label="Parallel runs" htmlFor="rm-create-conc" hint="Max local agent runs at once (1–16). The rest wait in a visible queue.">
+              <Input id="rm-create-conc" type="number" min={1} max={16} value={String(f.concurrency)} onChange={(e) => setF({ ...f, concurrency: Math.min(16, Math.max(1, Number(e.target.value) || 1)) })} />
+            </Field>
+            <Field label="Turn limit" htmlFor="rm-create-turns" hint="Max agent-to-agent hand-offs per task/thread (1–100). A human message resets it.">
+              <Input id="rm-create-turns" type="number" min={1} max={100} value={String(f.turnLimit)} onChange={(e) => setF({ ...f, turnLimit: Math.min(100, Math.max(1, Number(e.target.value) || 6)) })} />
+            </Field>
+            <div className="rm-span-2">
+              <Field label="Workspace isolation" hint="Writing agents get their own git worktree by default when the workspace is a git repo.">
+                <select className="rm-input" aria-label="Isolation mode" value={f.isolation} onChange={(e) => setF({ ...f, isolation: e.target.value })}>
+                  <option value="auto">Auto — git worktree per writing agent, else file locks</option>
+                  <option value="worktree">Git worktree per agent</option>
+                  <option value="locks">File locks (shared workspace)</option>
+                  <option value="off">Off (shared, no locks)</option>
+                </select>
+              </Field>
+            </div>
+            <div className="rm-span-2 rm-note">These apply as soon as the room has local agents. Change them later under Runs / Workspace isolation in the room panel.</div>
           </div>
-          <Switch checked={f.public} onChange={(v) => setF({ ...f, public: v, localOnly: v ? false : f.localOnly })} label="List in public directory" />
-        </div>
-        {err ? <div className="rm-span-2 rm-error">{err}</div> : null}
+        ) : null}
+        {err ? <div className="rm-error" style={{ marginTop: 10 }}>{err}</div> : null}
       </div>
     </Modal>
   );

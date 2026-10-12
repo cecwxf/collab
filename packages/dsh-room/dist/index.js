@@ -3164,11 +3164,22 @@ var CollabBridge = class {
         }
         return cfg;
       })(),
-      local: { ...defaultLocalSettings(), loopback: opts.localOnly === true }
+      local: {
+        ...defaultLocalSettings(),
+        loopback: opts.localOnly === true,
+        ...typeof opts.turnLimit === "number" ? { turnLimit: opts.turnLimit } : {},
+        ...typeof opts.concurrency === "number" ? { concurrency: opts.concurrency } : {},
+        ...opts.isolation ? { isolation: opts.isolation } : {}
+      }
     };
+    meta.local = normalizeLocalSettings(meta.local);
     const conn = await this.open(meta);
-    for (const key of opts.agents ?? []) {
-      if (AGENT_PRESETS.some((p) => p.key === key)) await this.addLocalAgent(meta.roomId, { preset: key });
+    for (const entry of opts.agents ?? []) {
+      if (typeof entry === "string") {
+        if (AGENT_PRESETS.some((p) => p.key === entry)) await this.addLocalAgent(meta.roomId, { preset: entry });
+      } else if (entry && typeof entry === "object") {
+        await this.addLocalAgent(meta.roomId, entry);
+      }
     }
     this.activeRoomId = meta.roomId;
     if (bindTo) this.bind(conn, bindTo);
@@ -4751,7 +4762,7 @@ function createApiHandler(bridge, connection) {
       if (method === "GET" && path === "/directory") return sendJson2(res, 200, { rooms: await bridge.search(str(url.searchParams.get("q")), str(url.searchParams.get("tag"))) });
       if (method === "POST" && path === "/rooms") {
         const b = await readJson2(req);
-        return sendJson2(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "relay" ? "relay" : "lan", lanHostPort: typeof b.lanHostPort === "string" ? b.lanHostPort.trim() : void 0, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName), localOnly: b.localOnly === true, agents: strs(b.agents) }));
+        return sendJson2(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "relay" ? "relay" : "lan", lanHostPort: typeof b.lanHostPort === "string" ? b.lanHostPort.trim() : void 0, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName), localOnly: b.localOnly === true, agents: Array.isArray(b.agents) ? b.agents : void 0, turnLimit: typeof b.turnLimit === "number" ? b.turnLimit : void 0, concurrency: typeof b.concurrency === "number" ? b.concurrency : void 0, isolation: typeof b.isolation === "string" ? b.isolation : void 0 }));
       }
       if (method === "GET" && path === "/presets") return sendJson2(res, 200, { presets: bridge.presets() });
       if (method === "POST" && path === "/join") {

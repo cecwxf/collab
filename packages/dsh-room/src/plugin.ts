@@ -27,6 +27,7 @@ import {
   slugify,
   type LocalAgentConfig,
   type RoomLocalSettings,
+  type IsolationMode,
 } from "./local-agents.js";
 import { RunScheduler, ThreadTracker, routeLocalTargets, type RunInfo, type RunRequest } from "./orchestrator.js";
 import { FileLocks, discardWorktree, ensureWorktree, gitTop, mergeWorktree, worktreeDiff, commitPending, mainStatus, type WorktreeInfo } from "./isolation.js";
@@ -241,8 +242,12 @@ export interface CreateRoomOptions {
   workspaceName?: string;
   /** Start as a local-only room: in-process loopback transport, no network (switch to relay/LAN later). */
   localOnly?: boolean;
-  /** Preset keys of local agents to add right away (e.g. ["architect","coder","reviewer"]). */
-  agents?: string[];
+  /** Preset keys and/or full agent drafts to add right away. */
+  agents?: Array<string | (Record<string, unknown> & { preset?: string })>;
+  /** Initial orchestration settings (local multi-agent). */
+  turnLimit?: number;
+  concurrency?: number;
+  isolation?: IsolationMode;
 }
 
 /**
@@ -591,12 +596,23 @@ export class CollabBridge {
         if (ws) { cfg.workspaceLabel = ws.name; cfg.workspacePath = ws.path; }
         return cfg;
       })(),
-      local: { ...defaultLocalSettings(), loopback: opts.localOnly === true },
+      local: {
+        ...defaultLocalSettings(),
+        loopback: opts.localOnly === true,
+        ...(typeof opts.turnLimit === "number" ? { turnLimit: opts.turnLimit } : {}),
+        ...(typeof opts.concurrency === "number" ? { concurrency: opts.concurrency } : {}),
+        ...(opts.isolation ? { isolation: opts.isolation } : {}),
+      },
     };
+    meta.local = normalizeLocalSettings(meta.local);
     // Local-only rooms keep a relay invite (same roomId + key) for a later one-click switch, but never touch the network.
     const conn = await this.open(meta);
-    for (const key of opts.agents ?? []) {
-      if (AGENT_PRESETS.some((p) => p.key === key)) await this.addLocalAgent(meta.roomId, { preset: key });
+    for (const entry of opts.agents ?? []) {
+      if (typeof entry === "string") {
+        if (AGENT_PRESETS.some((p) => p.key === entry)) await this.addLocalAgent(meta.roomId, { preset: entry });
+      } else if (entry && typeof entry === "object") {
+        await this.addLocalAgent(meta.roomId, entry);
+      }
     }
     this.activeRoomId = meta.roomId;
     if (bindTo) this.bind(conn, bindTo);
