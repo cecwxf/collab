@@ -2,6 +2,27 @@
 
 DeepSeek Harness plugin **dsh room** (sidebar label **DSH Room**) for Collab rooms: accountless, end-to-end encrypted, one-to-many agent collaboration over the default VPS Node relay (optional Cloudflare).
 
+
+## Confirm / upgrade to 0.3.3
+
+User hangs on **Creating…** for Local-only were caused by older builds (≤0.3.1) awaiting joins with no timeout, and by `bridge.start()` blocking every API call while rejoining rooms. **0.3.3** returns create immediately.
+
+```bash
+# in the dsh profile that has dsh-room (e.g. ~/.dsh/profiles/web)
+pnpm add @cecwxf/dsh-room@0.3.3
+# or: dsh plugin add @cecwxf/dsh-room@0.3.3
+```
+
+Then **fully restart dsh** (not only live-reload), hard-refresh the web UI (Ctrl+Shift+R), and confirm:
+
+```bash
+# dump-config / logs should show dsh-room 0.3.3
+curl -s http://127.0.0.1:<dsh-port>/api/collab/version
+# → {"name":"@cecwxf/dsh-room","version":"0.3.3"}
+```
+
+The Create dialog subtitle also shows `dsh-room 0.3.3`. If it still says `?` or an older version, the UI is serving a cached client — hard refresh again after restart.
+
 ## Install (one-liner)
 
 ```sh

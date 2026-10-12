@@ -25,6 +25,21 @@ before(async () => {
 const agent = (name, extra = {}) => ({ id: name.toLowerCase(), agentId: `${name.toLowerCase()}.h0st`, name, scope: "read", approvalRequired: false, createdAt: 0, ...extra });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+async function waitConnected(bridge, roomId, ms = 8000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    const conn = bridge.room(roomId);
+    if (conn.status === "online" && conn.client?.isJoined()) {
+      const agents = conn.local.agents;
+      if (!agents.length || agents.every((a) => conn.agents.get(a.agentId)?.isJoined())) return;
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  const conn = bridge.room(roomId);
+  throw new Error(`room ${roomId} not ready: status=${conn.status} agents=${conn.local.agents.map((a) => a.agentId + ":" + !!conn.agents.get(a.agentId)?.isJoined()).join(",")}`);
+}
+
+
 describe("routing", () => {
   const mod = agent("Moderator", { moderator: true });
   const coder = agent("Coder", { scope: "write" });
@@ -32,7 +47,7 @@ describe("routing", () => {
   const all = [mod, coder, rev];
   const chat = (mentions, extra = {}) => ({ kind: "chat", messageId: "m" + Math.random(), sender: "human", mentions, ...extra });
 
-  test("@agent wakes only that agent; aliases resolve; unknown mentions wake nobody", () => {
+test("@agent wakes only that agent; aliases resolve; unknown mentions wake nobody", () => {
     assert.deepEqual(O.routeLocalTargets(chat(["coder.h0st"]), all).targets, ["coder.h0st"]);
     assert.deepEqual(O.routeLocalTargets(chat(["coder"]), all).targets, ["coder.h0st"]);
     assert.deepEqual(O.routeLocalTargets(chat(["someone-remote"]), all).targets, []);
@@ -174,6 +189,7 @@ describe("local multi-agent room (loopback, mock runner)", () => {
     const b = await bridgeIn(dir, ws);
     b.localRunner = P.mockLocalRunner;
     const room = await b.createRoom({ name: "Team", localOnly: true, workspacePath: ws, agents: ["moderator", "coder", "reviewer"] });
+    await waitConnected(b, room.roomId);
     assert.equal(room.transport, "local");
     const v = b.view(b.room(room.roomId));
     assert.equal(v.local.agents.length, 3);
@@ -232,6 +248,7 @@ describe("local multi-agent room (loopback, mock runner)", () => {
     await mkdir(ws);
     const b = await bridgeIn(dir, ws);
     const room = await b.createRoom({ name: "Loop", localOnly: true, workspacePath: ws, agents: ["architect", "reviewer"] });
+    await waitConnected(b, room.roomId);
     await b.updateLocalSettings(room.roomId, { turnLimit: 4 });
     const [arch, rev] = b.room(room.roomId).local.agents;
     let runs = 0;
@@ -262,6 +279,7 @@ describe("local multi-agent room (loopback, mock runner)", () => {
     const b = await bridgeIn(dir, ws);
     b.localRunner = async () => {};
     const room = await b.createRoom({ name: "Crud", localOnly: true, workspacePath: ws });
+    await waitConnected(b, room.roomId);
     const a = await b.addLocalAgent(room.roomId, { name: "Tester", persona: "writes tests", scope: "write", approvalRequired: true, model: "deepseek-chat", agentId: "evil" });
     assert.notEqual(a.agentId, "evil", "client cannot choose the member id");
     await b.updateLocalAgent(room.roomId, a.id, { reasoningEffort: "high", scope: "read" });

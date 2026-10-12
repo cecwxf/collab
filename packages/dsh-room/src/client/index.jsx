@@ -1033,7 +1033,7 @@ function CreateDialog({ store, d }) {
         agents: f.agents.map((ag) => ag.key
           ? ag.key
           : { name: ag.name, persona: ag.persona, systemPrompt: ag.systemPrompt, scope: ag.scope, moderator: ag.moderator, reasoningEffort: ag.reasoningEffort, approvalRequired: ag.approvalRequired, model: ag.model || undefined }),
-      }, { timeoutMs: 35_000 });
+      }, { timeoutMs: 12_000 });
       // success swaps the dialog to the invite card via the store; busy clears on unmount
     } catch (e) {
       const msg = (e && e.message) || "Create failed";
@@ -1055,7 +1055,7 @@ function CreateDialog({ store, d }) {
   return (
     <Modal open onClose={a.closeDialog} title="Create room" closeLabel="Close" className="rm-modal-wide rm-modal-create rm-modal-scrollable"
       contentClassName="rm-modal-scroll"
-      description={ws ? `Workspace “${ws.title}” · default VPS relay 62.234.113.56:80 · E2EE. Every option below is editable.` : "Pick a dsh workspace. Every create option is on these tabs — nothing is hidden off-screen."}
+      description={(ws ? `Workspace “${ws.title}” · ` : "") + `dsh-room ${s.version || "?"} · default VPS 62.234.113.56:80 · E2EE. Create returns immediately; agents join in the background.`}
       footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={!ok} onClick={submit}>{busy ? "Creating…" : "Create"}</Button></>}>
       <div className="rm-root rm-create" data-rm-create="" onKeyDown={(e) => e.key === "Enter" && e.target.tagName === "INPUT" && tab === "room" && submit()}>
         <div className="rm-tabs" role="tablist" aria-label="Create room sections">

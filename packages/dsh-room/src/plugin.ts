@@ -47,6 +47,9 @@ import type {
 } from "./adapter.js";
 import { loadState, saveState, createWorkspaceMeta, type RoomMeta, type WorkspaceMeta } from "./state.js";
 import { extractMentions } from "./commands.js";
+import { createRequire } from "node:module";
+const requirePkg = createRequire(import.meta.url);
+export const PLUGIN_VERSION: string = (() => { try { return requirePkg("../package.json").version as string; } catch { return "0.3.3"; } })();
 
 const SUMMARY_MAX = 120;
 const MESSAGES_MAX = 300;
@@ -354,8 +357,17 @@ export class CollabBridge {
         metas.push({ roomId, invite: this.config.invite, name: roomId, description: "", tags: [], public: false, owner: false, joinedAt: Date.now(), workspaceId: wsId });
       }
       this.activeRoomId = st?.activeRoomId ?? metas[0]?.roomId ?? null;
-      await Promise.all(metas.map((m) => this.open(m).catch((e) => this.log("error", `rejoin ${m.roomId} failed: ${(e as Error).message}`))));
       await this.persist();
+      // CRITICAL: never block API handlers (incl. Local-only create) on room rejoins.
+      // A single hung relay/loopback join used to freeze every /api/collab request.
+      this.emit({ type: "rooms" });
+      void Promise.all(
+        metas.map((m) =>
+          withTimeout(this.open(m), 20_000, `rejoin ${m.roomId}`).catch((e) =>
+            this.log("error", `rejoin ${m.roomId} failed: ${(e as Error).message}`),
+          ),
+        ),
+      ).then(() => this.emit({ type: "rooms" }));
     })();
     return this.ready;
   }
@@ -367,11 +379,13 @@ export class CollabBridge {
   // ── room lifecycle ───────────────────────────────────────────────────────
   private async open(meta: RoomMeta): Promise<RoomConn> {
     const existing = this.rooms.get(meta.roomId);
-    if (existing) return existing;
-    const conn = new RoomConn(meta);
-    conn.onAdd = () => this.scheduleHistorySave(conn);
-    this.rooms.set(meta.roomId, conn);
-    this.emit({ type: "rooms" });
+    if (existing?.client?.isJoined()) return existing;
+    const conn = existing ?? new RoomConn(meta);
+    if (!existing) {
+      conn.onAdd = () => this.scheduleHistorySave(conn);
+      this.rooms.set(meta.roomId, conn);
+      this.emit({ type: "rooms" });
+    }
     try {
       await this.connect(conn);
     } catch (e) {
@@ -460,19 +474,27 @@ export class CollabBridge {
     }
     this.log("info", `joined room ${roomId} as ${identity.agentId} via ${loopback ? "in-process loopback" : wsUrl} (${loopback ? "local" : parsed.mode})`);
     // Loopback history lives on disk; it is also kept after a switch to Relay/LAN (the relay ring only has newer messages).
-    if (loopback || conn.local.agents.length) await this.loadLocalHistory(conn);
+    if (loopback || conn.local.agents.length) {
+      await withTimeout(this.loadLocalHistory(conn), 3_000, `local-history ${roomId}`).catch((e) =>
+        this.log("warn", `local history ${roomId}: ${(e as Error).message}`),
+      );
+    }
     try {
-      for (const p of await client.history(0)) {
+      const hist = await withTimeout(client.history(0), 5_000, `history ${roomId}`);
+      for (const p of hist) {
         const m = toMessage(p, identity.agentId);
         if (m) conn.add(m);
       }
     } catch (e) {
       this.log("warn", `history for ${roomId} failed: ${(e as Error).message}`);
     }
-    await this.connectAgents(conn).catch((e) => this.log("warn", `local agents for ${roomId} failed: ${(e as Error).message}`));
+    // Agent joins: best-effort with timeout so a single agent cannot block host connect forever.
+    await withTimeout(this.connectAgents(conn), loopback ? 8_000 : 20_000, `connectAgents ${roomId}`).catch((e) =>
+      this.log("warn", `local agents for ${roomId} failed: ${(e as Error).message}`),
+    );
     // Announce local member config (no secrets)
     try {
-      await this.announceMemberConfig(conn);
+      await withTimeout(this.announceMemberConfig(conn), 5_000, `announce ${roomId}`);
     } catch (e) {
       this.log("warn", `announce member.config failed: ${(e as Error).message}`);
     }
@@ -614,9 +636,15 @@ export class CollabBridge {
       },
     };
     meta.local = normalizeLocalSettings(meta.local);
-    // Local-only rooms keep a relay invite (same roomId + key) for a later one-click switch, but never touch the network.
-    // Host join only (with transport timeouts). Local agents are registered without awaiting their joins.
-    const conn = await withTimeout(this.open(meta), 25_000, "create room join");
+    this.log("info", `createRoom begin name=${meta.name} localOnly=${!!opts.localOnly} agents=${(opts.agents ?? []).length}`);
+    // Register the room + agents in memory/disk FIRST and return. Joins (loopback or relay) run in the
+    // background so the Create dialog can never stick on "Creating…" waiting for crypto/WS/history.
+    const conn = new RoomConn(meta);
+    conn.onAdd = () => this.scheduleHistorySave(conn);
+    this.rooms.set(meta.roomId, conn);
+    conn.status = "connecting";
+    this.activeRoomId = meta.roomId;
+    this.emit({ type: "rooms" });
     for (const entry of opts.agents ?? []) {
       if (typeof entry === "string") {
         if (AGENT_PRESETS.some((p) => p.key === entry)) await this.addLocalAgent(meta.roomId, { preset: entry }, { connect: false });
@@ -624,26 +652,36 @@ export class CollabBridge {
         await this.addLocalAgent(meta.roomId, entry, { connect: false });
       }
     }
-    this.activeRoomId = meta.roomId;
     if (bindTo) this.bind(conn, bindTo);
     await this.persist();
-    // Loopback joins are cheap — await briefly so the room is ready. Relay/LAN joins run in the background
-    // so a slow/blocked WebSocket cannot leave the Create dialog stuck on "Creating…".
-    if (conn.local.agents.length) {
-      if (conn.local.loopback) {
-        await withTimeout(this.connectAgents(conn), 6_000, "local agents join").catch((e) =>
-          this.log("warn", `local agents for ${meta.roomId}: ${(e as Error).message}`),
+    this.log("info", `createRoom persisted ${meta.roomId} with ${conn.local.agents.length} agent(s); connecting in background`);
+    void this.finishCreateConnect(conn, meta.public).catch((e) =>
+      this.log("error", `createRoom background connect ${meta.roomId}: ${(e as Error).message}`),
+    );
+    return { ...this.view(conn), invite: meta.invite, listed: false };
+  }
+
+  /** Background: host join + local agent joins + optional directory publish. Never awaited by HTTP create. */
+  private async finishCreateConnect(conn: RoomConn, isPublic: boolean) {
+    try {
+      await withTimeout(this.connect(conn), conn.local.loopback ? 8_000 : 20_000, `connect ${conn.meta.roomId}`);
+      if (conn.local.agents.length) {
+        await withTimeout(this.connectAgents(conn), conn.local.loopback ? 8_000 : 25_000, `agents ${conn.meta.roomId}`).catch((e) =>
+          this.log("warn", `local agents for ${conn.meta.roomId}: ${(e as Error).message}`),
         );
-      } else {
-        void this.connectAgents(conn).catch((e) => this.log("warn", `background local agents for ${meta.roomId}: ${(e as Error).message}`));
       }
+      if (isPublic && conn.meta.owner) {
+        this.startHeartbeat(conn);
+        await this.publish(conn).catch((e) => this.log("warn", `directory publish failed: ${(e as Error).message}`));
+      }
+      this.log("info", `createRoom connected ${conn.meta.roomId} status=${conn.status}`);
+    } catch (e) {
+      conn.status = "offline";
+      conn.error = (e as Error).message;
+      this.emit({ type: "rooms" });
+      throw e;
     }
-    let listing: DirectoryEntry | undefined;
-    if (meta.public) listing = await this.publish(conn).catch((e) => {
-      this.log("warn", `directory publish failed: ${(e as Error).message}`);
-      return undefined;
-    });
-    return { ...this.view(conn), invite: meta.invite, listed: !!listing };
+    this.emit({ type: "rooms" });
   }
 
   /** Join by invite. `info` carries directory metadata when joining from search results. */
@@ -799,7 +837,8 @@ export class CollabBridge {
       error: conn.error,
       members: (() => {
         const localAgents = conn.local.agents;
-        for (const a of localAgents) if (conn.agents.get(a.agentId)?.isJoined()) live.add(a.agentId);
+        // Always list configured local agents (even while background join is in flight).
+        for (const a of localAgents) live.add(a.agentId);
         const ids = [...live];
         const cfgs = this.peerConfigs.get(conn.meta.roomId);
         return ids.map((agentId) => {
@@ -830,6 +869,7 @@ export class CollabBridge {
   }
   state() {
     return {
+      version: PLUGIN_VERSION,
       self: this.identity?.agentId ?? null,
       relayUrl: this.config.relayUrl,
       lanRelayPort: this.lanRelay?.port ?? null,

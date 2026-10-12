@@ -65,6 +65,7 @@ async function call(path, init) {
 var post = (path, body, init) => call(path, { method: "POST", body: JSON.stringify(body || {}), ...init || {} });
 function createRoomsStore() {
   let snap = {
+    version: null,
     self: null,
     relayUrl: "",
     lanRelayPort: null,
@@ -170,7 +171,7 @@ function createRoomsStore() {
     async create(form, opts) {
       const ac = opts && opts.signal ? null : new AbortController();
       const signal = opts && opts.signal || ac.signal;
-      const timer = ac ? setTimeout(() => ac.abort(), opts && opts.timeoutMs || 3e4) : null;
+      const timer = ac ? setTimeout(() => ac.abort(), opts && opts.timeoutMs || 12e3) : null;
       try {
         const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? void 0 : form.workspaceId || snap.activeWorkspaceId }, { signal });
         try {
@@ -1544,7 +1545,7 @@ function CreateDialog({ store, d }) {
         concurrency: f.concurrency,
         isolation: f.isolation,
         agents: f.agents.map((ag) => ag.key ? ag.key : { name: ag.name, persona: ag.persona, systemPrompt: ag.systemPrompt, scope: ag.scope, moderator: ag.moderator, reasoningEffort: ag.reasoningEffort, approvalRequired: ag.approvalRequired, model: ag.model || void 0 })
-      }, { timeoutMs: 35e3 });
+      }, { timeoutMs: 12e3 });
     } catch (e) {
       const msg = e && e.message || "Create failed";
       setErr(/timed out|timeout|abort/i.test(msg) ? `${msg}. Check transport (try Local only), relay host, and network \u2014 agent joins continue in the background after a successful create.` : msg);
@@ -1574,7 +1575,7 @@ function CreateDialog({ store, d }) {
       closeLabel: "Close",
       className: "rm-modal-wide rm-modal-create rm-modal-scrollable",
       contentClassName: "rm-modal-scroll",
-      description: ws ? `Workspace \u201C${ws.title}\u201D \xB7 default VPS relay 62.234.113.56:80 \xB7 E2EE. Every option below is editable.` : "Pick a dsh workspace. Every create option is on these tabs \u2014 nothing is hidden off-screen.",
+      description: (ws ? `Workspace \u201C${ws.title}\u201D \xB7 ` : "") + `dsh-room ${s.version || "?"} \xB7 default VPS 62.234.113.56:80 \xB7 E2EE. Create returns immediately; agents join in the background.`,
       footer: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: a.closeDialog, children: "Cancel" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "primary", disabled: !ok, onClick: submit, children: busy ? "Creating\u2026" : "Create" })
@@ -2245,6 +2246,7 @@ async function call(path, init) {
 var post = (path, body, init) => call(path, { method: "POST", body: JSON.stringify(body || {}), ...init || {} });
 function createRoomsStore() {
   let snap = {
+    version: null,
     self: null,
     relayUrl: "",
     lanRelayPort: null,
@@ -2350,7 +2352,7 @@ function createRoomsStore() {
     async create(form, opts) {
       const ac = opts && opts.signal ? null : new AbortController();
       const signal = opts && opts.signal || ac.signal;
-      const timer = ac ? setTimeout(() => ac.abort(), opts && opts.timeoutMs || 3e4) : null;
+      const timer = ac ? setTimeout(() => ac.abort(), opts && opts.timeoutMs || 12e3) : null;
       try {
         const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? void 0 : form.workspaceId || snap.activeWorkspaceId }, { signal });
         try {
@@ -3724,7 +3726,7 @@ function CreateDialog({ store, d }) {
         concurrency: f.concurrency,
         isolation: f.isolation,
         agents: f.agents.map((ag) => ag.key ? ag.key : { name: ag.name, persona: ag.persona, systemPrompt: ag.systemPrompt, scope: ag.scope, moderator: ag.moderator, reasoningEffort: ag.reasoningEffort, approvalRequired: ag.approvalRequired, model: ag.model || void 0 })
-      }, { timeoutMs: 35e3 });
+      }, { timeoutMs: 12e3 });
     } catch (e) {
       const msg = e && e.message || "Create failed";
       setErr(/timed out|timeout|abort/i.test(msg) ? `${msg}. Check transport (try Local only), relay host, and network \u2014 agent joins continue in the background after a successful create.` : msg);
@@ -3754,7 +3756,7 @@ function CreateDialog({ store, d }) {
       closeLabel: "Close",
       className: "rm-modal-wide rm-modal-create rm-modal-scrollable",
       contentClassName: "rm-modal-scroll",
-      description: ws ? `Workspace \u201C${ws.title}\u201D \xB7 default VPS relay 62.234.113.56:80 \xB7 E2EE. Every option below is editable.` : "Pick a dsh workspace. Every create option is on these tabs \u2014 nothing is hidden off-screen.",
+      description: (ws ? `Workspace \u201C${ws.title}\u201D \xB7 ` : "") + `dsh-room ${s.version || "?"} \xB7 default VPS 62.234.113.56:80 \xB7 E2EE. Create returns immediately; agents join in the background.`,
       footer: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: a.closeDialog, children: "Cancel" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "primary", disabled: !ok, onClick: submit, children: busy ? "Creating\u2026" : "Create" })

@@ -22,7 +22,7 @@ const post = (path, body, init) => call(path, { method: "POST", body: JSON.strin
 
 export function createRoomsStore() {
   let snap = {
-    self: null, relayUrl: "", lanRelayPort: null, workspaces: [], activeWorkspaceId: null, rooms: [], activeRoomId: null, connected: false,
+    version: null, self: null, relayUrl: "", lanRelayPort: null, workspaces: [], activeWorkspaceId: null, rooms: [], activeRoomId: null, connected: false,
     selected: null, messages: {}, dialog: null, toast: null, approvals: [],
     search: { open: false, query: "", results: [], loading: false, error: null },
   };
@@ -106,7 +106,7 @@ export function createRoomsStore() {
     async create(form, opts) {
       const ac = opts && opts.signal ? null : new AbortController();
       const signal = (opts && opts.signal) || ac.signal;
-      const timer = ac ? setTimeout(() => ac.abort(), (opts && opts.timeoutMs) || 30_000) : null;
+      const timer = ac ? setTimeout(() => ac.abort(), (opts && opts.timeoutMs) || 12_000) : null;
       try {
         const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? undefined : (form.workspaceId || snap.activeWorkspaceId) }, { signal });
         try { api.onRoomOpened && api.onRoomOpened(); } catch { /* layout busy */ }

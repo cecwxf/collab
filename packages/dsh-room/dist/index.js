@@ -2768,6 +2768,15 @@ ${HELP}` };
 }
 
 // src/plugin.ts
+import { createRequire } from "node:module";
+var requirePkg = createRequire(import.meta.url);
+var PLUGIN_VERSION = (() => {
+  try {
+    return requirePkg("../package.json").version;
+  } catch {
+    return "0.3.3";
+  }
+})();
 var SUMMARY_MAX = 120;
 var MESSAGES_MAX = 300;
 var AGENT_SERVICES = ["agents", "agentDefaultModel", "agentPresets", "permissionPresets", "sessionTitle", "workspaceRegistry"];
@@ -2955,8 +2964,15 @@ var CollabBridge = class {
         metas.push({ roomId, invite: this.config.invite, name: roomId, description: "", tags: [], public: false, owner: false, joinedAt: Date.now(), workspaceId: wsId });
       }
       this.activeRoomId = st?.activeRoomId ?? metas[0]?.roomId ?? null;
-      await Promise.all(metas.map((m) => this.open(m).catch((e) => this.log("error", `rejoin ${m.roomId} failed: ${e.message}`))));
       await this.persist();
+      this.emit({ type: "rooms" });
+      void Promise.all(
+        metas.map(
+          (m) => withTimeout(this.open(m), 2e4, `rejoin ${m.roomId}`).catch(
+            (e) => this.log("error", `rejoin ${m.roomId} failed: ${e.message}`)
+          )
+        )
+      ).then(() => this.emit({ type: "rooms" }));
     })();
     return this.ready;
   }
@@ -2966,11 +2982,13 @@ var CollabBridge = class {
   // ── room lifecycle ───────────────────────────────────────────────────────
   async open(meta) {
     const existing = this.rooms.get(meta.roomId);
-    if (existing) return existing;
-    const conn = new RoomConn(meta);
-    conn.onAdd = () => this.scheduleHistorySave(conn);
-    this.rooms.set(meta.roomId, conn);
-    this.emit({ type: "rooms" });
+    if (existing?.client?.isJoined()) return existing;
+    const conn = existing ?? new RoomConn(meta);
+    if (!existing) {
+      conn.onAdd = () => this.scheduleHistorySave(conn);
+      this.rooms.set(meta.roomId, conn);
+      this.emit({ type: "rooms" });
+    }
     try {
       await this.connect(conn);
     } catch (e) {
@@ -3055,18 +3073,25 @@ var CollabBridge = class {
       conn.presenceTimer.unref?.();
     }
     this.log("info", `joined room ${roomId} as ${identity.agentId} via ${loopback ? "in-process loopback" : wsUrl} (${loopback ? "local" : parsed.mode})`);
-    if (loopback || conn.local.agents.length) await this.loadLocalHistory(conn);
+    if (loopback || conn.local.agents.length) {
+      await withTimeout(this.loadLocalHistory(conn), 3e3, `local-history ${roomId}`).catch(
+        (e) => this.log("warn", `local history ${roomId}: ${e.message}`)
+      );
+    }
     try {
-      for (const p of await client.history(0)) {
+      const hist = await withTimeout(client.history(0), 5e3, `history ${roomId}`);
+      for (const p of hist) {
         const m = toMessage(p, identity.agentId);
         if (m) conn.add(m);
       }
     } catch (e) {
       this.log("warn", `history for ${roomId} failed: ${e.message}`);
     }
-    await this.connectAgents(conn).catch((e) => this.log("warn", `local agents for ${roomId} failed: ${e.message}`));
+    await withTimeout(this.connectAgents(conn), loopback ? 8e3 : 2e4, `connectAgents ${roomId}`).catch(
+      (e) => this.log("warn", `local agents for ${roomId} failed: ${e.message}`)
+    );
     try {
-      await this.announceMemberConfig(conn);
+      await withTimeout(this.announceMemberConfig(conn), 5e3, `announce ${roomId}`);
     } catch (e) {
       this.log("warn", `announce member.config failed: ${e.message}`);
     }
@@ -3204,7 +3229,13 @@ var CollabBridge = class {
       }
     };
     meta.local = normalizeLocalSettings(meta.local);
-    const conn = await withTimeout(this.open(meta), 25e3, "create room join");
+    this.log("info", `createRoom begin name=${meta.name} localOnly=${!!opts.localOnly} agents=${(opts.agents ?? []).length}`);
+    const conn = new RoomConn(meta);
+    conn.onAdd = () => this.scheduleHistorySave(conn);
+    this.rooms.set(meta.roomId, conn);
+    conn.status = "connecting";
+    this.activeRoomId = meta.roomId;
+    this.emit({ type: "rooms" });
     for (const entry of opts.agents ?? []) {
       if (typeof entry === "string") {
         if (AGENT_PRESETS.some((p) => p.key === entry)) await this.addLocalAgent(meta.roomId, { preset: entry }, { connect: false });
@@ -3212,24 +3243,35 @@ var CollabBridge = class {
         await this.addLocalAgent(meta.roomId, entry, { connect: false });
       }
     }
-    this.activeRoomId = meta.roomId;
     if (bindTo) this.bind(conn, bindTo);
     await this.persist();
-    if (conn.local.agents.length) {
-      if (conn.local.loopback) {
-        await withTimeout(this.connectAgents(conn), 6e3, "local agents join").catch(
-          (e) => this.log("warn", `local agents for ${meta.roomId}: ${e.message}`)
+    this.log("info", `createRoom persisted ${meta.roomId} with ${conn.local.agents.length} agent(s); connecting in background`);
+    void this.finishCreateConnect(conn, meta.public).catch(
+      (e) => this.log("error", `createRoom background connect ${meta.roomId}: ${e.message}`)
+    );
+    return { ...this.view(conn), invite: meta.invite, listed: false };
+  }
+  /** Background: host join + local agent joins + optional directory publish. Never awaited by HTTP create. */
+  async finishCreateConnect(conn, isPublic) {
+    try {
+      await withTimeout(this.connect(conn), conn.local.loopback ? 8e3 : 2e4, `connect ${conn.meta.roomId}`);
+      if (conn.local.agents.length) {
+        await withTimeout(this.connectAgents(conn), conn.local.loopback ? 8e3 : 25e3, `agents ${conn.meta.roomId}`).catch(
+          (e) => this.log("warn", `local agents for ${conn.meta.roomId}: ${e.message}`)
         );
-      } else {
-        void this.connectAgents(conn).catch((e) => this.log("warn", `background local agents for ${meta.roomId}: ${e.message}`));
       }
+      if (isPublic && conn.meta.owner) {
+        this.startHeartbeat(conn);
+        await this.publish(conn).catch((e) => this.log("warn", `directory publish failed: ${e.message}`));
+      }
+      this.log("info", `createRoom connected ${conn.meta.roomId} status=${conn.status}`);
+    } catch (e) {
+      conn.status = "offline";
+      conn.error = e.message;
+      this.emit({ type: "rooms" });
+      throw e;
     }
-    let listing;
-    if (meta.public) listing = await this.publish(conn).catch((e) => {
-      this.log("warn", `directory publish failed: ${e.message}`);
-      return void 0;
-    });
-    return { ...this.view(conn), invite: meta.invite, listed: !!listing };
+    this.emit({ type: "rooms" });
   }
   /** Join by invite. `info` carries directory metadata when joining from search results. */
   async joinInvite(invite, info = {}, bindTo) {
@@ -3382,7 +3424,7 @@ var CollabBridge = class {
       error: conn.error,
       members: (() => {
         const localAgents = conn.local.agents;
-        for (const a of localAgents) if (conn.agents.get(a.agentId)?.isJoined()) live.add(a.agentId);
+        for (const a of localAgents) live.add(a.agentId);
         const ids = [...live];
         const cfgs = this.peerConfigs.get(conn.meta.roomId);
         return ids.map((agentId) => {
@@ -3413,6 +3455,7 @@ var CollabBridge = class {
   }
   state() {
     return {
+      version: PLUGIN_VERSION,
       self: this.identity?.agentId ?? null,
       relayUrl: this.config.relayUrl,
       lanRelayPort: this.lanRelay?.port ?? null,
@@ -4810,6 +4853,7 @@ function createApiHandler(bridge, connection) {
       await bridge.start();
       if (method === "GET" && path === "/stream") return stream(bridge, req, res);
       if (method === "GET" && path === "/state") return sendJson2(res, 200, bridge.state());
+      if (method === "GET" && path === "/version") return sendJson2(res, 200, { name: "@cecwxf/dsh-room", version: bridge.state().version ?? "unknown" });
       if (method === "GET" && path === "/directory") return sendJson2(res, 200, { rooms: await bridge.search(str(url.searchParams.get("q")), str(url.searchParams.get("tag"))) });
       if (method === "POST" && path === "/rooms") {
         const b = await readJson2(req);
@@ -4989,6 +5033,7 @@ export {
   AGENT_PRESETS,
   CollabBridge,
   Config,
+  PLUGIN_VERSION,
   apply,
   inject,
   mockLocalRunner,

@@ -12,10 +12,9 @@ import type { DshCollabConfig, HostContext } from "./adapter.js";
 export const name = "dsh-room";
 /** Only the tool registry is required; commands/webServer/agent services are optional. */
 export const inject = ["tools"];
-export { Config, normalizeConfig, CollabBridge };
-export { mockLocalRunner } from "./plugin.js";
+export { PLUGIN_VERSION, CollabBridge, mockLocalRunner } from "./plugin.js";
+export { Config, normalizeConfig };
 export { AGENT_PRESETS } from "./local-agents.js";
-export type * from "./adapter.js";
 
 export function apply(ctx: HostContext, config: DshCollabConfig) {
   const bridge = new CollabBridge(ctx, normalizeConfig(config));

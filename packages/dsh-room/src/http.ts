@@ -65,6 +65,7 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
       await bridge.start();
       if (method === "GET" && path === "/stream") return stream(bridge, req, res);
       if (method === "GET" && path === "/state") return sendJson(res, 200, bridge.state());
+      if (method === "GET" && path === "/version") return sendJson(res, 200, { name: "@cecwxf/dsh-room", version: (bridge.state() as { version?: string }).version ?? "unknown" });
       if (method === "GET" && path === "/directory") return sendJson(res, 200, { rooms: await bridge.search(str(url.searchParams.get("q")), str(url.searchParams.get("tag"))) });
       if (method === "POST" && path === "/rooms") {
         const b = await readJson(req);

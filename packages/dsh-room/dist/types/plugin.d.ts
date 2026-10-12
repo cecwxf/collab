@@ -7,6 +7,7 @@ import { ApprovalQueue } from "./approval-queue.js";
 import { publicMemberConfig, type RoomMemberConfig } from "./member-config.js";
 import type { AgentLike, DshCollabConfig, HostContext, ToolDefinition } from "./adapter.js";
 import { type RoomMeta, type WorkspaceMeta } from "./state.js";
+export declare const PLUGIN_VERSION: string;
 export declare function describePayload(p: CollabPayload): string;
 /** UI/transcript view of one decrypted room payload. */
 export interface RoomMessage {
@@ -295,6 +296,8 @@ export declare class CollabBridge {
         agentSessions?: Record<string, string> | undefined;
         agentNoEffort?: string[] | undefined;
     }>;
+    /** Background: host join + local agent joins + optional directory publish. Never awaited by HTTP create. */
+    private finishCreateConnect;
     /** Join by invite. `info` carries directory metadata when joining from search results. */
     joinInvite(invite: string, info?: Partial<Pick<RoomMeta, "name" | "description" | "tags" | "public" | "workspaceId">> & {
         workspacePath?: string;
@@ -399,6 +402,7 @@ export declare class CollabBridge {
     }[]>;
     view(conn: RoomConn): RoomView;
     state(): {
+        version: string;
         self: string | null;
         relayUrl: string;
         lanRelayPort: number | null;
