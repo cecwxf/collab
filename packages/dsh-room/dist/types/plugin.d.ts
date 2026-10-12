@@ -208,6 +208,8 @@ export declare class CollabBridge {
     readonly scheduler: RunScheduler;
     /** `${roomId}:${agentId}` → dsh session handle of that local agent. */
     private agentHandles;
+    /** room:agent keys whose model rejected the configured reasoning effort (sessions then use the model default). */
+    private noEffort;
     /** dsh session id → the local agent that session belongs to (routes collab_* tool calls). */
     private sessionAgents;
     /** Override how a local agent run executes (tests / mock provider). */
@@ -553,6 +555,8 @@ export declare class CollabBridge {
     /** Working directory of an agent: private worktree (write + git), else the room workspace. */
     agentCwd(conn: RoomConn, a: LocalAgentConfig): Promise<string>;
     private runInSession;
+    /** Last turn/end error since `from`, if the agent's turn failed (provider/model errors). */
+    private turnError;
     /** One dsh session per local agent, under the room's workspace (nested + marked in the native sidebar). */
     private agentSessionFor;
     /** Map a tool call's calling session to the local agent it belongs to. */

@@ -2845,6 +2845,8 @@ var CollabBridge = class {
   scheduler;
   /** `${roomId}:${agentId}` → dsh session handle of that local agent. */
   agentHandles = /* @__PURE__ */ new Map();
+  /** room:agent keys whose model rejected the configured reasoning effort (sessions then use the model default). */
+  noEffort = /* @__PURE__ */ new Set();
   /** dsh session id → the local agent that session belongs to (routes collab_* tool calls). */
   sessionAgents = /* @__PURE__ */ new Map();
   /** Override how a local agent run executes (tests / mock provider). */
@@ -3974,7 +3976,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     conn.locks ??= new FileLocks(root);
     return root;
   }
-  async runInSession(conn, a, ctx) {
+  async runInSession(conn, a, ctx, retried = false) {
     const handle = await this.agentSessionFor(conn, a, ctx.cwd);
     const agent = handle.agent;
     if (agent.whenIdle) await Promise.race([agent.whenIdle(), new Promise((r) => setTimeout(r, 3e4))]);
@@ -3995,13 +3997,40 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     })();
     await Promise.race([settled, aborted, timeout]);
     this.log("info", `run ${a.agentId}: seq ${seq0} -> ${agent.session?.seq}`);
+    if (process.env.DSH_ROOM_DEBUG_LOG && seq0 !== void 0) {
+      const sess = agent.session;
+      for (let i = seq0; i < (sess.seq ?? seq0); i++) this.log("info", `  ev ${i}: ${JSON.stringify(sess.eventAt?.(i)).slice(0, 700)}`);
+    }
     if (!ctx.signal.aborted && seq0 !== void 0 && agent.session?.seq === seq0) throw new Error("agent session did not start a turn");
+    const failure = !ctx.signal.aborted && seq0 !== void 0 ? this.turnError(agent.session, seq0) : void 0;
+    if (failure) {
+      const key = `${conn.meta.roomId}:${a.agentId}`;
+      if (!retried && failure.code === "UNSUPPORTED_REASONING_EFFORT" && a.reasoningEffort) {
+        this.log("warn", `${a.agentId}: ${failure.message}; recreating its session with the model's default effort`);
+        this.noEffort.add(key);
+        this.agentHandles.delete(key);
+        if (conn.meta.agentSessions) delete conn.meta.agentSessions[a.agentId];
+        return this.runInSession(conn, a, ctx, true);
+      }
+      throw new Error(failure.message);
+    }
     if (ctx.signal.aborted) {
       try {
         agent.cancel?.({ kind: "user" });
       } catch {
       }
     }
+  }
+  /** Last turn/end error since `from`, if the agent's turn failed (provider/model errors). */
+  turnError(sess, from) {
+    if (!sess?.eventAt) return void 0;
+    for (let i = (sess.seq ?? from) - 1; i >= from; i--) {
+      const ev = sess.eventAt(i);
+      if (ev?.type !== "turn/end") continue;
+      const r = ev.data?.reason;
+      return r?.kind === "error" ? { message: r.error?.message ?? "agent turn failed", code: r.error?.code } : void 0;
+    }
+    return void 0;
   }
   /** One dsh session per local agent, under the room's workspace (nested + marked in the native sidebar). */
   agentSessionFor(conn, a, cwd) {
@@ -4041,7 +4070,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
         });
         let handle;
         try {
-          handle = await create(a.reasoningEffort ? { ...base, reasoningEffort: a.reasoningEffort } : base, root);
+          handle = await create(a.reasoningEffort && !this.noEffort.has(key) ? { ...base, reasoningEffort: a.reasoningEffort } : base, root);
         } catch (e) {
           this.log("warn", `session for ${a.agentId} with reasoning effort failed (${e.message}); retrying with defaults`);
           handle = await create(base, root);
