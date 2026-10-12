@@ -3741,6 +3741,8 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     if (resetSession) {
       this.agentHandles.delete(`${conn.meta.roomId}:${a.agentId}`);
       if (conn.meta.agentSessions) delete conn.meta.agentSessions[a.agentId];
+      conn.meta.agentNoEffort = conn.meta.agentNoEffort?.filter((x) => x !== a.agentId);
+      this.noEffort.delete(`${conn.meta.roomId}:${a.agentId}`);
     }
     await this.persist();
     await this.announceAgentConfig(conn, a).catch(() => {
@@ -4008,6 +4010,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
       if (!retried && failure.code === "UNSUPPORTED_REASONING_EFFORT" && a.reasoningEffort) {
         this.log("warn", `${a.agentId}: ${failure.message}; recreating its session with the model's default effort`);
         this.noEffort.add(key);
+        conn.meta.agentNoEffort = [.../* @__PURE__ */ new Set([...conn.meta.agentNoEffort ?? [], a.agentId])];
         this.agentHandles.delete(key);
         if (conn.meta.agentSessions) delete conn.meta.agentSessions[a.agentId];
         return this.runInSession(conn, a, ctx, true);
@@ -4057,8 +4060,32 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
         const root = conn.meta.memberConfig?.workspacePath?.trim() || this.config.workspacePath;
         const workspace = await svc.workspaceRegistry.create(root, root === this.config.workspacePath ? "collab" : void 0);
         const selected = svc.agentDefaultModel.currentSelection();
-        const sessionId = `room-${conn.meta.roomId.slice(-8)}-${a.id}-${randomUUID2().slice(0, 6)}`;
         const base = { provider: a.provider ?? selected.provider, model: a.model ?? selected.model };
+        const withEffort = a.reasoningEffort && !this.noEffort.has(key) && !conn.meta.agentNoEffort?.includes(a.agentId);
+        const resume = svc.agents.resume;
+        if (prevSid && resume) {
+          try {
+            const h = await resume.call(svc.agents, {
+              resumeSessionId: prevSid,
+              agentOptions: withEffort ? { ...base, reasoningEffort: a.reasoningEffort } : base,
+              setup: async (agentCtx) => {
+                await svc.agentPresets.mount(agentCtx, preset.id);
+              }
+            });
+            await workspace.attachSession(prevSid).catch(() => {
+            });
+            try {
+              svc.permissionPresets.set(h.agent.session, perm);
+            } catch {
+            }
+            this.sessionAgents.set(prevSid, { roomId: conn.meta.roomId, agentId: a.agentId });
+            this.log("info", `resumed session ${prevSid} for local agent ${a.agentId}`);
+            return h;
+          } catch (e) {
+            this.log("warn", `resume ${prevSid} for ${a.agentId} failed (${e.message}); creating a new session`);
+          }
+        }
+        const sessionId = `room-${conn.meta.roomId.slice(-8)}-${a.id}-${randomUUID2().slice(0, 6)}`;
         const create = (agentOptions, cwdPath) => svc.agents.create({
           sessionId,
           signal: this.abort.signal,
@@ -4070,7 +4097,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
         });
         let handle;
         try {
-          handle = await create(a.reasoningEffort && !this.noEffort.has(key) ? { ...base, reasoningEffort: a.reasoningEffort } : base, root);
+          handle = await create(withEffort ? { ...base, reasoningEffort: a.reasoningEffort } : base, root);
         } catch (e) {
           this.log("warn", `session for ${a.agentId} with reasoning effort failed (${e.message}); retrying with defaults`);
           handle = await create(base, root);

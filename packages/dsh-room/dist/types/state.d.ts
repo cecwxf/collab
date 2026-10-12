@@ -33,6 +33,8 @@ export interface RoomMeta {
     local?: RoomLocalSettings;
     /** local agentId → dsh session id it runs in. */
     agentSessions?: Record<string, string>;
+    /** Local agents whose model rejected their reasoning effort (their sessions use the model default). */
+    agentNoEffort?: string[];
 }
 /**
  * Runtime room state written by the DSH Room UI and `/collab` so no cordis yml edit is needed.

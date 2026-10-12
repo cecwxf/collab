@@ -37,6 +37,8 @@ export interface RoomMeta {
   local?: RoomLocalSettings;
   /** local agentId → dsh session id it runs in. */
   agentSessions?: Record<string, string>;
+  /** Local agents whose model rejected their reasoning effort (their sessions use the model default). */
+  agentNoEffort?: string[];
 }
 
 /**

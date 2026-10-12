@@ -1239,6 +1239,8 @@ export class CollabBridge {
       // model/scope are fixed per dsh session: the next run opens a fresh session with the new settings
       this.agentHandles.delete(`${conn.meta.roomId}:${a.agentId}`);
       if (conn.meta.agentSessions) delete conn.meta.agentSessions[a.agentId];
+      conn.meta.agentNoEffort = conn.meta.agentNoEffort?.filter((x) => x !== a.agentId);
+      this.noEffort.delete(`${conn.meta.roomId}:${a.agentId}`);
     }
     await this.persist();
     await this.announceAgentConfig(conn, a).catch(() => {});
@@ -1519,6 +1521,7 @@ export class CollabBridge {
       if (!retried && failure.code === "UNSUPPORTED_REASONING_EFFORT" && a.reasoningEffort) {
         this.log("warn", `${a.agentId}: ${failure.message}; recreating its session with the model's default effort`);
         this.noEffort.add(key);
+        conn.meta.agentNoEffort = [...new Set([...(conn.meta.agentNoEffort ?? []), a.agentId])];
         this.agentHandles.delete(key);
         if (conn.meta.agentSessions) delete conn.meta.agentSessions[a.agentId];
         return this.runInSession(conn, a, ctx, true);
@@ -1570,8 +1573,33 @@ export class CollabBridge {
         const root = conn.meta.memberConfig?.workspacePath?.trim() || this.config.workspacePath;
         const workspace = await svc.workspaceRegistry.create(root, root === this.config.workspacePath ? "collab" : undefined);
         const selected = svc.agentDefaultModel.currentSelection();
-        const sessionId = `room-${conn.meta.roomId.slice(-8)}-${a.id}-${randomUUID().slice(0, 6)}`;
         const base = { provider: a.provider ?? selected.provider, model: a.model ?? selected.model };
+        const withEffort = a.reasoningEffort && !this.noEffort.has(key) && !conn.meta.agentNoEffort?.includes(a.agentId);
+        // Resume the agent's previous session (after a dsh restart) instead of piling up new ones.
+        const resume = (svc.agents as unknown as { resume?(o: unknown): Promise<AgentHandle> }).resume;
+        if (prevSid && resume) {
+          try {
+            const h = await resume.call(svc.agents, {
+              resumeSessionId: prevSid,
+              agentOptions: withEffort ? { ...base, reasoningEffort: a.reasoningEffort } : base,
+              setup: async (agentCtx: unknown) => {
+                await svc.agentPresets.mount(agentCtx, preset.id);
+              },
+            });
+            await workspace.attachSession(prevSid).catch(() => {});
+            try {
+              svc.permissionPresets.set(h.agent.session, perm);
+            } catch {
+              /* */
+            }
+            this.sessionAgents.set(prevSid, { roomId: conn.meta.roomId, agentId: a.agentId });
+            this.log("info", `resumed session ${prevSid} for local agent ${a.agentId}`);
+            return h;
+          } catch (e) {
+            this.log("warn", `resume ${prevSid} for ${a.agentId} failed (${(e as Error).message}); creating a new session`);
+          }
+        }
+        const sessionId = `room-${conn.meta.roomId.slice(-8)}-${a.id}-${randomUUID().slice(0, 6)}`;
         const create = (agentOptions: Record<string, unknown>, cwdPath: string) =>
           svc.agents.create({
             sessionId,
@@ -1586,7 +1614,7 @@ export class CollabBridge {
         try {
           // dsh attaches a session to a workspace only when its cwd IS the workspace path, so the session
           // starts at the room workspace root; a worktree agent is directed to its worktree (inside the root).
-          handle = await create(a.reasoningEffort && !this.noEffort.has(key) ? { ...base, reasoningEffort: a.reasoningEffort } : base, root);
+          handle = await create(withEffort ? { ...base, reasoningEffort: a.reasoningEffort } : base, root);
         } catch (e) {
           this.log("warn", `session for ${a.agentId} with reasoning effort failed (${(e as Error).message}); retrying with defaults`);
           handle = await create(base, root);

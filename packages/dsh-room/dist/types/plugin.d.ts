@@ -286,6 +286,7 @@ export declare class CollabBridge {
         joinedAt: number;
         workspaceId?: string | undefined;
         agentSessions?: Record<string, string> | undefined;
+        agentNoEffort?: string[] | undefined;
     }>;
     /** Join by invite. `info` carries directory metadata when joining from search results. */
     joinInvite(invite: string, info?: Partial<Pick<RoomMeta, "name" | "description" | "tags" | "public" | "workspaceId">> & {
@@ -338,6 +339,7 @@ export declare class CollabBridge {
         joinedAt: number;
         workspaceId?: string | undefined;
         agentSessions?: Record<string, string> | undefined;
+        agentNoEffort?: string[] | undefined;
     }>;
     leave(roomId: string): Promise<{
         ok: boolean;
@@ -537,6 +539,7 @@ export declare class CollabBridge {
         joinedAt: number;
         workspaceId?: string | undefined;
         agentSessions?: Record<string, string> | undefined;
+        agentNoEffort?: string[] | undefined;
     }>;
     private historyPath;
     private scheduleHistorySave;
