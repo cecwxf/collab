@@ -68,8 +68,9 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
       if (method === "GET" && path === "/directory") return sendJson(res, 200, { rooms: await bridge.search(str(url.searchParams.get("q")), str(url.searchParams.get("tag"))) });
       if (method === "POST" && path === "/rooms") {
         const b = await readJson(req);
-        return sendJson(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "relay" ? "relay" : "lan", lanHostPort: typeof b.lanHostPort === "string" ? b.lanHostPort.trim() : undefined, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName) }));
+        return sendJson(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "relay" ? "relay" : "lan", lanHostPort: typeof b.lanHostPort === "string" ? b.lanHostPort.trim() : undefined, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName), localOnly: b.localOnly === true, agents: strs(b.agents) }));
       }
+      if (method === "GET" && path === "/presets") return sendJson(res, 200, { presets: bridge.presets() });
       if (method === "POST" && path === "/join") {
         const b = await readJson(req);
         const invite = str(b.invite);
@@ -122,6 +123,44 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
         if (!id || !decision) throw new HttpError(400, "requestId and decision=allow|deny required");
         return sendJson(res, 200, await bridge.decideApproval(id, decision));
       }
+      // ── local multi-agent ──
+      const agM = /^\/rooms\/([^/]+)\/agents(?:\/([^/]+))?$/.exec(path);
+      if (agM && method === "POST") {
+        const roomId = decodeURIComponent(agM[1]!);
+        const b = await readJson(req);
+        if (!agM[2]) return sendJson(res, 200, await bridge.addLocalAgent(roomId, b as Record<string, unknown> & { preset?: string }));
+        const id = decodeURIComponent(agM[2]);
+        if (url.searchParams.get("op") === "delete") return sendJson(res, 200, await bridge.removeLocalAgent(roomId, id));
+        return sendJson(res, 200, await bridge.updateLocalAgent(roomId, id, b));
+      }
+      const lm = /^\/rooms\/([^/]+)\/(local|transport|stop|runs|diffs|merge|discard)$/.exec(path);
+      if (lm) {
+        const roomId = decodeURIComponent(lm[1]!);
+        const action = lm[2]!;
+        if (method === "GET" && action === "runs") return sendJson(res, 200, { runs: bridge.scheduler.list(roomId) });
+        if (method === "GET" && action === "diffs") return sendJson(res, 200, await bridge.agentDiffs(roomId));
+        if (method === "POST") {
+          const b = await readJson(req);
+          if (action === "local") {
+            const patch: Record<string, unknown> = {};
+            if (typeof b.turnLimit === "number") patch.turnLimit = b.turnLimit;
+            if (typeof b.concurrency === "number") patch.concurrency = b.concurrency;
+            if (typeof b.isolation === "string") patch.isolation = b.isolation;
+            return sendJson(res, 200, await bridge.updateLocalSettings(roomId, patch));
+          }
+          if (action === "transport") {
+            const target = b.target === "local" || b.target === "relay" || b.target === "lan" ? b.target : null;
+            if (!target) throw new HttpError(400, "target must be local|relay|lan");
+            return sendJson(res, 200, await bridge.setTransport(roomId, target, b.force === true));
+          }
+          if (action === "stop") return sendJson(res, 200, bridge.stopLocal(roomId, str(b.agentId)));
+          const agentId = str(b.agentId);
+          if (!agentId) throw new HttpError(400, "agentId required");
+          // Merge/discard change the user's main workspace: the UI sends approve=true only from an explicit confirm.
+          if (action === "merge") return sendJson(res, 200, await bridge.mergeAgent(roomId, agentId, b.approve === true));
+          if (action === "discard") return sendJson(res, 200, await bridge.discardAgent(roomId, agentId, b.approve === true));
+        }
+      }
       const cfgM = /^\/rooms\/([^/]+)\/(config|mcp)$/.exec(path);
       if (cfgM) {
         const roomId = decodeURIComponent(cfgM[1]!);
@@ -149,7 +188,7 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
       }
       throw new HttpError(404, `no route ${method} ${API}${path}`);
     } catch (e) {
-      const status = e instanceof HttpError ? e.status : /not in room|not in a collab room/.test((e as Error).message) ? 404 : 500;
+      const status = e instanceof HttpError ? e.status : /not in room|not in a collab room|no local agent/.test((e as Error).message) ? 404 : /needs explicit approval/.test((e as Error).message) ? 403 : 500;
       if (!res.headersSent) sendJson(res, status, { error: (e as Error).message });
     }
   };

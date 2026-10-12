@@ -10,6 +10,8 @@ export declare const name = "dsh-room";
 /** Only the tool registry is required; commands/webServer/agent services are optional. */
 export declare const inject: string[];
 export { Config, normalizeConfig, CollabBridge };
+export { mockLocalRunner } from "./plugin.js";
+export { AGENT_PRESETS } from "./local-agents.js";
 export type * from "./adapter.js";
 export declare function apply(ctx: HostContext, config: DshCollabConfig): void;
 //# sourceMappingURL=index.d.ts.map

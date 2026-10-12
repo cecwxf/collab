@@ -13,6 +13,8 @@ export const name = "dsh-room";
 /** Only the tool registry is required; commands/webServer/agent services are optional. */
 export const inject = ["tools"];
 export { Config, normalizeConfig, CollabBridge };
+export { mockLocalRunner } from "./plugin.js";
+export { AGENT_PRESETS } from "./local-agents.js";
 export type * from "./adapter.js";
 
 export function apply(ctx: HostContext, config: DshCollabConfig) {

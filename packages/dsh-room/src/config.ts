@@ -30,6 +30,7 @@ export function normalizeConfig(raw: unknown): DshCollabConfig {
     permissionPreset: str("permissionPreset") ?? "read-only",
     wakeOnReplies: r.wakeOnReplies === true,
     maxWakesPerMinute: typeof r.maxWakesPerMinute === "number" && r.maxWakesPerMinute > 0 ? Math.floor(r.maxWakesPerMinute) : 6,
+    localAgentRunner: str("localAgentRunner") === "mock" || process.env.DSH_ROOM_MOCK_AGENTS === "1" ? "mock" : "dsh",
   };
 }
 

@@ -247,6 +247,14 @@ export interface MemberConfigPayload extends PayloadBase {
   /** MCP tools this member exposes to the room. */
   mcpTools?: string[];
   mcpEnabled?: boolean;
+  /** Optional (dsh-room ≥0.3): human-readable name/persona of this member. Older peers ignore these. */
+  displayName?: string;
+  persona?: string;
+  /** agentId of the dsh host that runs this member when it is a hosted local agent. */
+  hostedBy?: string;
+  /** "read" | "write" scope of a hosted local agent; "moderator" flag. */
+  scope?: "read" | "write";
+  moderator?: boolean;
 }
 
 export type ApprovalAction = "fs.write" | "fs.delete" | "shell.exec" | "network.fetch" | "mcp.call";

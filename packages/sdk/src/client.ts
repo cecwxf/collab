@@ -461,13 +461,16 @@ export class CollabClient {
   }
 
   private waitFor(pred: (f: WireFrame) => boolean, timeoutMs: number): Promise<WireFrame> {
-    return new Promise((resolve, reject) => {
+    const p = new Promise<WireFrame>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiters = this.waiters.filter((w) => w.timer !== timer);
         reject(new Error("timeout waiting for frame"));
       }, timeoutMs);
       this.waiters.push({ pred, resolve, reject, timer });
     });
+    // If the caller's send() throws before it awaits this promise, its later rejection must not go unhandled.
+    p.catch(() => {});
+    return p;
   }
 
   private startPing(): void {

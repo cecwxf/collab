@@ -1,4 +1,5 @@
 import type { RoomMemberConfig } from "./member-config.js";
+import type { RoomLocalSettings } from "./local-agents.js";
 /** A local workspace that owns one or more Collab rooms. */
 export interface WorkspaceMeta {
     id: string;
@@ -28,6 +29,10 @@ export interface RoomMeta {
     memberConfig?: RoomMemberConfig;
     /** Workspace this room belongs to (required for new rooms). */
     workspaceId?: string;
+    /** Local multi-agent settings (agents hosted by this dsh, turn limit, concurrency, loopback). */
+    local?: RoomLocalSettings;
+    /** local agentId → dsh session id it runs in. */
+    agentSessions?: Record<string, string>;
 }
 /**
  * Runtime room state written by the DSH Room UI and `/collab` so no cordis yml edit is needed.

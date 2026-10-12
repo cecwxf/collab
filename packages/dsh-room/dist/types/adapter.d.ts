@@ -157,5 +157,7 @@ export interface DshCollabConfig {
     wakeOnReplies: boolean;
     /** Upper bound on wakes per minute (loop guard). Default 6. */
     maxWakesPerMinute: number;
+    /** How local agent runs execute: "dsh" (real sessions, default) or "mock" (deterministic, no model calls). */
+    localAgentRunner?: "dsh" | "mock";
 }
 //# sourceMappingURL=adapter.d.ts.map

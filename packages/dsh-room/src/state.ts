@@ -1,6 +1,7 @@
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { RoomMemberConfig } from "./member-config.js";
+import type { RoomLocalSettings } from "./local-agents.js";
 
 /** A local workspace that owns one or more Collab rooms. */
 export interface WorkspaceMeta {
@@ -32,6 +33,10 @@ export interface RoomMeta {
   memberConfig?: RoomMemberConfig;
   /** Workspace this room belongs to (required for new rooms). */
   workspaceId?: string;
+  /** Local multi-agent settings (agents hosted by this dsh, turn limit, concurrency, loopback). */
+  local?: RoomLocalSettings;
+  /** local agentId → dsh session id it runs in. */
+  agentSessions?: Record<string, string>;
 }
 
 /**

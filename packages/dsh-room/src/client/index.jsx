@@ -30,6 +30,9 @@ const LinkIcon = () => <Svg><path d="M6.5 9.5l3-3M7 4.75l1-1a2.5 2.5 0 0 1 3.5 3
 const TaskIcon = () => <Svg><rect x="3" y="2.75" width="10" height="10.5" rx="2" /><path d="M5.75 7.75l1.5 1.5 3-3" /></Svg>;
 const GlobeIcon = () => <Svg size={12}><circle cx="8" cy="8" r="5.5" /><path d="M2.5 8h11M8 2.5c1.6 1.6 2.25 3.5 2.25 5.5S9.6 11.9 8 13.5C6.4 11.9 5.75 10 5.75 8S6.4 4.1 8 2.5z" /></Svg>;
 const LockIcon = () => <Svg size={12}><rect x="3.5" y="7" width="9" height="6.25" rx="1.5" /><path d="M5.5 7V5.25a2.5 2.5 0 0 1 5 0V7" /></Svg>;
+const BotIcon = ({ size = 14 }) => <Svg size={size}><rect x="3" y="5" width="10" height="7.5" rx="2" /><path d="M8 2.5V5M6 8.5h.01M10 8.5h.01M6.25 10.75h3.5" /></Svg>;
+const StopIcon = () => <Svg size={12}><rect x="4" y="4" width="8" height="8" rx="1.5" /></Svg>;
+const MergeIcon = () => <Svg size={14}><circle cx="5" cy="3.75" r="1.5" /><circle cx="5" cy="12.25" r="1.5" /><circle cx="11" cy="8" r="1.5" /><path d="M5 5.25v5.5M5 5.5c0 2 1.5 2.5 4.5 2.5" /></Svg>;
 const PeopleIcon = () => <Svg size={14}><circle cx="6" cy="5.5" r="2.25" /><path d="M2.5 13c.4-2 1.8-3.25 3.5-3.25S9.1 11 9.5 13" /><path d="M10.5 3.6a2.2 2.2 0 0 1 0 4.1M11.5 9.9c1 .4 1.7 1.5 2 3.1" /></Svg>;
 
 const HUES = [212, 262, 152, 28, 340, 190, 48, 290];
@@ -144,6 +147,10 @@ function RoomsNav({ store }) {
 /** Marker in a native Session row (leading seat) when that Session is a room's agent session. */
 function RoomSessionMark({ store, sessionId }) {
   const s = useStore(store);
+  for (const r of s.rooms || []) {
+    const ag = ((r.local && r.local.agents) || []).find((x) => x.sessionId === sessionId);
+    if (ag) return <span className="rm-session-mark rm-session-agent" title={`DSH Room · ${r.name} · ${ag.name} (${ag.agentId})`} aria-label={`DSH Room ${r.name} agent ${ag.name}`}><BotIcon size={13} /></span>;
+  }
   const room = (s.rooms || []).find((r) => r.sessionId === sessionId);
   if (!room) return null;
   return <span className="rm-session-mark" title={`DSH Room · ${room.name}`} aria-label={`DSH Room ${room.name}`}><RoomsIcon size={13} /></span>;
@@ -168,12 +175,12 @@ function renderMentions(text) {
 function PanelIcon({ size }) { return <RoomsIcon size={size} />; }
 
 
-function Message({ m, showAuthor }) {
+function Message({ m, showAuthor, who }) {
   if (m.kind === "task.create") {
     return (
       <div className="rm-msg rm-msg-event" data-message-id={m.id}>
         <div className="rm-task-card">
-          <div className="rm-task-head"><TaskIcon /><span>Task · {m.from}</span><Tag tone="info">open</Tag><span className="rm-msg-time">{fmtTime(m.ts)}</span></div>
+          <div className="rm-task-head"><TaskIcon /><span>Task · {(who && who.name) || m.from}</span><Tag tone="info">open</Tag><span className="rm-msg-time">{fmtTime(m.ts)}</span></div>
           <div className="rm-task-title">{m.title}</div>
           <div className="rm-note" style={{ margin: 0 }}>{m.assignee ? `Assigned to @${m.assignee}` : "Unassigned — any agent may claim"}</div>
         </div>
@@ -184,7 +191,7 @@ function Message({ m, showAuthor }) {
     return (
       <div className="rm-msg rm-msg-event" data-message-id={m.id}>
         <div className="rm-task-head">
-          <TaskIcon /><span>{m.self ? "You" : m.from} {m.kind === "task.claim" ? "claimed" : "updated"} task</span>
+          <TaskIcon /><span>{m.self ? "You" : (who && who.name) || m.from} {m.kind === "task.claim" ? "claimed" : "updated"} task</span>
           <Tag tone={STATUS_TONE[m.status] || "neutral"}>{m.status}</Tag>
           {m.kind === "task.update" && m.text.includes(": ") ? <span>{m.text.slice(m.text.indexOf(": ") + 2)}</span> : null}
           <span className="rm-msg-time">{fmtTime(m.ts)}</span>
@@ -204,14 +211,22 @@ function Message({ m, showAuthor }) {
     <div className="rm-msg" data-message-id={m.id}>
       {showAuthor ? <Avatar name={m.from} size={28} /> : <span />}
       <div>
-        {showAuthor ? <div className="rm-msg-head"><span className="rm-msg-author">{m.from}</span><span className="rm-msg-time">{fmtTime(m.ts)}</span></div> : null}
+        {showAuthor ? (
+          <div className="rm-msg-head">
+            <span className="rm-msg-author">{who && who.name ? who.name : m.from}</span>
+            {who && who.name ? <span className="rm-msg-id">{m.from}</span> : null}
+            {who && who.local ? <span className="rm-agent-tag"><BotIcon size={11} />{who.moderator ? "moderator" : "local agent"}</span> : null}
+            <span className="rm-msg-time">{fmtTime(m.ts)}</span>
+          </div>
+        ) : null}
         <div className="rm-msg-body">{renderMentions(m.text)}</div>
       </div>
     </div>
   );
 }
 
-function ChatBody({ messages }) {
+function ChatBody({ messages, members }) {
+  const byId = useMemo(() => Object.fromEntries((members || []).map((x) => [x.agentId, x])), [members]);
   const ref = useRef(null);
   useEffect(() => { const el = ref.current; if (el) el.scrollTop = el.scrollHeight; }, [messages.length]);
   const nodes = [];
@@ -220,7 +235,7 @@ function ChatBody({ messages }) {
     const d = fmtDay(m.ts);
     if (d !== day) { nodes.push(<div key={"d" + m.ts} className="rm-day">{d}</div>); day = d; prev = null; }
     const showAuthor = !prev || prev.from !== m.from || m.ts - prev.ts > 5 * 60_000;
-    nodes.push(<Message key={m.id} m={m} showAuthor={showAuthor} />);
+    nodes.push(<Message key={m.id} m={m} showAuthor={showAuthor} who={byId[m.from]} />);
     prev = m;
   }
   return (
@@ -249,11 +264,12 @@ function MentionMenu({ items, active, onPick, onHover }) {
           className={"rm-mention-item" + (i === active ? " is-active" : "")}
           onMouseEnter={() => onHover(i)}
           onMouseDown={(e) => { e.preventDefault(); onPick(it); }}>
-          <Avatar name={it.id === "all" ? "all" : it.id} size={22} />
+          <Avatar name={it.id === "all" ? "all" : it.name || it.id} size={22} />
           <span className="rm-mention-item-body">
             <span className="rm-mention-item-name">@{it.id}</span>
             <span className="rm-mention-item-meta">{it.hint}</span>
           </span>
+          {it.local ? <span className="rm-agent-tag"><BotIcon size={11} />local</span> : null}
           {it.online === false ? <Tag tone="quiet">offline</Tag> : null}
         </button>
       ))}
@@ -279,14 +295,21 @@ function Composer({ room, store, draft, setDraft }) {
     if (!mq) return [];
     const q = mq.query.toLowerCase();
     const members = (room.members || []).filter((m) => !m.self);
-    const known = members.map((m) => ({
-      id: m.agentId,
-      hint: m.online === false ? "member · offline" : "member · wake",
-      online: m.online !== false,
-    }));
-    const all = { id: "all", hint: "Everyone · wake all members", online: true };
+    const localAgents = (room.local && room.local.agents) || [];
+    const seen = new Set();
+    const known = [];
+    // local agents first (hosted by this dsh), then remote members
+    for (const la of localAgents) {
+      seen.add(la.agentId);
+      known.push({ id: la.agentId, name: la.name, local: true, hint: `${la.name} · local agent${la.moderator ? " · moderator" : ""}${la.state && la.state !== "idle" ? ` · ${la.state}` : ""}`, online: la.online !== false });
+    }
+    for (const m of members) {
+      if (seen.has(m.agentId)) continue;
+      known.push({ id: m.agentId, name: m.name, hint: `${m.name ? m.name + " · " : ""}${m.hostedBy ? "remote agent" : "member"}${m.online === false ? " · offline" : " · wake"}`, online: m.online !== false });
+    }
+    const all = { id: "all", hint: localAgents.length ? "Everyone · wakes all local agents in parallel" : "Everyone · wake all members", online: true };
     const list = [all, ...known];
-    return list.filter((it) => !q || it.id.toLowerCase().startsWith(q) || ("@" + it.id).toLowerCase().startsWith("@" + q));
+    return list.filter((it) => !q || it.id.toLowerCase().startsWith(q) || (it.name && it.name.toLowerCase().startsWith(q)));
   })();
   const mc = room.memberConfig || {};
   const modelLabel = mc.model || "Default model";
@@ -322,6 +345,15 @@ function Composer({ room, store, draft, setDraft }) {
   };
 
 
+  const syncCaret = (el) => { if (el) setCaret(el.selectionStart == null ? el.value.length : el.selectionStart); };
+  const insertMention = (it) => {
+    if (!mq || !it) return;
+    const next = draft.slice(0, mq.start) + "@" + it.id + " " + draft.slice(mq.end);
+    const pos = mq.start + it.id.length + 2;
+    setDraft(next);
+    setCaret(pos);
+    requestAnimationFrame(() => { const el = taRef.current; if (el) { el.focus(); el.setSelectionRange(pos, pos); } });
+  };
   const submit = async () => {
     const text = draft.trim();
     if (!text || busy) return;
@@ -490,7 +522,8 @@ function RoomDetail({ room, messages, store, mention, assign }) {
         {room.members.map((m) => (
           <div key={m.agentId} className="rm-member" data-agent-id={m.agentId}>
             <span className="rm-avatar-wrap"><Avatar name={m.agentId} size={26} /><span className={"rm-dot rm-dot-" + (m.online === false ? "offline" : "online")} style={{ position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" }} /></span>
-            <span className="rm-member-name">{m.agentId}</span>
+            <span className="rm-member-name">{m.name ? <>{m.name} <span className="rm-msg-id">{m.agentId}</span></> : m.agentId}</span>
+            {m.local ? <span className="rm-agent-tag"><BotIcon size={11} />{m.moderator ? "moderator" : "local"}</span> : m.hostedBy && !m.self ? <span className="rm-agent-tag">remote agent</span> : null}
             {m.self ? <Tag tone="quiet">you</Tag> : (
               <span className="rm-member-actions">
                 <button type="button" className="rm-mini" title={`@mention ${m.agentId}`} onClick={() => mention(m.agentId)}>@</button>
@@ -501,6 +534,9 @@ function RoomDetail({ room, messages, store, mention, assign }) {
         ))}
         {!room.members.length ? <p className="rm-note">{room.status === "online" ? "Only you are here." : "Offline."}</p> : null}
       </div>
+      <LocalAgentsSection room={room} store={store} mention={mention} />
+      <OrchestrationSection room={room} store={store} />
+      <IsolationSection room={room} store={store} />
       <div className="rm-detail-section">
         <div className="rm-detail-h"><TaskIcon />Tasks · {tasks.length}</div>
         {tasks.map((t) => (
@@ -517,13 +553,15 @@ function RoomDetail({ room, messages, store, mention, assign }) {
         <p className="rm-note">{room.public
           ? "Public: listed in the relay directory with its key. Anyone can find, join, and read this room."
           : "Private: only agents holding the invite can join. The invite contains the room key — share it only with agents you trust."}</p>
+        {room.transport === "local" ? <p className="rm-note">Local-only room: switch Transport to Relay or LAN before inviting remote hosts.</p> : null}
         <div className="rm-actions"><Button size="sm" variant="outline" onClick={copyInvite} icon={<LinkIcon />}>Copy invite</Button></div>
       </div>
+      <TransportSection room={room} store={store} />
       <div className="rm-detail-section">
         <div className="rm-detail-h">About</div>
         <dl className="rm-about">
           <dt>Visibility</dt><dd>{room.public ? <><GlobeIcon /> Public</> : <><LockIcon /> Private</>}</dd>
-          <dt>Transport</dt><dd>{room.transport === "lan" ? "LAN / VPS (Node relay)" : "Relay (Cloudflare)"}</dd>
+          <dt>Transport</dt><dd>{room.transport === "local" ? "Local only (in-process loopback)" : room.transport === "lan" ? "LAN / VPS (Node relay)" : "Relay (Cloudflare)"}</dd>
           {room.memberConfig?.workspaceLabel ? <><dt>Workspace</dt><dd>{room.memberConfig.workspaceLabel}</dd></> : null}
           {room.description ? <><dt>Description</dt><dd>{room.description}</dd></> : null}
           {room.tags?.length ? <><dt>Tags</dt><dd>{room.tags.map((t) => "#" + t).join(" ")}</dd></> : null}
@@ -537,6 +575,308 @@ function RoomDetail({ room, messages, store, mention, assign }) {
         </div>
       </div>
     </aside>
+  );
+}
+
+/* ── local multi-agent UI ─────────────────────────────────────────────── */
+const RUN_TONE = { running: "warning", queued: "info", approval: "info", done: "success", failed: "danger", stopped: "quiet" };
+const MODEL_CHOICES = ["", "deepseek-chat", "deepseek-reasoner"];
+
+function LocalAgentsSection({ room, store, mention }) {
+  const a = store.actions;
+  const local = room.local || { agents: [] };
+  return (
+    <div className="rm-detail-section" data-rm-local-agents="">
+      <div className="rm-detail-h"><BotIcon />Local agents · {local.agents.length}</div>
+      {local.agents.map((ag) => (
+        <div key={ag.agentId} className="rm-agent-row" data-agent-id={ag.agentId}>
+          <span className="rm-avatar-wrap"><Avatar name={ag.name} size={26} /><span className={"rm-dot rm-dot-" + (ag.state === "running" ? "busy" : ag.online ? "online" : "offline")} style={{ position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" }} /></span>
+          <span className="rm-agent-main">
+            <span className="rm-agent-name">{ag.name}{ag.moderator ? <span className="rm-agent-tag">moderator</span> : null}</span>
+            <span className="rm-agent-sub rm-mono">@{ag.agentId}</span>
+            <span className="rm-agent-sub">{ag.scope === "write" ? (ag.isolation === "worktree" ? "writes · own worktree" : ag.isolation === "locks" ? "writes · file locks" : "writes") : "read-only"}{ag.approvalRequired ? " · approval" : ""}{ag.model ? ` · ${ag.model}` : ""}{ag.reasoningEffort ? ` · ${ag.reasoningEffort}` : ""}</span>
+          </span>
+          {ag.state !== "idle" ? <Tag tone={RUN_TONE[ag.state] || "neutral"}>{ag.state}</Tag> : null}
+          <span className="rm-member-actions">
+            <button type="button" className="rm-mini" title={`@mention ${ag.name}`} onClick={() => mention(ag.agentId)}>@</button>
+            <button type="button" className="rm-mini" title={`Edit ${ag.name}`} aria-label={`Edit ${ag.name}`} onClick={() => a.openDialog({ kind: "agent", roomId: room.roomId, agentId: ag.agentId })}>✎</button>
+          </span>
+        </div>
+      ))}
+      {!local.agents.length ? <p className="rm-note">Host several agents from this dsh as separate members — each with its own identity, session and scope.</p> : null}
+      <div className="rm-actions"><Button size="sm" variant="outline" icon={<PlusIcon />} onClick={() => a.openDialog({ kind: "agent", roomId: room.roomId })}>Add local agent</Button></div>
+    </div>
+  );
+}
+
+function NumberSetting({ label, value, min, max, onSave, hint }) {
+  const [v, setV] = useState(String(value));
+  useEffect(() => setV(String(value)), [value]);
+  const commit = () => { const n = Number(v); if (Number.isFinite(n) && n !== value) onSave(Math.min(max, Math.max(min, Math.round(n)))); else setV(String(value)); };
+  return (
+    <label className="rm-num-setting" title={hint}>
+      <span>{label}</span>
+      <input type="number" min={min} max={max} value={v} aria-label={label} onChange={(e) => setV(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && e.target.blur()} />
+    </label>
+  );
+}
+
+function RunQueue({ room, store, compact }) {
+  const a = store.actions;
+  const runs = room.runs || [];
+  const nameOf = (id) => ((room.local && room.local.agents) || []).find((x) => x.agentId === id)?.name || id;
+  const active = runs.filter((r) => r.state === "running" || r.state === "queued" || r.state === "approval");
+  const recent = runs.filter((r) => !active.includes(r)).slice(-3).reverse();
+  return (
+    <div className="rm-runs" data-rm-runs="">
+      {active.map((r, i) => (
+        <div key={r.id} className={"rm-run rm-run-" + r.state}>
+          <span className="rm-run-pos">{r.state === "running" ? "▶" : r.state === "approval" ? "?" : `#${i + 1 - active.filter((x) => x.state === "running").length}`}</span>
+          <span className="rm-run-who">{nameOf(r.agentId)}</span>
+          <span className="rm-run-what" title={r.summary}>{r.summary}</span>
+          <Tag tone={RUN_TONE[r.state]}>{r.state === "approval" ? "needs approval" : r.state}</Tag>
+        </div>
+      ))}
+      {!compact ? recent.map((r) => (
+        <div key={r.id} className={"rm-run rm-run-" + r.state}>
+          <span className="rm-run-pos">✓</span>
+          <span className="rm-run-who">{nameOf(r.agentId)}</span>
+          <span className="rm-run-what" title={r.error || r.summary}>{r.error || r.summary}</span>
+          <Tag tone={RUN_TONE[r.state]}>{r.state}</Tag>
+        </div>
+      )) : null}
+      {!active.length && !recent.length ? <p className="rm-note">No agent runs yet.</p> : null}
+      {active.length ? <div className="rm-actions"><Button size="sm" variant="outline" className="rm-danger" icon={<StopIcon />} onClick={() => a.stop(room.roomId).then((r) => a.toast(`Stopped ${r.stopped} run(s)`)).catch((e) => a.toast(e.message))}>Stop all agents</Button></div> : null}
+    </div>
+  );
+}
+
+function OrchestrationSection({ room, store }) {
+  const a = store.actions;
+  const local = room.local;
+  if (!local || !local.agents.length) return null;
+  const save = (patch) => a.saveLocal(room.roomId, patch).catch((e) => a.toast(e.message));
+  const active = (room.runs || []).filter((r) => r.state === "running" || r.state === "queued" || r.state === "approval");
+  return (
+    <div className="rm-detail-section" data-rm-orchestration="">
+      <div className="rm-detail-h">Runs · {active.filter((r) => r.state === "running").length}/{local.concurrency} running{active.length > local.concurrency ? ` · ${active.length - Math.min(local.concurrency, active.filter((r) => r.state === "running").length)} queued` : ""}</div>
+      <div className="rm-num-row">
+        <NumberSetting label="Parallel runs" value={local.concurrency} min={1} max={16} onSave={(n) => save({ concurrency: n })} hint="Max local agent runs at once; the rest wait in the queue." />
+        <NumberSetting label="Turn limit" value={local.turnLimit} min={1} max={100} onSave={(n) => save({ turnLimit: n })} hint="Max agent-to-agent hand-offs per task/thread. A human message resets it." />
+      </div>
+      <RunQueue room={room} store={store} />
+    </div>
+  );
+}
+
+function IsolationSection({ room, store }) {
+  const a = store.actions;
+  const local = room.local;
+  if (!local || !local.agents.some((x) => x.scope === "write")) return null;
+  return (
+    <div className="rm-detail-section" data-rm-isolation="">
+      <div className="rm-detail-h"><MergeIcon />Workspace isolation</div>
+      <select className="rm-input" aria-label="Isolation mode" value={local.isolation} onChange={(e) => a.saveLocal(room.roomId, { isolation: e.target.value }).catch((x) => a.toast(x.message))}>
+        <option value="auto">Auto — git worktree per writing agent, else file locks</option>
+        <option value="worktree">Git worktree per agent</option>
+        <option value="locks">File locks (shared workspace)</option>
+        <option value="off">Off (shared, no locks)</option>
+      </select>
+      {local.locks && local.locks.length ? <div className="rm-note">{local.locks.length} file lock(s): {local.locks.slice(0, 4).map((l) => `${l.path} (${l.owner})`).join(", ")}</div> : null}
+      <div className="rm-actions"><Button size="sm" variant="outline" icon={<MergeIcon />} onClick={() => a.openDialog({ kind: "merge", roomId: room.roomId })}>Review &amp; merge</Button></div>
+    </div>
+  );
+}
+
+function TransportSection({ room, store }) {
+  const a = store.actions;
+  const [busy, setBusy] = useState(null);
+  const cur = room.transport === "local" ? "local" : room.transport === "lan" ? "relay" : "relay";
+  const go = async (target) => {
+    setBusy(target);
+    try {
+      await a.setTransport(room.roomId, target);
+      a.toast(target === "local" ? "Local only — in-process, no network" : target === "lan" ? "Now on this machine's LAN relay — invite remote hosts" : "Now on the relay — invite remote hosts");
+    } catch (e) { a.toast(e.message); }
+    finally { setBusy(null); }
+  };
+  return (
+    <div className="rm-detail-section" data-rm-transport="">
+      <div className="rm-detail-h">Transport</div>
+      <div className="rm-mode-row">
+        <button type="button" disabled={!!busy || room.public} className={"rm-mode-btn" + (cur === "local" ? " is-on" : "")} onClick={() => go("local")} title={room.public ? "Public rooms need a relay" : "In-process loopback: no network"}>{busy === "local" ? "…" : "Local only"}</button>
+        <button type="button" disabled={!!busy} className={"rm-mode-btn" + (cur === "relay" && room.transport !== "local" ? " is-on" : "")} onClick={() => go("relay")}>{busy === "relay" ? "…" : "Relay (VPS)"}</button>
+        <button type="button" disabled={!!busy} className="rm-mode-btn" onClick={() => go("lan")} title="Embedded LAN relay on this machine (mDNS)">{busy === "lan" ? "…" : "LAN"}</button>
+      </div>
+      <p className="rm-note">{room.transport === "local" ? "All members are on this dsh — nothing leaves the process. Switch to Relay or LAN to invite remote hosts; local agents stay members." : "Local agents connect as separate members over this transport, alongside remote hosts."}</p>
+    </div>
+  );
+}
+
+function AgentDialog({ store, d }) {
+  const a = store.actions;
+  const s = useStore(store);
+  const room = (s.rooms || []).find((r) => r.roomId === d.roomId);
+  const existing = room && room.local ? room.local.agents.find((x) => x.agentId === d.agentId) : null;
+  const [presets, setPresets] = useState([]);
+  const [f, setF] = useState(() => existing
+    ? { name: existing.name, persona: existing.persona || "", systemPrompt: existing.systemPrompt || "", model: existing.model || "", reasoningEffort: existing.reasoningEffort || "medium", scope: existing.scope, approvalRequired: !!existing.approvalRequired, moderator: !!existing.moderator }
+    : { preset: "", name: "", persona: "", systemPrompt: "", model: "", reasoningEffort: "medium", scope: "read", approvalRequired: false, moderator: false });
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { a.presets().then(setPresets).catch(() => {}); }, []);
+  const pick = (p) => setF({ ...f, preset: p.key, name: p.name, persona: p.persona, systemPrompt: p.systemPrompt, scope: p.scope, moderator: !!p.moderator, reasoningEffort: p.reasoningEffort || "medium" });
+  const submit = async () => {
+    if (!f.name.trim()) { setErr("Name required"); return; }
+    setBusy(true); setErr(null);
+    try {
+      const body = { name: f.name, persona: f.persona, systemPrompt: f.systemPrompt, model: f.model, reasoningEffort: f.reasoningEffort, scope: f.scope, approvalRequired: f.approvalRequired, moderator: f.moderator, preset: f.preset || undefined };
+      if (existing) await a.updateAgent(d.roomId, existing.agentId, body);
+      else { const r = await a.addAgent(d.roomId, body); a.toast(`${r.name} joined as @${r.agentId}`); }
+      a.closeDialog();
+    } catch (e) { setErr(e.message); setBusy(false); }
+  };
+  const remove = async () => {
+    setBusy(true);
+    try { const r = await a.removeAgent(d.roomId, existing.agentId); a.toast(`Removed ${existing.name}${r.branchKept ? ` · branch ${r.branchKept} kept` : ""}`); a.closeDialog(); }
+    catch (e) { setErr(e.message); setBusy(false); }
+  };
+  return (
+    <Modal open onClose={a.closeDialog} title={existing ? `Edit ${existing.name}` : "Add local agent"} closeLabel="Close" className="rm-modal-wide"
+      description={existing ? `Member @${existing.agentId} · own identity and dsh session in this room's workspace.` : "Runs on this dsh as a separate room member: own keypair, own session, own scope. Remote peers see it as a member."}
+      footer={<>{existing ? <Button variant="ghost" className="rm-danger" disabled={busy} onClick={remove}>Remove</Button> : null}<span style={{ flex: 1 }} /><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={busy} onClick={submit}>{busy ? "Saving…" : existing ? "Save" : "Add agent"}</Button></>}>
+      <div className="rm-root rm-form rm-form-wide" data-rm-agent-form="">
+        {!existing ? (
+          <div className="rm-span-2">
+            <div className="rm-field-label">Preset</div>
+            <div className="rm-preset-row">
+              {presets.map((p) => (
+                <button key={p.key} type="button" className={"rm-preset" + (f.preset === p.key ? " is-on" : "")} onClick={() => pick(p)}>
+                  <b>{p.name}</b><span>{p.persona}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        <Field label="Name" htmlFor="rm-ag-name" hint="Member id is derived from it (e.g. coder.ab12)."><Input id="rm-ag-name" value={f.name} maxLength={40} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Coder" /></Field>
+        <Field label="Persona" htmlFor="rm-ag-persona" hint="One line other members see."><Input id="rm-ag-persona" value={f.persona} maxLength={200} onChange={(e) => setF({ ...f, persona: e.target.value })} placeholder="e.g. Implements changes" /></Field>
+        <div className="rm-span-2"><Field label="System prompt" htmlFor="rm-ag-sp" hint="Prepended to every wake of this agent.">
+          <textarea id="rm-ag-sp" className="rm-input rm-textarea" rows={4} value={f.systemPrompt} maxLength={4000} onChange={(e) => setF({ ...f, systemPrompt: e.target.value })} />
+        </Field></div>
+        <Field label="Model">
+          <select className="rm-input" aria-label="Model" value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })}>
+            {MODEL_CHOICES.map((m) => <option key={m} value={m}>{m || "dsh default model"}</option>)}
+            {f.model && !MODEL_CHOICES.includes(f.model) ? <option value={f.model}>{f.model}</option> : null}
+          </select>
+        </Field>
+        <Field label="Reasoning effort">
+          <select className="rm-input" aria-label="Reasoning effort" value={f.reasoningEffort} onChange={(e) => setF({ ...f, reasoningEffort: e.target.value })}>
+            {["low", "medium", "high", "max"].map((x) => <option key={x} value={x}>{x}</option>)}
+          </select>
+        </Field>
+        <Field label="Workspace scope">
+          <div className="rm-mode-row">
+            <button type="button" className={"rm-mode-btn" + (f.scope === "read" ? " is-on" : "")} onClick={() => setF({ ...f, scope: "read" })}>Read-only</button>
+            <button type="button" className={"rm-mode-btn" + (f.scope === "write" ? " is-on" : "")} onClick={() => setF({ ...f, scope: "write" })}>Read + write</button>
+          </div>
+        </Field>
+        <div className="rm-switch-col">
+          <div className="rm-switch-row"><div><div className="rm-field-label">Approval required</div><div className="rm-field-hint">Each run waits for your OK.</div></div><Switch checked={f.approvalRequired} onChange={(v) => setF({ ...f, approvalRequired: v })} label="Approval required" /></div>
+          <div className="rm-switch-row"><div><div className="rm-field-label">Moderator</div><div className="rm-field-hint">Splits requests into tasks and summarizes. One per room.</div></div><Switch checked={f.moderator} onChange={(v) => setF({ ...f, moderator: v })} label="Moderator" /></div>
+        </div>
+        {f.scope === "write" ? <div className="rm-span-2 rm-note">Writes go to its own git worktree (branch room/&lt;room&gt;/&lt;agent&gt;) when the workspace is a git repo; you merge from “Review &amp; merge”. Non-git workspaces use file locks.</div> : null}
+        {err ? <div className="rm-span-2 rm-error">{err}</div> : null}
+      </div>
+    </Modal>
+  );
+}
+
+function DiffView({ patch }) {
+  if (!patch) return <p className="rm-note">No changes.</p>;
+  return (
+    <pre className="rm-diff" data-rm-diff="">
+      {patch.split("\n").map((l, i) => (
+        <div key={i} className={l.startsWith("+++") || l.startsWith("---") ? "rm-diff-file" : l.startsWith("+") ? "rm-diff-add" : l.startsWith("-") ? "rm-diff-del" : l.startsWith("@@") ? "rm-diff-hunk" : l.startsWith("diff ") ? "rm-diff-head" : ""}>{l || " "}</div>
+      ))}
+    </pre>
+  );
+}
+
+function MergeDialog({ store, d }) {
+  const a = store.actions;
+  const [data, setData] = useState(null);
+  const [sel, setSel] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const load = async () => {
+    try { const r = await a.diffs(d.roomId); setData(r); setSel((cur) => cur && r.agents.some((x) => x.agentId === cur) ? cur : (r.agents.find((x) => x.ahead) || r.agents[0] || {}).agentId || null); }
+    catch (e) { setData({ error: e.message, agents: [] }); }
+  };
+  useEffect(() => { void load(); }, [d.roomId]);
+  const ag = data && data.agents.find((x) => x.agentId === sel);
+  const run = async (kind) => {
+    setBusy(true); setResult(null);
+    try {
+      const r = kind === "merge" ? await a.merge(d.roomId, sel) : await a.discard(d.roomId, sel);
+      setResult(kind === "merge"
+        ? (r.merged ? { ok: true, text: `Merged into the main workspace (${r.commit}).` } : { ok: false, text: `${r.error || "Not merged"}${r.conflicts && r.conflicts.length ? ": " + r.conflicts.join(", ") : ""}` })
+        : { ok: true, text: r.discarded ? `Discarded ${r.branch}.` : "Nothing to discard." });
+      await load();
+    } catch (e) { setResult({ ok: false, text: e.message }); }
+    finally { setBusy(false); setConfirm(null); }
+  };
+  return (
+    <Modal open onClose={a.closeDialog} title="Review & merge agent changes" closeLabel="Close" className="rm-modal-wide rm-modal-xl"
+      description="Each writing agent works on its own branch. Review the diff, then merge into (or discard from) your main workspace. Nothing is merged without your confirmation."
+      footer={<Button variant="outline" onClick={a.closeDialog}>Close</Button>}>
+      <div className="rm-root rm-merge" data-rm-merge="">
+        {!data ? <p className="rm-note">Loading diffs…</p> : data.error ? <div className="rm-error">{data.error}</div> : !data.agents.length ? <p className="rm-note">No writing agents in this room.</p> : (
+          <>
+            <div className="rm-merge-list">
+              {data.agents.map((x) => (
+                <button key={x.agentId} type="button" className={"rm-merge-agent" + (x.agentId === sel ? " is-on" : "")} onClick={() => { setSel(x.agentId); setConfirm(null); setResult(null); }}>
+                  <Avatar name={x.name} size={24} />
+                  <span className="rm-merge-agent-body"><b>{x.name}</b><span className="rm-mono">{x.branch || (x.isolation === "locks" ? "shared workspace · locks" : "no worktree yet")}</span></span>
+                  {x.conflicts && x.conflicts.length ? <Tag tone="danger">conflict</Tag> : x.ahead ? <Tag tone="info">{x.files.length} file{x.files.length === 1 ? "" : "s"}</Tag> : <Tag tone="quiet">clean</Tag>}
+                </button>
+              ))}
+            </div>
+            <div className="rm-merge-main">
+              {ag ? (
+                <>
+                  <div className="rm-merge-head">
+                    <div><b>{ag.name}</b> <span className="rm-mono">{ag.branch || ""}</span>{ag.ahead ? <span className="rm-note" style={{ margin: "0 0 0 8px" }}>{ag.ahead} commit(s) ahead</span> : null}</div>
+                    <div className="rm-actions" style={{ margin: 0 }}>
+                      {confirm ? (
+                        <>
+                          <span className="rm-confirm-text">{confirm === "merge" ? `Merge ${ag.files.length} file(s) into the main workspace?` : `Discard ${ag.name}'s branch and worktree?`}</span>
+                          <Button size="sm" variant="outline" onClick={() => setConfirm(null)}>Cancel</Button>
+                          <Button size="sm" variant="primary" disabled={busy} onClick={() => run(confirm)}>{busy ? "Working…" : confirm === "merge" ? "Confirm merge" : "Confirm discard"}</Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button size="sm" variant="ghost" className="rm-danger" disabled={!ag.branch || busy} onClick={() => setConfirm("discard")}>Discard</Button>
+                          <Button size="sm" variant="primary" icon={<MergeIcon />} disabled={!ag.ahead || busy} onClick={() => setConfirm("merge")}>Merge into main</Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {result ? <div className={result.ok ? "rm-ok" : "rm-error"}>{result.text}</div> : null}
+                  {ag.conflicts && ag.conflicts.length ? <div className="rm-error">Would conflict with the main workspace: {ag.conflicts.join(", ")} — resolve on the branch or discard.</div> : null}
+                  {ag.mainDirty && ag.mainDirty.length ? <div className="rm-error">Uncommitted changes in the main workspace touch: {ag.mainDirty.join(", ")}</div> : null}
+                  {ag.files && ag.files.length ? (
+                    <div className="rm-merge-files">{ag.files.map((f) => <span key={f.path} className="rm-merge-file"><span className="rm-mono">{f.path}</span> <span className="rm-diff-addn">+{f.adds}</span> <span className="rm-diff-deln">−{f.dels}</span></span>)}</div>
+                  ) : null}
+                  <DiffView patch={ag.patch} />
+                  {ag.truncated ? <p className="rm-note">Diff truncated.</p> : null}
+                </>
+              ) : null}
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -591,12 +931,22 @@ function RoomsMain({ store }) {
             <Avatar name={room.name} size={28} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="rm-chat-header-title">{room.name}</div>
-              <div className="rm-chat-header-sub">{room.members.filter((m) => m.online !== false).length} online · {room.public ? "public" : "private"}{room.status !== "online" ? ` · room ${room.status}` : ""}</div>
+              <div className="rm-chat-header-sub">{room.members.filter((m) => m.online !== false).length} online{room.local && room.local.agents.length ? ` · ${room.local.agents.length} local agent${room.local.agents.length === 1 ? "" : "s"}` : ""} · {room.public ? "public" : "private"}{room.status !== "online" ? ` · room ${room.status}` : ""}</div>
             </div>
-            {room.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}{room.transport === "lan" ? <span className="rm-badge">LAN/VPS</span> : null}
+            {(() => {
+              const act = (room.runs || []).filter((r) => r.state === "running" || r.state === "queued" || r.state === "approval");
+              if (!act.length) return null;
+              const running = act.filter((r) => r.state === "running").length;
+              return (
+                <button type="button" className="rm-stop-btn" data-rm-stop="" title="Stop all local agent runs" onClick={() => store.actions.stop(room.roomId).then((r) => store.actions.toast(`Stopped ${r.stopped} run(s)`)).catch((e) => store.actions.toast(e.message))}>
+                  <StopIcon />Stop · {running} running{act.length > running ? `, ${act.length - running} queued` : ""}
+                </button>
+              );
+            })()}
+            {room.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}{room.transport === "local" ? <span className="rm-badge rm-badge-local">Local only</span> : room.transport === "lan" ? <span className="rm-badge">LAN/VPS</span> : null}
             <StateDot state={room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error"} size={8} />
           </header>
-          <ChatBody messages={messages} />
+          <ChatBody messages={messages} members={room.members} />
           <Composer room={room} store={store} draft={draft} setDraft={setDraft} />
         </section>
         <RoomDetail room={room} messages={messages} store={store}
@@ -615,7 +965,7 @@ function Field({ label, hint, children, htmlFor }) {
 function CreateDialog({ store, d }) {
   const s = useStore(store);
   const a = store.actions;
-  const [f, setF] = useState({ name: "", description: "", tags: "", public: false, mode: "lan", lanHostPort: "62.234.113.56:80" });
+  const [f, setF] = useState({ name: "", description: "", tags: "", public: false, mode: "lan", lanHostPort: "62.234.113.56:80", localOnly: false, agents: [] });
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const [lanPeers, setLanPeers] = useState([]);
@@ -631,6 +981,7 @@ function CreateDialog({ store, d }) {
         public: f.public, mode: f.mode,
         lanHostPort: f.mode === "lan" ? f.lanHostPort.trim() : undefined,
         workspacePath: ws.path, workspaceName: ws.title,
+        localOnly: f.localOnly, agents: f.agents,
       });
     } catch (e) { setErr(e.message); setBusy(false); }
   };
@@ -672,6 +1023,29 @@ function CreateDialog({ store, d }) {
             </Field>
           </div>
         ) : null}
+        <div className="rm-span-2 rm-local-box">
+          <div className="rm-switch-row">
+            <div>
+              <div className="rm-field-label">Local agents</div>
+              <div className="rm-field-hint">Host several agents from this dsh as separate members (own identity, session, scope). Edit them later in room details.</div>
+            </div>
+          </div>
+          <div className="rm-preset-row">
+            {[["moderator", "Moderator"], ["architect", "Architect"], ["coder", "Coder"], ["reviewer", "Reviewer"]].map(([k, label]) => (
+              <label key={k} className={"rm-preset rm-preset-check" + (f.agents.includes(k) ? " is-on" : "")}>
+                <input type="checkbox" checked={f.agents.includes(k)} onChange={(e) => setF({ ...f, agents: e.target.checked ? [...f.agents, k] : f.agents.filter((x) => x !== k) })} />
+                <b>{label}</b>
+              </label>
+            ))}
+          </div>
+          <div className="rm-switch-row">
+            <div>
+              <div className="rm-field-label">Local only (no network)</div>
+              <div className="rm-field-hint">In-process loopback — nothing leaves this machine. One click to switch to Relay/LAN later.</div>
+            </div>
+            <Switch checked={f.localOnly} onChange={(v) => setF({ ...f, localOnly: v, public: v ? false : f.public })} label="Local only" />
+          </div>
+        </div>
         <div className="rm-span-2 rm-switch-row">
           <div>
             <div className="rm-field-label">List in public directory</div>
@@ -679,7 +1053,7 @@ function CreateDialog({ store, d }) {
               ? "Anyone can find and join — key is published with the listing."
               : "Private: invite only."}</div>
           </div>
-          <Switch checked={f.public} onChange={(v) => setF({ ...f, public: v })} label="List in public directory" />
+          <Switch checked={f.public} onChange={(v) => setF({ ...f, public: v, localOnly: v ? false : f.localOnly })} label="List in public directory" />
         </div>
         {err ? <div className="rm-span-2 rm-error">{err}</div> : null}
       </div>
@@ -928,6 +1302,8 @@ function Overlay({ store }) {
       {d?.kind === "config" ? <ConfigDialog store={store} d={d} /> : null}
       {d?.kind === "workspace" ? <WorkspaceDialog store={store} /> : null}
       {d?.kind === "browse" ? <BrowseDialog store={store} /> : null}
+      {d?.kind === "agent" ? <AgentDialog store={store} d={d} /> : null}
+      {d?.kind === "merge" ? <MergeDialog store={store} d={d} /> : null}
       {s.toast ? <Toast text={s.toast} onDone={store.actions.clearToast} holdMs={2200} /> : null}
     </>
   );

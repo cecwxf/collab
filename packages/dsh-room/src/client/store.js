@@ -131,6 +131,17 @@ export function createRoomsStore() {
     async saveConfig(roomId, patch) { return post(`/rooms/${encodeURIComponent(roomId)}/config`, patch); },
     async decideApproval(requestId, decision) { return post("/approvals/decide", { requestId, decision }); },
     async mcp(roomId, tool, args, target) { return post(`/rooms/${encodeURIComponent(roomId)}/mcp`, { tool, args, target }); },
+    // ── local multi-agent ──
+    async presets() { return (await call("/presets")).presets; },
+    async addAgent(roomId, body) { return post(`/rooms/${encodeURIComponent(roomId)}/agents`, body); },
+    async updateAgent(roomId, id, body) { return post(`/rooms/${encodeURIComponent(roomId)}/agents/${encodeURIComponent(id)}`, body); },
+    async removeAgent(roomId, id) { return post(`/rooms/${encodeURIComponent(roomId)}/agents/${encodeURIComponent(id)}?op=delete`); },
+    async saveLocal(roomId, patch) { return post(`/rooms/${encodeURIComponent(roomId)}/local`, patch); },
+    async setTransport(roomId, target, force) { return post(`/rooms/${encodeURIComponent(roomId)}/transport`, { target, force: !!force }); },
+    async stop(roomId, agentId) { return post(`/rooms/${encodeURIComponent(roomId)}/stop`, agentId ? { agentId } : {}); },
+    async diffs(roomId) { return call(`/rooms/${encodeURIComponent(roomId)}/diffs`); },
+    async merge(roomId, agentId) { return post(`/rooms/${encodeURIComponent(roomId)}/merge`, { agentId, approve: true }); },
+    async discard(roomId, agentId) { return post(`/rooms/${encodeURIComponent(roomId)}/discard`, { agentId, approve: true }); },
   };
 
   const api = {
