@@ -1,3 +1,4 @@
+import { type ModelChoice } from "./models.js";
 import { DirectoryClient, type CollabPayload, type Identity } from "@collab/protocol";
 import { CollabClient, RoomHub } from "@collab/sdk";
 import { type LocalAgentConfig, type RoomLocalSettings, type IsolationMode } from "./local-agents.js";
@@ -52,6 +53,7 @@ export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId" | "membe
     /** Public member config (no secrets / no absolute path). */
     memberConfig?: (ReturnType<typeof publicMemberConfig> & {
         workspacePath?: string;
+        resolvedModel?: ModelChoice | null;
         peerGrants?: RoomMemberConfig["peerGrants"];
     }) | null;
     peerConfigs?: Record<string, ReturnType<typeof publicMemberConfig> & {
@@ -65,6 +67,7 @@ export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId" | "membe
     runs?: RunInfo[];
 }
 export interface LocalAgentView extends LocalAgentConfig {
+    resolvedModel?: ModelChoice | null;
     sessionId?: string;
     online: boolean;
     state: "idle" | "approval" | "queued" | "running";
@@ -223,6 +226,11 @@ export declare class CollabBridge {
     private sessionAgents;
     /** Override how a local agent run executes (tests / mock provider). */
     localRunner: LocalRunner | null;
+    private models;
+    refreshModels(): Promise<void>;
+    private selectedModel;
+    private resolvedModel;
+    private resetAgentSession;
     constructor(ctx: HostContext, config: DshCollabConfig, fetchImpl?: typeof fetch);
     log(level: "info" | "warn" | "error", ...a: unknown[]): void;
     subscribe(fn: (e: BridgeEvent) => void): () => void;
@@ -275,6 +283,7 @@ export declare class CollabBridge {
         /** Public member config (no secrets / no absolute path). */
         memberConfig?: (ReturnType<typeof publicMemberConfig> & {
             workspacePath?: string;
+            resolvedModel?: ModelChoice | null;
             peerGrants?: RoomMemberConfig["peerGrants"];
         }) | null;
         peerConfigs?: Record<string, ReturnType<typeof publicMemberConfig> & {
@@ -330,6 +339,7 @@ export declare class CollabBridge {
         /** Public member config (no secrets / no absolute path). */
         memberConfig?: (ReturnType<typeof publicMemberConfig> & {
             workspacePath?: string;
+            resolvedModel?: ModelChoice | null;
             peerGrants?: RoomMemberConfig["peerGrants"];
         }) | null;
         peerConfigs?: Record<string, ReturnType<typeof publicMemberConfig> & {
@@ -404,6 +414,8 @@ export declare class CollabBridge {
     view(conn: RoomConn): RoomView;
     state(): {
         version: string;
+        models: ModelChoice[];
+        defaultModel: ModelChoice | null;
         self: string | null;
         relayUrl: string;
         lanRelayPort: number | null;
@@ -475,6 +487,7 @@ export declare class CollabBridge {
     private wake;
     /** Same creation sequence as @deepseek-ai/dsh-webhook createWebhookSession. */
     private sessionFor;
+    private inviteUrl;
     private transportFor;
     private agentIdentityPath;
     /** Join every configured local agent as its own room member (own keypair, same transport as the host). */
@@ -534,6 +547,7 @@ export declare class CollabBridge {
         /** Public member config (no secrets / no absolute path). */
         memberConfig?: (ReturnType<typeof publicMemberConfig> & {
             workspacePath?: string;
+            resolvedModel?: ModelChoice | null;
             peerGrants?: RoomMemberConfig["peerGrants"];
         }) | null;
         peerConfigs?: Record<string, ReturnType<typeof publicMemberConfig> & {
@@ -679,7 +693,7 @@ export declare class CollabBridge {
     tools(): ToolDefinition[];
 }
 /**
- * Deterministic local agent "model" (config localAgentRunner: mock, or no dsh agent services):
+ * Deterministic local agent "model" (config localAgentRunner: mock):
  * acts through the same publishAs path real sessions use via collab_* tools, so routing, turn limits,
  * concurrency, moderator flow and worktree merges are exercised end to end without model calls.
  */

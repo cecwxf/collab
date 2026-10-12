@@ -33,6 +33,7 @@ export function apply(ctx: HostContext, config: DshCollabConfig) {
     c.effect(() => registerRoutes(bridge, c.webServer as WebServerLike, () => c.get("connection") as ConnectionLike | undefined), "dsh-room: /api/collab routes");
   });
 
+  ctx.inject?.(["llm", "agentDefaultModel"], () => { void bridge.refreshModels().catch((e) => bridge.log("warn", `model catalog: ${e.message}`)); });
   bridge.start().catch((e) => bridge.log("error", `start failed: ${(e as Error).message}`));
   bridge.log("info", `loaded (relay ${bridge.config.relayUrl}, autoReply ${bridge.config.autoReply}, ${unregister.length} tools)`);
 }

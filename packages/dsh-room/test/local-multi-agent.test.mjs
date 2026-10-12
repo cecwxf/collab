@@ -213,7 +213,7 @@ function fakeCtx() {
 }
 
 async function bridgeIn(dir, ws) {
-  const cfg = P.normalizeConfig({ statePath: join(dir, "state.json"), identityPath: join(dir, "identity.json"), workspacePath: ws, agentName: "human" });
+  const cfg = P.normalizeConfig({ localAgentRunner: "mock", statePath: join(dir, "state.json"), identityPath: join(dir, "identity.json"), workspacePath: ws, agentName: "human" });
   const b = new P.CollabBridge(fakeCtx(), cfg);
   await b.start();
   return b;
@@ -257,6 +257,7 @@ describe("local multi-agent room (loopback, mock runner)", () => {
     const dir = await mkdtemp(join(tmpdir(), "lma-session-stop-"));
     const b = await bridgeIn(dir, join(dir, "ws"));
     let release, started = 0;
+    b.config.localAgentRunner = "dsh";
     b.agentServices = () => ({});
     b.agentSessionFor = () => new Promise((r) => { release = () => r({ agent: { session: { seq: 0 }, followup() { started++; this.session.seq++; }, whenIdle: async () => {} } }); });
     try {
@@ -479,4 +480,69 @@ describe("local multi-agent room (loopback, mock runner)", () => {
     assert.equal(b.room(room.roomId).local.agents.length, 0);
     await b.dispose();
   });
+});
+
+test("model catalog exposes concrete names and agents inherit the room selection", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lma-models-"));
+  const ctx = fakeCtx();
+  const services = {
+    agentDefaultModel: { currentSelection: () => ({ provider: "deepseek-official", model: "deepseek-flash" }) },
+    llm: { listProviders: () => [{ id: "deepseek-official", name: "DeepSeek" }], listModels: async () => [
+      { provider: "deepseek-official", id: "deepseek-flash", name: "DeepSeek-V41-Flash" },
+      { provider: "deepseek-official", id: "deepseek-v4-pro", name: "DeepSeek-V4-Pro" },
+    ] },
+  };
+  ctx.get = (name) => services[name];
+  const b = new P.CollabBridge(ctx, P.normalizeConfig({ statePath: join(dir, "state.json"), identityPath: join(dir, "identity.json"), workspacePath: join(dir, "ws") }));
+  try {
+    await b.start();
+    const room = await b.createRoom({ localOnly: true, agents: [{ name: "Worker" }] });
+    assert.equal(b.state().defaultModel.name, "DeepSeek-V41-Flash");
+    assert.equal(b.view(b.room(room.roomId)).memberConfig.resolvedModel.name, "DeepSeek-V41-Flash");
+    await b.updateMemberConfig(room.roomId, { provider: "deepseek-official", model: "deepseek-v4-pro" });
+    assert.equal(b.localView(b.room(room.roomId)).agents[0].resolvedModel.name, "DeepSeek-V4-Pro");
+    const ag = b.localView(b.room(room.roomId)).agents[0];
+    await b.updateLocalAgent(room.roomId, ag.agentId, { model: "deepseek-flash" });
+    assert.equal(b.localView(b.room(room.roomId)).agents[0].resolvedModel.name, "DeepSeek-V41-Flash");
+    await b.updateLocalAgent(room.roomId, ag.agentId, { model: "", provider: "" });
+    assert.equal(b.localView(b.room(room.roomId)).agents[0].resolvedModel.name, "DeepSeek-V4-Pro");
+  } finally { await b.dispose(); }
+});
+
+test("room and worker sessions use their resolved model; changing it disposes old handles", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "lma-model-session-"));
+  const calls = []; let disposed = 0;
+  const services = {
+    agentDefaultModel: { currentSelection: () => ({ provider: "deepseek-official", model: "deepseek-flash" }) },
+    agents: { create: async (o) => { calls.push(o.agentOptions); return { agent: { session: {}, followup() {} }, dispose: async () => { disposed++; } }; } },
+    agentPresets: { resolve: async () => ({ id: "default" }), acquireScope: async () => ({ [Symbol.asyncDispose]: async () => {} }), mount: async () => {} },
+    permissionPresets: { resolve() {}, set() {} }, sessionTitle: { rename() {} },
+    workspaceRegistry: { create: async (path) => ({ path, attachSession: async () => {} }) },
+  };
+  const ctx=fakeCtx();ctx.get=(name)=>services[name];
+  const b=new P.CollabBridge(ctx,P.normalizeConfig({statePath:join(dir,'state.json'),identityPath:join(dir,'id.json'),workspacePath:join(dir,'ws')}));
+  try {
+    await b.start();const room=await b.createRoom({localOnly:true,agents:[{name:'Worker'}]});const conn=b.room(room.roomId);const a=conn.local.agents[0];
+    await b.updateMemberConfig(room.roomId,{model:'deepseek-v4-pro',reasoningEffort:'low'});
+    await b.sessionFor(conn,services);await b.agentSessionFor(conn,a,join(dir,'ws'));
+    assert.deepEqual(calls,[{provider:'deepseek-official',model:'deepseek-v4-pro',reasoningEffort:'low'},{provider:'deepseek-official',model:'deepseek-v4-pro',reasoningEffort:'low'}]);
+    await b.updateMemberConfig(room.roomId,{model:'deepseek-flash'});assert.equal(disposed,2);
+    await b.agentSessionFor(conn,a,join(dir,'ws'));assert.equal(calls.at(-1).model,'deepseek-flash');
+  } finally { await b.dispose(); }
+});
+
+test("missing real agent services fail visibly instead of silently generating mock replies", async () => {
+  const dir=await mkdtemp(join(tmpdir(),'lma-no-services-'));const b=await bridgeIn(dir,join(dir,'ws'));b.config.localAgentRunner='dsh';
+  try {const room=await b.createRoom({localOnly:true,agents:['reviewer']});await waitConnected(b,room.roomId);await b.send(room.roomId,'@reviewer hello');await b.scheduler.whenIdle();assert.equal(b.scheduler.list(room.roomId)[0].state,'failed');assert.ok(!b.room(room.roomId).messages.some(m=>m.text.includes('[mock')));}finally{await b.dispose();}
+});
+
+test("short invites use configured relayUrl for both the host and local agent sockets", async () => {
+  const {LanRelayServer}=await import('@collab/lan-relay');const relay=new LanRelayServer({host:'127.0.0.1',port:0,mdns:false});await relay.listen();
+  const dir=await mkdtemp(join(tmpdir(),'lma-relay-config-'));const ctx=fakeCtx();const b=new P.CollabBridge(ctx,P.normalizeConfig({relayUrl:`ws://127.0.0.1:${relay.port}`,statePath:join(dir,'state.json'),identityPath:join(dir,'id.json'),workspacePath:join(dir,'ws'),localAgentRunner:'mock'}));
+  try {await b.start();const room=await b.createRoom({mode:'relay',agents:['reviewer']});await waitConnected(b,room.roomId);assert.equal(b.view(b.room(room.roomId)).members.length,2);}finally{await b.dispose();await relay.close();}
+});
+
+test("model-facing history and room state contain only lossless JSON values", async () => {
+  const dir=await mkdtemp(join(tmpdir(),'lma-tool-json-'));const b=await bridgeIn(dir,join(dir,'ws'));
+  try {const room=await b.createRoom({localOnly:true});await waitConnected(b,room.roomId);await b.send(room.roomId,'json history marker');for(const name of ['collab_history','collab_rooms','collab_peers']){const out=await b.tools().find(t=>t.name===name).execute({roomId:room.roomId},{});assert.deepEqual(out,JSON.parse(JSON.stringify(out)),name+' must satisfy dsh lossless JSON output validation');}}finally{await b.dispose();}
 });

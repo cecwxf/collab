@@ -7,6 +7,7 @@
   --rm-border: var(--dsw-alias-border-l2);
   --rm-bg: var(--dsw-alias-bg-base);
   --rm-panel: var(--dsw-alias-bg-module-platform);
+  --rm-elev: var(--dsw-alias-bg-module-platform);
   --rm-label: var(--dsw-alias-label-primary);
   --rm-muted: var(--dsw-alias-label-secondary);
   --rm-quiet: var(--dsw-alias-label-tertiary);

@@ -644,6 +644,19 @@ var init_mcp_workspace = __esm({
   }
 });
 
+// src/models.ts
+function resolveSelection(defaults, room = {}, agent = {}) {
+  return {
+    provider: agent.provider || room.provider || defaults.provider,
+    model: agent.model || room.model || defaults.model,
+    reasoningEffort: agent.reasoningEffort || room.reasoningEffort || defaults.reasoningEffort
+  };
+}
+function describeModel(selection, catalog) {
+  if (!selection.provider || !selection.model) return null;
+  return catalog.find((m) => m.provider === selection.provider && m.model === selection.model) ?? { provider: selection.provider, model: selection.model, name: selection.model };
+}
+
 // src/plugin.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
 import { mkdir as mkdir5, readFile as readFile5, writeFile as writeFile4, appendFile as appendFile2, rename as rename2, rm as rm3 } from "node:fs/promises";
@@ -2908,7 +2921,7 @@ var PLUGIN_VERSION = (() => {
   try {
     return requirePkg("../package.json").version;
   } catch {
-    return "0.3.3";
+    return "0.3.4";
   }
 })();
 var SUMMARY_MAX = 120;
@@ -3062,6 +3075,36 @@ var CollabBridge = class {
   sessionAgents = /* @__PURE__ */ new Map();
   /** Override how a local agent run executes (tests / mock provider). */
   localRunner = null;
+  models = [];
+  async refreshModels() {
+    const llm = this.ctx.get("llm", false);
+    if (!llm?.listProviders || !llm?.listModels) return;
+    const results = await Promise.allSettled(llm.listProviders().map(async (p) => {
+      const entries = await withTimeout(llm.listModels(p.id), 5e3, `models ${p.id}`);
+      return entries.map((m) => ({ provider: p.id, model: m.id, name: m.name || m.id }));
+    }));
+    this.models = results.flatMap((r) => r.status === "fulfilled" ? r.value : []);
+    this.emit({ type: "rooms" });
+  }
+  selectedModel(conn, agent) {
+    const defaults = this.ctx.get("agentDefaultModel", false)?.currentSelection?.() ?? {};
+    return resolveSelection(defaults, conn?.meta.memberConfig, agent);
+  }
+  resolvedModel(conn, agent) {
+    return describeModel(this.selectedModel(conn, agent), this.models);
+  }
+  async resetAgentSession(conn, agent) {
+    const key = `${conn.meta.roomId}:${agent.agentId}`;
+    const pending = this.agentHandles.get(key);
+    this.agentHandles.delete(key);
+    const sid = conn.meta.agentSessions?.[agent.agentId];
+    if (sid) this.sessionAgents.delete(sid);
+    if (conn.meta.agentSessions) delete conn.meta.agentSessions[agent.agentId];
+    conn.meta.agentNoEffort = conn.meta.agentNoEffort?.filter((id) => id !== agent.agentId);
+    this.noEffort.delete(key);
+    if (pending) await pending.then((h) => h.dispose()).catch(() => {
+    });
+  }
   log(level, ...a) {
     this.ctx.logger[level]("[collab]", ...a);
     const dbg = process.env.DSH_ROOM_DEBUG_LOG;
@@ -3092,6 +3135,7 @@ var CollabBridge = class {
   start() {
     this.ready ??= (async () => {
       await this.self();
+      await this.refreshModels();
       const st = await loadState(this.config.statePath);
       for (const w of st?.workspaces ?? []) this.workspaces.set(w.id, w);
       if (!this.workspaces.size) {
@@ -3153,7 +3197,7 @@ var CollabBridge = class {
     const roomId = parsed.roomId;
     const roomKeyB64 = parsed.roomKeyB64;
     conn.meta.transport = parsed.mode;
-    const wsUrl = inviteWsUrl(parsed);
+    const wsUrl = this.inviteUrl(parsed);
     if (!conn.meta.memberConfig) {
       conn.meta.memberConfig = defaultMemberConfig(this.config.workspacePath);
     }
@@ -3595,7 +3639,7 @@ var CollabBridge = class {
       bound: !!sessionId,
       sessionId,
       transport: conn.local.loopback ? "local" : conn.meta.transport ?? (conn.meta.invite.startsWith("collab://lan/") ? "lan" : "relay"),
-      memberConfig: conn.meta.memberConfig ? { ...publicMemberConfig(conn.meta.memberConfig), workspacePath: conn.meta.memberConfig.workspacePath, peerGrants: conn.meta.memberConfig.peerGrants, permissions: conn.meta.memberConfig.permissions } : null,
+      memberConfig: conn.meta.memberConfig ? { ...publicMemberConfig(conn.meta.memberConfig), workspacePath: conn.meta.memberConfig.workspacePath, resolvedModel: this.resolvedModel(conn), peerGrants: conn.meta.memberConfig.peerGrants, permissions: conn.meta.memberConfig.permissions } : null,
       peerConfigs: Object.fromEntries(this.peerConfigs.get(conn.meta.roomId) ?? []),
       local: this.localView(conn),
       runs: this.scheduler.list(conn.meta.roomId)
@@ -3604,6 +3648,8 @@ var CollabBridge = class {
   state() {
     return {
       version: PLUGIN_VERSION,
+      models: this.models,
+      defaultModel: this.resolvedModel(),
       self: this.identity?.agentId ?? null,
       relayUrl: this.config.relayUrl,
       lanRelayPort: this.lanRelay?.port ?? null,
@@ -3634,7 +3680,20 @@ var CollabBridge = class {
       workspacePath: patch.workspacePath ?? cur.workspacePath,
       workspaceLabel: patch.workspaceLabel ?? cur.workspaceLabel
     };
+    const modelChanged = ["provider", "model", "reasoningEffort"].some((k) => cur[k] !== next[k]);
+    if (modelChanged && conn.local.agents.some((a) => this.scheduler.isExecuting(roomId, a.agentId))) throw new Error("Stop running agents before changing the room model");
+    const before = conn.local.agents.map((a) => this.selectedModel(conn, a));
     conn.meta.memberConfig = next;
+    if (modelChanged) {
+      const host = this.sessions.get(roomId);
+      this.sessions.delete(roomId);
+      delete conn.meta.sessionId;
+      if (host) await host.then((h) => h.dispose()).catch(() => {
+      });
+      for (const [i, a] of conn.local.agents.entries()) {
+        if (JSON.stringify(before[i]) !== JSON.stringify(this.selectedModel(conn, a))) await this.resetAgentSession(conn, a);
+      }
+    }
     this.mcpByRoom.get(roomId)?.updateConfig(next);
     await this.persist();
     if (conn.client) await this.announceMemberConfig(conn);
@@ -3876,13 +3935,13 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
         const wsPath = roomPath && roomPath.trim() ? roomPath : cfg.workspacePath;
         await mkdir5(wsPath, { recursive: true });
         const workspace = await svc.workspaceRegistry.create(wsPath, wsPath === cfg.workspacePath ? "collab" : void 0);
-        const selected = svc.agentDefaultModel.currentSelection();
+        const selected = this.selectedModel(conn);
         const sessionId = `collab-${roomId}-${randomUUID3().slice(0, 8)}`;
         const handle = await svc.agents.create({
           sessionId,
           signal: this.abort.signal,
           meta: { cwd: workspace.path, agentPreset: preset.id },
-          agentOptions: { provider: selected.provider, model: selected.model },
+          agentOptions: { provider: selected.provider, model: selected.model, ...selected.reasoningEffort ? { reasoningEffort: selected.reasoningEffort } : {} },
           setup: async (agentCtx) => {
             await svc.agentPresets.mount(agentCtx, preset.id);
           }
@@ -3903,6 +3962,9 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     return pending;
   }
   // ── local multi-agent: members hosted by this dsh ────────────────────────
+  inviteUrl(parsed) {
+    return inviteWsUrl(parsed.uri.startsWith("collab://join/") ? { ...parsed, wsBase: this.config.relayUrl } : parsed);
+  }
   transportFor(conn, wsUrl) {
     return conn.local.loopback ? new MockTransport(this.hub, `loopback:${conn.meta.roomId}`) : new WsTransport(wsUrl);
   }
@@ -3929,7 +3991,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
       identity,
       roomId: parsed.roomId,
       roomKey: parsed.roomKeyB64,
-      transport: this.transportFor(conn, inviteWsUrl(parsed)),
+      transport: this.transportFor(conn, this.inviteUrl(parsed)),
       autoReply: "off",
       reconnect: !conn.local.loopback,
       capabilities: ["collab.v1", "dsh", "member.config", "local-agent"]
@@ -4028,13 +4090,11 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     const clean = sanitizeAgentInput(input);
     const sessionKeys = ["model", "provider", "reasoningEffort", "scope"];
     const resetSession = sessionKeys.some((k) => k in clean && clean[k] !== a[k]);
+    if (resetSession && this.scheduler.isExecuting(roomId, a.agentId)) throw new Error("Stop this agent before changing its model or scope");
     if (clean.moderator) for (const x of conn.local.agents) x.moderator = false;
     Object.assign(a, clean, { id: a.id, agentId: a.agentId });
     if (resetSession) {
-      this.agentHandles.delete(`${conn.meta.roomId}:${a.agentId}`);
-      if (conn.meta.agentSessions) delete conn.meta.agentSessions[a.agentId];
-      conn.meta.agentNoEffort = conn.meta.agentNoEffort?.filter((x) => x !== a.agentId);
-      this.noEffort.delete(`${conn.meta.roomId}:${a.agentId}`);
+      await this.resetAgentSession(conn, a);
     }
     await this.persist();
     await this.announceAgentConfig(conn, a).catch(() => {
@@ -4241,7 +4301,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
       const before = wtBefore ? await mainStatus(wtBefore.repo).catch(() => null) : null;
       try {
         if (this.localRunner) await this.localRunner(ctx);
-        else if (this.config.localAgentRunner === "mock" || !this.agentServices()) await mockLocalRunner(ctx);
+        else if (this.config.localAgentRunner === "mock") await mockLocalRunner(ctx);
         else await this.runInSession(conn, a, ctx);
       } finally {
         if (wtBefore && before) {
@@ -4321,7 +4381,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
       const failure = !ctx.signal.aborted && seq0 !== void 0 ? this.turnError(agent.session, seq0) : void 0;
       if (failure) {
         const key = `${conn.meta.roomId}:${a.agentId}`;
-        if (!retried && failure.code === "UNSUPPORTED_REASONING_EFFORT" && a.reasoningEffort) {
+        if (!retried && failure.code === "UNSUPPORTED_REASONING_EFFORT" && this.selectedModel(conn, a).reasoningEffort) {
           this.log("warn", `${a.agentId}: ${failure.message}; recreating its session with the model's default effort`);
           this.noEffort.add(key);
           conn.meta.agentNoEffort = [.../* @__PURE__ */ new Set([...conn.meta.agentNoEffort ?? [], a.agentId])];
@@ -4375,15 +4435,15 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
       try {
         const root = conn.meta.memberConfig?.workspacePath?.trim() || this.config.workspacePath;
         const workspace = await svc.workspaceRegistry.create(root, root === this.config.workspacePath ? "collab" : void 0);
-        const selected = svc.agentDefaultModel.currentSelection();
-        const base = { provider: a.provider ?? selected.provider, model: a.model ?? selected.model };
-        const withEffort = a.reasoningEffort && !this.noEffort.has(key) && !conn.meta.agentNoEffort?.includes(a.agentId);
+        const effective = this.selectedModel(conn, a);
+        const base = { provider: effective.provider, model: effective.model };
+        const withEffort = effective.reasoningEffort && !this.noEffort.has(key) && !conn.meta.agentNoEffort?.includes(a.agentId);
         const resume = svc.agents.resume;
         if (prevSid && resume) {
           try {
             const h = await resume.call(svc.agents, {
               resumeSessionId: prevSid,
-              agentOptions: withEffort ? { ...base, reasoningEffort: a.reasoningEffort } : base,
+              agentOptions: withEffort ? { ...base, reasoningEffort: effective.reasoningEffort } : base,
               setup: async (agentCtx) => {
                 await svc.agentPresets.mount(agentCtx, preset.id);
               }
@@ -4413,7 +4473,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
         });
         let handle;
         try {
-          handle = await create(withEffort ? { ...base, reasoningEffort: a.reasoningEffort } : base, root);
+          handle = await create(withEffort ? { ...base, reasoningEffort: effective.reasoningEffort } : base, root);
         } catch (e) {
           this.log("warn", `session for ${a.agentId} with reasoning effort failed (${e.message}); retrying with defaults`);
           handle = await create(base, root);
@@ -4617,6 +4677,7 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
         const wt = conn.worktrees.get(a.agentId);
         return {
           ...a,
+          resolvedModel: this.resolvedModel(conn, a),
           sessionId: conn.meta.agentSessions?.[a.agentId],
           online: online.has(a.agentId) || !!conn.agents.get(a.agentId)?.isJoined(),
           state: r?.state ?? "idle",
@@ -4672,7 +4733,7 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
         }
         const who = bridge.callerAgent(exec);
         bridge.log("info", `tool ${name2} by ${who?.agent.agentId ?? "host"}`);
-        return await run(a, who) ?? { ok: true };
+        return JSON.parse(JSON.stringify(await run(a, who) ?? { ok: true }));
       }
     });
     const str2 = (v) => typeof v === "string" && v ? v : void 0;
@@ -5222,6 +5283,9 @@ function apply(ctx, config) {
   });
   ctx.inject?.(["webServer"], (c) => {
     c.effect(() => registerRoutes(bridge, c.webServer, () => c.get("connection")), "dsh-room: /api/collab routes");
+  });
+  ctx.inject?.(["llm", "agentDefaultModel"], () => {
+    void bridge.refreshModels().catch((e) => bridge.log("warn", `model catalog: ${e.message}`));
   });
   bridge.start().catch((e) => bridge.log("error", `start failed: ${e.message}`));
   bridge.log("info", `loaded (relay ${bridge.config.relayUrl}, autoReply ${bridge.config.autoReply}, ${unregister.length} tools)`);

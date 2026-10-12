@@ -12,7 +12,8 @@
     "smoke": "node scripts/smoke-two-agents.mjs",
     "cli": "node packages/cli/dist/cli.js",
     "e2e:live": "node scripts/e2e-live.mjs 20",
-    "e2e:dsh:local": "node scripts/e2e-dsh-local.mjs"
+    "e2e:dsh:local": "node scripts/e2e-dsh-local.mjs",
+    "e2e:dsh:real": "node scripts/e2e-dsh-real.mjs"
   },
   "engines": {
     "node": ">=22"

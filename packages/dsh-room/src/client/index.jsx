@@ -312,7 +312,8 @@ function Composer({ room, store, draft, setDraft }) {
     return list.filter((it) => !q || it.id.toLowerCase().startsWith(q) || (it.name && it.name.toLowerCase().startsWith(q)));
   })();
   const mc = room.memberConfig || {};
-  const modelLabel = mc.model || "Default model";
+  const catalog = useStore(store).models || [];
+  const modelLabel = mc.resolvedModel?.name || mc.model || "Model unavailable";
   const effort = mc.reasoningEffort || "medium";
   const permSummary = (() => {
     const p = mc.permissions || {};
@@ -324,7 +325,7 @@ function Composer({ room, store, draft, setDraft }) {
     return bits.length ? `Auto · ${bits.join("+")}` : "Ask to run";
   })();
   useEffect(() => { setMentionActive(0); setMentionDismissed(false); }, [mqRaw && mqRaw.query, mqRaw && mqRaw.start]);
-  const MODELS = ["deepseek-chat", "deepseek-reasoner", "deepseek-coder"];
+  const MODELS = catalog;
   const EFFORTS = ["low", "medium", "high", "max"];
 
   const patchConfig = async (patch) => {
@@ -411,7 +412,7 @@ function Composer({ room, store, draft, setDraft }) {
               <div className="rm-composer-menu" role="menu">
                 <div className="rm-composer-menu-label">Model</div>
                 {MODELS.map((m) => (
-                  <button key={m} type="button" role="menuitem" className={mc.model === m ? "is-active" : ""} onClick={() => { void patchConfig({ model: m }); setModelOpen(false); }}>{m}</button>
+                  <button key={`${m.provider}/${m.model}`} type="button" role="menuitem" className={mc.resolvedModel?.model === m.model && mc.resolvedModel?.provider === m.provider ? "is-active" : ""} onClick={() => { void patchConfig({ model: m.model, provider: m.provider }); setModelOpen(false); }}>{m.name}</button>
                 ))}
                 <div className="rm-composer-menu-label">Reasoning</div>
                 {EFFORTS.map((e) => (
@@ -561,7 +562,7 @@ function RoomDetail({ room, messages, store, mention, assign }) {
         <div className="rm-detail-h">About</div>
         <dl className="rm-about">
           <dt>Visibility</dt><dd>{room.public ? <><GlobeIcon /> Public</> : <><LockIcon /> Private</>}</dd>
-          <dt>Transport</dt><dd>{room.transport === "local" ? "Local only (in-process loopback)" : room.transport === "lan" ? "LAN / VPS (Node relay)" : "Relay (Cloudflare)"}</dd>
+          <dt>Transport</dt><dd>{room.transport === "local" ? "Local only (in-process loopback)" : room.transport === "lan" ? "LAN / VPS (Node relay)" : "Relay"}</dd>
           {room.memberConfig?.workspaceLabel ? <><dt>Workspace</dt><dd>{room.memberConfig.workspaceLabel}</dd></> : null}
           {room.description ? <><dt>Description</dt><dd>{room.description}</dd></> : null}
           {room.tags?.length ? <><dt>Tags</dt><dd>{room.tags.map((t) => "#" + t).join(" ")}</dd></> : null}
@@ -580,7 +581,20 @@ function RoomDetail({ room, messages, store, mention, assign }) {
 
 /* ── local multi-agent UI ─────────────────────────────────────────────── */
 const RUN_TONE = { running: "warning", queued: "info", approval: "info", done: "success", failed: "danger", stopped: "quiet" };
-const MODEL_CHOICES = ["", "deepseek-chat", "deepseek-reasoner"];
+function ModelSelect({ catalog = [], inherited, model, provider, onChange }) {
+  const route = model ? JSON.stringify([provider || inherited?.provider || "", model]) : "";
+  const choices = [...catalog];
+  if (model && !choices.some((m) => m.model === model && m.provider === (provider || inherited?.provider))) {
+    choices.push({ model, provider: provider || inherited?.provider || "", name: model });
+  }
+  return <select className="rm-input" aria-label="Model" value={route} onChange={(e) => {
+    const [provider, model] = e.target.value ? JSON.parse(e.target.value) : ["", ""];
+    onChange({ provider, model });
+  }}>
+    <option value="">{inherited?.name ? `Inherit · ${inherited.name}` : "Model unavailable"}</option>
+    {choices.map((m) => <option key={`${m.provider}/${m.model}`} value={JSON.stringify([m.provider, m.model])}>{m.name}</option>)}
+  </select>;
+}
 
 function LocalAgentsSection({ room, store, mention }) {
   const a = store.actions;
@@ -594,7 +608,7 @@ function LocalAgentsSection({ room, store, mention }) {
           <span className="rm-agent-main">
             <span className="rm-agent-name">{ag.name}{ag.moderator ? <span className="rm-agent-tag">moderator</span> : null}</span>
             <span className="rm-agent-sub rm-mono">@{ag.agentId}</span>
-            <span className="rm-agent-sub">{ag.scope === "write" ? (ag.isolation === "worktree" ? "writes · own worktree" : ag.isolation === "locks" ? "writes · file locks" : "writes") : "read-only"}{ag.approvalRequired ? " · approval" : ""}{ag.model ? ` · ${ag.model}` : ""}{ag.reasoningEffort ? ` · ${ag.reasoningEffort}` : ""}</span>
+            <span className="rm-agent-sub">{ag.scope === "write" ? (ag.isolation === "worktree" ? "writes · own worktree" : ag.isolation === "locks" ? "writes · file locks" : "writes") : "read-only"}{ag.approvalRequired ? " · approval" : ""}{ag.resolvedModel?.name ? ` · ${ag.resolvedModel.name}` : ag.model ? ` · ${ag.model}` : ""}{ag.reasoningEffort ? ` · ${ag.reasoningEffort}` : ""}</span>
           </span>
           {ag.state !== "idle" ? <Tag tone={RUN_TONE[ag.state] || "neutral"}>{ag.state}</Tag> : null}
           <span className="rm-member-actions">
@@ -719,9 +733,9 @@ function AgentDialog({ store, d }) {
   const room = (s.rooms || []).find((r) => r.roomId === d.roomId);
   const existing = room && room.local ? room.local.agents.find((x) => x.agentId === d.agentId) : null;
   const [presets, setPresets] = useState([]);
-  const blank = () => ({ preset: "", name: "", persona: "", systemPrompt: "", model: "", reasoningEffort: "medium", scope: "read", approvalRequired: false, moderator: false });
+  const blank = () => ({ preset: "", name: "", persona: "", systemPrompt: "", model: "", provider: "", reasoningEffort: "medium", scope: "read", approvalRequired: false, moderator: false });
   const [f, setF] = useState(() => existing
-    ? { preset: "", name: existing.name, persona: existing.persona || "", systemPrompt: existing.systemPrompt || "", model: existing.model || "", reasoningEffort: existing.reasoningEffort || "medium", scope: existing.scope, approvalRequired: !!existing.approvalRequired, moderator: !!existing.moderator }
+    ? { preset: "", name: existing.name, persona: existing.persona || "", systemPrompt: existing.systemPrompt || "", model: existing.model || "", provider: existing.provider || "", reasoningEffort: existing.reasoningEffort || "medium", scope: existing.scope, approvalRequired: !!existing.approvalRequired, moderator: !!existing.moderator }
     : blank());
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -732,7 +746,7 @@ function AgentDialog({ store, d }) {
     if (!f.name.trim()) { setErr("Name required"); return; }
     setBusy(true); setErr(null);
     try {
-      const body = { name: f.name.trim(), persona: f.persona, systemPrompt: f.systemPrompt, model: f.model || undefined, reasoningEffort: f.reasoningEffort, scope: f.scope, approvalRequired: f.approvalRequired, moderator: f.moderator };
+      const body = { name: f.name.trim(), persona: f.persona, systemPrompt: f.systemPrompt, model: f.model, provider: f.provider, reasoningEffort: f.reasoningEffort, scope: f.scope, approvalRequired: f.approvalRequired, moderator: f.moderator };
       if (existing) await a.updateAgent(d.roomId, existing.agentId, body);
       else {
         const r = await a.addAgent(d.roomId, f.preset ? { ...body, preset: f.preset } : body);
@@ -775,10 +789,7 @@ function AgentDialog({ store, d }) {
           <textarea id="rm-ag-sp" className="rm-input rm-textarea" rows={4} value={f.systemPrompt} maxLength={4000} onChange={(e) => setF({ ...f, systemPrompt: e.target.value, ...(f.preset ? { preset: "" } : {}) })} placeholder="You are … Focus on … Report back with …" />
         </Field></div>
         <Field label="Model">
-          <select className="rm-input" aria-label="Model" value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })}>
-            {MODEL_CHOICES.map((m) => <option key={m} value={m}>{m || "dsh default model"}</option>)}
-            {f.model && !MODEL_CHOICES.includes(f.model) ? <option value={f.model}>{f.model}</option> : null}
-          </select>
+          <ModelSelect catalog={s.models} inherited={room?.memberConfig?.resolvedModel || s.defaultModel} model={f.model} provider={f.provider} onChange={(patch) => setF({ ...f, ...patch })} />
         </Field>
         <Field label="Reasoning effort">
           <select className="rm-input" aria-label="Reasoning effort" value={f.reasoningEffort} onChange={(e) => setF({ ...f, reasoningEffort: e.target.value })}>
@@ -1032,7 +1043,7 @@ function CreateDialog({ store, d }) {
         turnLimit: f.turnLimit, concurrency: f.concurrency, isolation: f.isolation,
         agents: f.agents.map((ag) => ag.key
           ? ag.key
-          : { name: ag.name, persona: ag.persona, systemPrompt: ag.systemPrompt, scope: ag.scope, moderator: ag.moderator, reasoningEffort: ag.reasoningEffort, approvalRequired: ag.approvalRequired, model: ag.model || undefined }),
+          : { name: ag.name, persona: ag.persona, systemPrompt: ag.systemPrompt, scope: ag.scope, moderator: ag.moderator, reasoningEffort: ag.reasoningEffort, approvalRequired: ag.approvalRequired, model: ag.model || undefined, provider: ag.provider || undefined }),
       }, { timeoutMs: 12_000 });
       // success swaps the dialog to the invite card via the store; busy clears on unmount
     } catch (e) {
@@ -1158,9 +1169,7 @@ function CreateDialog({ store, d }) {
                     <textarea id="rm-create-ag-sp" className="rm-input rm-textarea" rows={3} value={draft.systemPrompt} maxLength={4000} onChange={(e) => setDraft({ ...draft, systemPrompt: e.target.value })} />
                   </Field></div>
                   <Field label="Model">
-                    <select className="rm-input" aria-label="Model" value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })}>
-                      {MODEL_CHOICES.map((m) => <option key={m} value={m}>{m || "dsh default model"}</option>)}
-                    </select>
+                    <ModelSelect catalog={s.models} inherited={s.defaultModel} model={draft.model} provider={draft.provider} onChange={(patch) => setDraft({ ...draft, ...patch })} />
                   </Field>
                   <Field label="Reasoning effort">
                     <select className="rm-input" aria-label="Reasoning effort" value={draft.reasoningEffort} onChange={(e) => setDraft({ ...draft, reasoningEffort: e.target.value })}>
@@ -1295,7 +1304,7 @@ function ConfigDialog({ store, d }) {
     setBusy(true); setErr(null);
     try {
       await a.saveConfig(d.roomId, {
-        model: f.model || undefined, provider: f.provider || undefined, reasoningEffort: f.reasoningEffort,
+        model: f.model, provider: f.provider, reasoningEffort: f.reasoningEffort,
         workspacePath: f.workspacePath || undefined, workspaceLabel: f.workspaceLabel || undefined, mcpEnabled: f.mcpEnabled,
         permissions: { autoRead: f.autoRead, autoWrite: f.autoWrite, autoShell: f.autoShell, autoNetwork: f.autoNetwork },
       });
@@ -1307,7 +1316,7 @@ function ConfigDialog({ store, d }) {
       description="Local to this member. Peers see model, effort, workspace label, permissions, and MCP tools — never API keys."
       footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={busy} onClick={submit}>{busy ? "Saving…" : "Save"}</Button></>}>
       <div className="rm-root rm-form">
-        <Field label="Model" htmlFor="rm-cfg-model"><Input id="rm-cfg-model" value={f.model} onChange={(e) => setF({ ...f, model: e.target.value })} placeholder="e.g. deepseek-chat" /></Field>
+        <Field label="Model" htmlFor="rm-cfg-model"><ModelSelect catalog={s.models} inherited={s.defaultModel} model={f.model} provider={f.provider} onChange={(patch) => setF({ ...f, ...patch })} /></Field>
         <Field label="Provider" htmlFor="rm-cfg-prov"><Input id="rm-cfg-prov" value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value })} placeholder="e.g. deepseek" /></Field>
         <Field label="Reasoning effort">
           <select className="rm-input" value={f.reasoningEffort} onChange={(e) => setF({ ...f, reasoningEffort: e.target.value })}>

@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+const versionExpected = JSON.parse(await readFile(new URL("../packages/dsh-room/package.json", import.meta.url), "utf8")).version;
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dir = await mkdtemp(join(tmpdir(), "collab-dsh-e2e-"));
 const workspace = join(dir, "workspace");
@@ -41,7 +42,7 @@ async function boot() {
   const auth = await fetch(url, { redirect: "manual" });
   cookie = auth.headers.getSetCookie().map((v) => v.split(";", 1)[0]).join("; ");
   assert.ok(cookie, "dsh issued an auth cookie");
-  await until(async () => (await api("/version")).version === "0.3.3", "plugin API loaded");
+  await until(async () => (await api("/version")).version === versionExpected, "plugin API loaded");
 }
 async function shutdown() {
   if (!child || child.exitCode !== null) return;

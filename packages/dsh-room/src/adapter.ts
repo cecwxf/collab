@@ -90,7 +90,7 @@ export interface AgentServices {
       sessionId: string;
       signal?: AbortSignal;
       meta: { cwd: string; agentPreset?: string };
-      agentOptions: { provider: string; model: string };
+      agentOptions: { provider: string; model: string; reasoningEffort?: string };
       setup?: (agentCtx: unknown) => Promise<void>;
     }): Promise<AgentHandle>;
   };

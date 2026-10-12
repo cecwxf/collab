@@ -102,6 +102,7 @@ export interface AgentServices {
             agentOptions: {
                 provider: string;
                 model: string;
+                reasoningEffort?: string;
             };
             setup?: (agentCtx: unknown) => Promise<void>;
         }): Promise<AgentHandle>;

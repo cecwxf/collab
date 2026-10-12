@@ -128,3 +128,13 @@ Create room → defaults to **LAN / VPS** with `62.234.113.56:80` (public direct
 **MCP tools**: `workspace_list`, `workspace_read`, `workspace_stat`, `workspace_search`, `workspace_write`, `workspace_mkdir`, `workspace_delete`, `workspace_exec`.
 
 API: `GET/POST /api/collab/rooms/:id/config`, `POST /api/collab/rooms/:id/mcp`, `GET /api/collab/lan/browse`, `POST /api/collab/approvals/decide`.
+
+## Models and validation (0.3.4)
+
+Model selectors load the active dsh provider catalog and show its versioned names (for example `DeepSeek-V41-Flash`), while passing the catalog's exact provider/model IDs to sessions. Agents inherit the room model; rooms inherit the dsh selection. Changing a model resets the affected idle sessions. Stop running agents before changing their model or scope. Missing real agent services now produce a failed run; mock execution requires explicit `localAgentRunner: mock`.
+
+Short `collab://join/...` invitations use the host's configured `relayUrl`; invitations specifying a LAN or relay host use that explicit address.
+
+From the repository, run `npm test`, `npm run smoke`, and `npm run e2e:dsh:local` for offline/mock regression coverage. `DEEPSEEK_API_KEY=... npm run e2e:dsh:real` exercises real dsh sessions: agent create/edit/remove, coding task claim/completion, worktree diff/merge, executable code, review, and moderator delegation/summary. It uses an isolated dsh home and workspace, and makes paid model requests. Optional `DSH_PLUGIN_SOURCE` selects a packed npm tarball; `DSH_REAL_RELAY=1` uses a relay, with `DSH_TEST_RELAY` overriding the default URL. Credentials are inherited only through the child process environment.
+
+For two running isolated real dsh hosts, `DSH_MAC_CONTROL=/path/mac.json DSH_VPS_CONTROL=/path/vps.json node scripts/e2e-dsh-cross-real.mjs` verifies Mac → VPS → Mac model cooperation. Each control file contains the authenticated API `base` and `cookie`; the Mac file also contains `roomId` and `invite`. Keep these files private and remove them after testing.
