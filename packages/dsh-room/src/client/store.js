@@ -1,4 +1,5 @@
 // Tiny external store for the Rooms UI: /api/collab JSON + SSE.
+import { sameWorkspacePath, sessionFileAddress } from './files.js';
 export const API = "/api/collab";
 
 async function call(path, init) {
@@ -25,11 +26,13 @@ export function createRoomsStore() {
     version: null, self: null, relayUrl: "", lanRelayPort: null, workspaces: [], activeWorkspaceId: null, rooms: [], activeRoomId: null, connected: false,
     selected: null, messages: {}, dialog: null, toast: null, approvals: [],
     search: { open: false, query: "", results: [], loading: false, error: null },
+    detailsOpen: false, expandedRooms: {},
   };
   const subs = new Set();
   const set = (patch) => { snap = { ...snap, ...(typeof patch === "function" ? patch(snap) : patch) }; for (const s of subs) s(); };
   let es = null;
   let searchTimer = null;
+  let navigation = 0;
 
   function connect() {
     if (es) return;
@@ -86,12 +89,16 @@ export function createRoomsStore() {
 
   const actions = {
     select(roomId) {
+      navigation++;
+      try { api.onRoomOpened && api.onRoomOpened(); } catch { /* layout busy */ }
       set({ selected: roomId });
       if (!snap.messages[roomId]) void loadMessages(roomId);
       void post(`/rooms/${encodeURIComponent(roomId)}/active`).catch(() => {});
     },
     openDialog(dialog) { set({ dialog }); },
     closeDialog() { set({ dialog: null }); },
+    toggleDetails() { set(s => ({ detailsOpen: !s.detailsOpen })); },
+    toggleRoom(roomId) { set(s => ({ expandedRooms: { ...s.expandedRooms, [roomId]: s.expandedRooms[roomId] === false } })); },
     toast,
     clearToast() { set({ toast: null }); },
     setSearchOpen(open) {
@@ -158,6 +165,47 @@ export function createRoomsStore() {
     async setTransport(roomId, target, force) { return post(`/rooms/${encodeURIComponent(roomId)}/transport`, { target, force: !!force }); },
     async stop(roomId, agentId) { return post(`/rooms/${encodeURIComponent(roomId)}/stop`, agentId ? { agentId } : {}); },
     async diffs(roomId) { return call(`/rooms/${encodeURIComponent(roomId)}/diffs`); },
+    async openSession(roomId, agentId) {
+      const request = ++navigation;
+      const result = await post(`/rooms/${encodeURIComponent(roomId)}/session`, { agentId });
+      if (request !== navigation) return result;
+      if (!api.uiWorkspace) throw new Error("Native dsh session navigation is unavailable");
+      api.uiWorkspace.openSession(result.sessionId);
+      return result;
+    },
+    openRoomSession(roomId) {
+      navigation++;
+      const id = snap.rooms.find(r => r.roomId === roomId)?.sessionId;
+      if (!id || !api.uiWorkspace) throw new Error("Room session is unavailable");
+      api.uiWorkspace.openSession(id);
+    },
+    async inspectFiles(roomId, paths, agentId) { return post(`/rooms/${encodeURIComponent(roomId)}/files`, { paths, agentId }); },
+    async preview(roomId, path, agentId, line) {
+      const request = ++navigation;
+      const result = await post(`/rooms/${encodeURIComponent(roomId)}/preview`, { path, agentId });
+      if (request !== navigation) return;
+      if (!api.uiWorkspace || !api.sidebarRight) throw new Error("Native dsh preview is unavailable");
+      // Native previews live with a native conversation session, not a custom main panel.
+      let sessionId = result.sessionId;
+      if (sessionId) api.uiWorkspace.openSession(sessionId);
+      else {
+        const workspace = api.native?.list.getSnapshot().items.find(w => sameWorkspacePath(w.path, result.workspacePath));
+        if (!workspace) throw new Error("Open this room's workspace in dsh before previewing files");
+        await api.uiWorkspace.openWorkspace(workspace.workspaceId, id => { sessionId = id; });
+      }
+      if (!sessionId) throw new Error("No native session available for preview");
+      const address = sessionFileAddress(sessionId, result.path);
+      // Wait for the native session's preview store to be mounted by React.
+      for (let attempt = 0; attempt < 100; attempt++) {
+        if (request !== navigation) return;
+        if (api.sidebarRight.mounted?.getSnapshot() === sessionId) {
+          try { api.sidebarRight.openResource(address, line ? { params: { line } } : undefined); api.actions.closeDialog(); return; }
+          catch (e) { if (attempt === 99) throw e; }
+        }
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      throw new Error("Native preview did not become ready");
+    },
     async merge(roomId, agentId) { return post(`/rooms/${encodeURIComponent(roomId)}/merge`, { agentId, approve: true }); },
     async discard(roomId, agentId) { return post(`/rooms/${encodeURIComponent(roomId)}/discard`, { agentId, approve: true }); },
   };
@@ -166,10 +214,12 @@ export function createRoomsStore() {
     getSnapshot: () => snap,
     subscribe(fn) { subs.add(fn); connect(); return () => subs.delete(fn); },
     actions,
-    dispose() { if (es) es.close(); es = null; subs.clear(); clearTimeout(searchTimer); },
+    dispose() { navigation++; if (es) es.close(); es = null; subs.clear(); clearTimeout(searchTimer); },
     /** Native dsh workspaces service (set by apply). */
     native: null,
     nativeList: null,
+    uiWorkspace: null,
+    sidebarRight: null,
     /** Called after a room is created/joined (apply switches to the DSH Room panel). */
     onRoomOpened: null,
   };

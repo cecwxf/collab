@@ -1,16 +1,16 @@
 /**
  * DSH Room — browser UI for the dsh room plugin.
- * Independent product surface inside the dsh shell (sidebar entry + main panel).
- * Visual identity, layout, and copy are Rooms-specific (rooms / members / invites /
- * search / tasks). Own visual identity — not a clone of other dsh panel UIs.
+ * Rooms share the native workspace navigation, sessions and document previews.
  */
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Button, Input, Modal, StateDot, Switch, Tag, Toast, writeClipboard } from "@deepseek-ai/dsh-client-ui-primitives";
+import { Button, Input, Modal, StateDot, Switch, Tag, Toast, MarkdownText, MarkdownDelegateProvider, writeClipboard } from "@deepseek-ai/dsh-client-ui-primitives";
 import roomsCss from "./rooms.css";
 import { createRoomsStore } from "./store.js";
+import { sameWorkspacePath, fileCandidates, inlineFile } from "./files.js";
+import { installRoomGroups } from "./workspace-rooms.js";
 
 export const name = "dsh-room-client";
-export const inject = ["slots", "layout", "workspaces"];
+export const inject = ["slots", "layout", "workspaces", "uiWorkspace", "sidebarRight"];
 const PANEL_ID = "collab";
 
 const Svg = ({ size = 16, children }) => (
@@ -68,7 +68,7 @@ function useNativeWorkspaces(store) {
   const snap = useSyncExternalStore(src ? src.subscribe : NO_SUB, src ? src.getSnapshot : NO_SNAP);
   return (snap && snap.items) || [];
 }
-const samePath = (a, b) => !!a && !!b && a.replace(/[\\/]+$/, "") === b.replace(/[\\/]+$/, "");
+const samePath = sameWorkspacePath;
 /** Group joined rooms under the native workspace whose path they are attached to. */
 function groupRooms(rooms, workspaces) {
   const groups = workspaces.map((w) => ({ ws: w, rooms: [] }));
@@ -104,7 +104,7 @@ function RoomsNav({ store }) {
   const qq = q.trim().toLowerCase();
   const match = (r) => !qq || r.name.toLowerCase().includes(qq) || (r.description || "").toLowerCase().includes(qq) || (r.tags || []).some((t) => ("#" + t).includes(qq));
   const { groups, other } = groupRooms((s.rooms || []).filter(match), workspaces);
-  const sel = (r) => a.select(r.roomId);
+  const sel = (r) => { a.select(r.roomId); if (s.dialog?.kind === "rooms") a.closeDialog(); };
   return (
     <nav className="rm-nav" aria-label="Rooms by workspace" data-rm-nav="">
       <div className="rm-nav-head">
@@ -168,14 +168,32 @@ function WorkspaceSelect({ store, value, onChange, id }) {
   );
 }
 
-function renderMentions(text) {
-  return text.split(/(@[A-Za-z0-9][\w.:-]*)/g).map((part, i) => (part.startsWith("@") ? <span key={i} className="rm-mention">{part}</span> : part));
-}
-
 function PanelIcon({ size }) { return <RoomsIcon size={size} />; }
 
 
-function Message({ m, showAuthor, who }) {
+const MARKDOWN_LABELS = { code: { copyLabel: "Copy", copiedLabel: "Copied" }, footnotes: "Footnotes" };
+function MessageBody({ text, room, store, from }) {
+  const agent = room.local?.agents.find(a => a.agentId === from);
+  const candidates = useMemo(() => fileCandidates(text), [text]);
+  const [files, setFiles] = useState({});
+  useEffect(() => {
+    let active = true;
+    setFiles({});
+    if (candidates.paths.length) store.actions.inspectFiles(room.roomId, candidates.paths, agent?.agentId).then(r => { if (active) setFiles(r.files || {}); }).catch(() => {});
+    return () => { active = false; };
+  }, [room.roomId, agent?.agentId, candidates]);
+  const open = (path, options) => store.actions.preview(room.roomId, path, agent?.agentId, options?.line).catch(e => store.actions.toast(e.message));
+  const mentions = { resolve(value) {
+    const parsed = inlineFile(value);
+    return Object.hasOwn(files, parsed.path) ? { title: files[parsed.path], label: `Preview ${value}`, open: () => open(parsed.path, { line: parsed.line }) } : undefined;
+  } };
+  return <MarkdownDelegateProvider openFile={open}>
+    <MarkdownText text={text} labels={MARKDOWN_LABELS} fileMentions={mentions} />
+    {candidates.images.filter(path => files[path]).map(path => <button key={path} className="rm-output-link" type="button" onClick={() => open(path)} data-rm-preview={path}>Preview {path}</button>)}
+  </MarkdownDelegateProvider>;
+}
+
+function Message({ m, showAuthor, who, room, store }) {
   if (m.kind === "task.create") {
     return (
       <div className="rm-msg rm-msg-event" data-message-id={m.id}>
@@ -193,7 +211,7 @@ function Message({ m, showAuthor, who }) {
         <div className="rm-task-head">
           <TaskIcon /><span>{m.self ? "You" : (who && who.name) || m.from} {m.kind === "task.claim" ? "claimed" : "updated"} task</span>
           <Tag tone={STATUS_TONE[m.status] || "neutral"}>{m.status}</Tag>
-          {m.kind === "task.update" && m.text.includes(": ") ? <span>{m.text.slice(m.text.indexOf(": ") + 2)}</span> : null}
+          {m.kind === "task.update" && m.text.includes(": ") ? <MessageBody text={m.text.slice(m.text.indexOf(": ") + 2)} room={room} store={store} from={m.from} /> : null}
           <span className="rm-msg-time">{fmtTime(m.ts)}</span>
         </div>
       </div>
@@ -202,7 +220,7 @@ function Message({ m, showAuthor, who }) {
   if (m.self) {
     return (
       <div className="rm-msg rm-msg-self" data-message-id={m.id}>
-        <div className="rm-msg-body">{renderMentions(m.text)}</div>
+        <div className="rm-msg-body"><MessageBody text={m.text} room={room} store={store} from={m.from} /></div>
         <div className="rm-msg-time" style={{ textAlign: "right", marginTop: 2 }}>{fmtTime(m.ts)}</div>
       </div>
     );
@@ -219,13 +237,13 @@ function Message({ m, showAuthor, who }) {
             <span className="rm-msg-time">{fmtTime(m.ts)}</span>
           </div>
         ) : null}
-        <div className="rm-msg-body">{renderMentions(m.text)}</div>
+        <div className="rm-msg-body"><MessageBody text={m.text} room={room} store={store} from={m.from} /></div>
       </div>
     </div>
   );
 }
 
-function ChatBody({ messages, members }) {
+function ChatBody({ messages, members, room, store }) {
   const byId = useMemo(() => Object.fromEntries((members || []).map((x) => [x.agentId, x])), [members]);
   const ref = useRef(null);
   useEffect(() => { const el = ref.current; if (el) el.scrollTop = el.scrollHeight; }, [messages.length]);
@@ -235,7 +253,7 @@ function ChatBody({ messages, members }) {
     const d = fmtDay(m.ts);
     if (d !== day) { nodes.push(<div key={"d" + m.ts} className="rm-day">{d}</div>); day = d; prev = null; }
     const showAuthor = !prev || prev.from !== m.from || m.ts - prev.ts > 5 * 60_000;
-    nodes.push(<Message key={m.id} m={m} showAuthor={showAuthor} who={byId[m.from]} />);
+    nodes.push(<Message key={m.id} m={m} showAuthor={showAuthor} who={byId[m.from]} room={room} store={store} />);
     prev = m;
   }
   return (
@@ -315,7 +333,7 @@ function Composer({ room, store, draft, setDraft }) {
   const mc = room.memberConfig || {};
   const catalog = useStore(store).models || [];
   const modelLabel = mc.resolvedModel?.name || mc.model || "Model unavailable";
-  const effort = mc.reasoningEffort || "medium";
+  const effort = mc.reasoningEffort || mc.effectiveReasoningEffort || "medium";
   const permSummary = (() => {
     const p = mc.permissions || {};
     const bits = [];
@@ -517,6 +535,7 @@ function RoomDetail({ room, messages, store, mention, assign }) {
   const copyInvite = async () => { const inv = await a.invite(room.roomId); a.toast((await writeClipboard(inv)) ? "Invite copied" : inv); };
   return (
     <aside className="rm-detail" aria-label="Room details">
+      <div className="rm-detail-heading"><b>Room details</b><button className="rm-icon-btn" type="button" aria-label="Close room details" onClick={a.toggleDetails}><CloseIcon /></button></div>
       <div className="rm-detail-section">
         <div className="rm-detail-h"><PeopleIcon />Members · {room.members.length}</div>
         {room.members.map((m) => (
@@ -888,7 +907,7 @@ function MergeDialog({ store, d }) {
                   {ag.conflicts && ag.conflicts.length ? <div className="rm-error">Would conflict with the main workspace: {ag.conflicts.join(", ")} — resolve on the branch or discard.</div> : null}
                   {ag.mainDirty && ag.mainDirty.length ? <div className="rm-error">Uncommitted changes in the main workspace touch: {ag.mainDirty.join(", ")}</div> : null}
                   {ag.files && ag.files.length ? (
-                    <div className="rm-merge-files">{ag.files.map((f) => <span key={f.path} className="rm-merge-file"><span className="rm-mono">{f.path}</span> <span className="rm-diff-addn">+{f.adds}</span> <span className="rm-diff-deln">−{f.dels}</span></span>)}</div>
+                    <div className="rm-merge-files">{ag.files.map((f) => <button key={f.path} type="button" className="rm-merge-file rm-output-link" data-rm-preview={f.path} onClick={() => a.preview(d.roomId, f.path, ag.agentId).catch(e => a.toast(e.message))}><span className="rm-mono">{f.path}</span> <span className="rm-diff-addn">+{f.adds}</span> <span className="rm-diff-deln">−{f.dels}</span></button>)}</div>
                   ) : null}
                   <DiffView patch={ag.patch} />
                   {ag.truncated ? <p className="rm-note">Diff truncated.</p> : null}
@@ -935,7 +954,6 @@ function RoomsMain({ store }) {
   const room = s.rooms.find((r) => r.roomId === s.selected);
   if (!room) return (
     <div className="rm-root rm-main" data-collab-main="">
-      <RoomsNav store={store} />
       <div className="rm-main-body"><ApprovalBanner store={store} /><EmptyMain store={store} /></div>
     </div>
   );
@@ -944,7 +962,6 @@ function RoomsMain({ store }) {
   const setDraft = (v) => setDrafts((d) => ({ ...d, [room.roomId]: typeof v === "function" ? v(d[room.roomId] || "") : v }));
   return (
     <div className="rm-root rm-main" data-collab-main="">
-      <RoomsNav store={store} />
       <div className="rm-main-body">
       <ApprovalBanner store={store} />
       <div className="rm-workspace">
@@ -967,13 +984,15 @@ function RoomsMain({ store }) {
             })()}
             {room.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}{room.transport === "local" ? <span className="rm-badge rm-badge-local">Local only</span> : room.transport === "lan" ? <span className="rm-badge">LAN/VPS</span> : null}
             <StateDot state={room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error"} size={8} />
+            <Button size="sm" variant="ghost" onClick={() => store.actions.openDialog({ kind: "rooms" })}>Rooms</Button>
+            <button type="button" className="rm-icon-btn" aria-label="Room members and settings" aria-expanded={s.detailsOpen} title="Room members and settings" data-rm-details-toggle="" onClick={store.actions.toggleDetails}><PeopleIcon /></button>
           </header>
-          <ChatBody messages={messages} members={room.members} />
+          <ChatBody messages={messages} members={room.members} room={room} store={store} />
           <Composer room={room} store={store} draft={draft} setDraft={setDraft} />
         </section>
-        <RoomDetail room={room} messages={messages} store={store}
+        {s.detailsOpen ? <RoomDetail room={room} messages={messages} store={store}
           mention={(id) => setDraft((d) => `${d}${d && !d.endsWith(" ") ? " " : ""}@${id} `)}
-          assign={(id) => { setDraft(`@${id} `); store.actions.toast(`Switch to task mode, then describe the task for @${id}`); }} />
+          assign={(id) => { setDraft(`@${id} `); store.actions.toast(`Switch to task mode, then describe the task for @${id}`); }} /> : null}
       </div>
       </div>
     </div>
@@ -1289,7 +1308,7 @@ function ConfigDialog({ store, d }) {
   const room = (store.getSnapshot().rooms || []).find((r) => r.roomId === d.roomId);
   const mc = room?.memberConfig || {};
   const [f, setF] = useState({
-    model: mc.model || "", provider: mc.provider || "", reasoningEffort: mc.reasoningEffort || "medium",
+    model: mc.model || "", provider: mc.provider || "", reasoningEffort: mc.reasoningEffort || mc.effectiveReasoningEffort || "medium",
     workspacePath: "", workspaceLabel: mc.workspaceLabel || "",
     autoRead: mc.permissions?.autoRead !== false, autoWrite: !!mc.permissions?.autoWrite,
     autoShell: !!mc.permissions?.autoShell, autoNetwork: !!mc.permissions?.autoNetwork,
@@ -1297,7 +1316,7 @@ function ConfigDialog({ store, d }) {
   });
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { a.getConfig(d.roomId).then((c) => setF((x) => ({ ...x, workspacePath: c.workspacePath || "", workspaceLabel: c.workspaceLabel || x.workspaceLabel, model: c.model || "", provider: c.provider || "", reasoningEffort: c.reasoningEffort || "medium", autoRead: c.permissions?.autoRead !== false, autoWrite: !!c.permissions?.autoWrite, autoShell: !!c.permissions?.autoShell, autoNetwork: !!c.permissions?.autoNetwork, mcpEnabled: c.mcpEnabled !== false }))).catch(() => {}); }, [d.roomId]);
+  useEffect(() => { a.getConfig(d.roomId).then((c) => setF((x) => ({ ...x, workspacePath: c.workspacePath || "", workspaceLabel: c.workspaceLabel || x.workspaceLabel, model: c.model || "", provider: c.provider || "", reasoningEffort: c.reasoningEffort || mc.effectiveReasoningEffort || "medium", autoRead: c.permissions?.autoRead !== false, autoWrite: !!c.permissions?.autoWrite, autoShell: !!c.permissions?.autoShell, autoNetwork: !!c.permissions?.autoNetwork, mcpEnabled: c.mcpEnabled !== false }))).catch(() => {}); }, [d.roomId]);
 
   const submit = async () => {
     setBusy(true); setErr(null);
@@ -1467,6 +1486,7 @@ function Overlay({ store }) {
       {d?.kind === "browse" ? <BrowseDialog store={store} /> : null}
       {d?.kind === "agent" ? <AgentDialog store={store} d={d} /> : null}
       {d?.kind === "merge" ? <MergeDialog store={store} d={d} /> : null}
+      {d?.kind === "rooms" ? <Modal open onClose={store.actions.closeDialog} title="Rooms" description="Rooms are grouped beneath their native workspaces in the sidebar."><div className="rm-root"><RoomsNav store={store} /></div></Modal> : null}
       {s.toast ? <Toast text={s.toast} onDone={store.actions.clearToast} holdMs={2200} /> : null}
     </>
   );
@@ -1493,16 +1513,20 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
   const wsFor = (key) => (native.list.getSnapshot().items || []).find((w) => w.workspaceId === key);
   const rowKey = (row) => (row.getAttribute("data-row-key") || "").slice("workspace:".length);
   const open = (key) => { const w = wsFor(key); if (w) onNewRoom({ id: w.workspaceId, path: w.path, title: wsTitle(w) }); };
+  const newSessionButton = row => {
+    const buttons = [...row.querySelectorAll("button")].filter(b => !b.hasAttribute("data-rm-ws-new-room"));
+    return buttons.find(b => /New session in|中新建会话/.test(b.getAttribute("aria-label") || "")) || buttons[buttons.length - 1];
+  };
   const decorate = () => {
     for (const row of document.querySelectorAll('[data-row-key^="workspace:"]')) {
       const key = rowKey(row);
       if (!key || row.querySelector("[data-rm-ws-new-room]")) continue;
-      const newSess = row.querySelector('button[aria-label^="New session in"]');
+      const newSess = newSessionButton(row);
       if (!newSess) continue;
       let anchor = newSess;
-      while (anchor.parentElement && anchor.parentElement !== row && !anchor.parentElement.querySelector('button[aria-label^="Workspace actions"]')) anchor = anchor.parentElement;
+      while (anchor.parentElement && anchor.parentElement !== row && anchor.parentElement.querySelectorAll("button").length < 2) anchor = anchor.parentElement;
       if (!anchor.parentElement) continue;
-      const label = (newSess.getAttribute("aria-label") || "").replace(/^New session in /, "");
+      const label = wsFor(key) ? wsTitle(wsFor(key)) : (newSess.getAttribute("aria-label") || "").replace(/^New session in /, "");
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = newSess.className;
@@ -1517,9 +1541,10 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
   // "…" menu: remember which workspace opened it, then append our rows to the portaled menu.
   let pendingKey = null;
   const onClickCapture = (e) => {
-    const trigger = e.target instanceof Element ? e.target.closest('button[aria-label^="Workspace actions for"]') : null;
+    const trigger = e.target instanceof Element ? e.target.closest("button") : null;
     if (!trigger) return;
     const row = trigger.closest('[data-row-key^="workspace:"]');
+    if (!row || trigger !== [...row.querySelectorAll("button")].filter(b => !b.hasAttribute("data-rm-ws-new-room"))[0]) return;
     pendingKey = row ? rowKey(row) : null;
     if (!pendingKey) return;
     const key = pendingKey;
@@ -1545,7 +1570,7 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
       const first = menu.firstElementChild;
       menu.insertBefore(mk("New session", newSessSvg, () => {
         const row = document.querySelector(`[data-row-key="workspace:${CSS.escape(key)}"]`);
-        row?.querySelector('button[aria-label^="New session in"]')?.click();
+        if (row) newSessionButton(row)?.click();
       }), first);
       menu.insertBefore(mk("New room", ROOM_SVG, () => open(key)), first);
     };
@@ -1570,6 +1595,8 @@ export function apply(ctx) {
   let native = null;
   try { native = ctx.get ? ctx.get("workspaces") : ctx.workspaces; } catch { native = ctx.workspaces || null; }
   store.native = native || null;
+  store.uiWorkspace = ctx.uiWorkspace;
+  store.sidebarRight = ctx.sidebarRight;
   store.nativeList = native && native.list ? {
     subscribe: (listener) => native.list.subscribe(listener),
     getSnapshot: () => native.list.getSnapshot(),
@@ -1587,4 +1614,5 @@ export function apply(ctx) {
   ctx.slots.inject("sidebar.session.row.leading", () => ctx.slots.register({ name: "sidebar.session.row.leading", id: "dsh-room-session-mark", inject: () => ({ store }) }, RoomSessionMark));
   // …and add "New room" next to each workspace's native "New session".
   ctx.effect(() => installWorkspaceDecorator(store, native, (workspace) => store.actions.openDialog({ kind: "create", workspace })), "dsh-room: workspace New room");
+  ctx.effect(() => installRoomGroups(store, native, ctx.layout, ctx.get ? ctx.get("sessions", false) : ctx.sessions), "dsh-room: workspace room groups");
 }

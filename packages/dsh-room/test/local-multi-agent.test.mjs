@@ -486,7 +486,7 @@ test("model catalog exposes concrete names and agents inherit the room selection
   const dir = await mkdtemp(join(tmpdir(), "lma-models-"));
   const ctx = fakeCtx();
   const services = {
-    agentDefaultModel: { currentSelection: () => ({ provider: "deepseek-official", model: "deepseek-flash" }) },
+    agentDefaultModel: { currentSelection: () => ({ provider: "deepseek-official", model: "deepseek-flash", reasoningEffort: "low" }) },
     llm: { listProviders: () => [{ id: "deepseek-official", name: "DeepSeek" }], listModels: async () => [
       { provider: "deepseek-official", id: "deepseek-flash", name: "DeepSeek-V41-Flash" },
       { provider: "deepseek-official", id: "deepseek-v4-pro", name: "DeepSeek-V4-Pro" },
@@ -499,6 +499,7 @@ test("model catalog exposes concrete names and agents inherit the room selection
     const room = await b.createRoom({ localOnly: true, agents: [{ name: "Worker" }] });
     assert.equal(b.state().defaultModel.name, "DeepSeek-V41-Flash");
     assert.equal(b.view(b.room(room.roomId)).memberConfig.resolvedModel.name, "DeepSeek-V41-Flash");
+    assert.equal(b.view(b.room(room.roomId)).memberConfig.effectiveReasoningEffort, "low");
     await b.updateMemberConfig(room.roomId, { provider: "deepseek-official", model: "deepseek-v4-pro" });
     assert.equal(b.localView(b.room(room.roomId)).agents[0].resolvedModel.name, "DeepSeek-V4-Pro");
     const ag = b.localView(b.room(room.roomId)).agents[0];

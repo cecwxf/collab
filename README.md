@@ -100,3 +100,7 @@ Build plugin, point profile at `packages/dsh-room/dist/index.js`, set `relayUrl`
 ## License
 
 MIT
+
+### Native UI (0.3.8)
+
+Rooms now appear as collapsible groups beneath native dsh workspaces, with their local agent sessions inside. The extra permanent Rooms column is removed and the member/details panel starts closed. Room messages use the native Markdown renderer; local output links and merge-view file chips open native document previews in the author session, including files still in an unmerged worktree. Verified in Web and official Desktop 0.2.0-rc.2.

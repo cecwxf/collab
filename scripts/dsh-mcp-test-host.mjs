@@ -20,7 +20,7 @@ async function boot(){
   child=exe?spawn(exe,['--user-data-dir='+join(dir,'electron')],{env,stdio:['ignore','pipe','pipe']}):spawn('dsh',['web','--patch',patch,'--no-open','--host','127.0.0.1','--port',process.env.DSH_TEST_PORT||'0'],{env,stdio:['ignore','pipe','pipe']});
   const url=await new Promise((res,rej)=>{let s='';const timer=setTimeout(()=>rej(Error('startup timeout')),60000);child.once('exit',c=>{clearTimeout(timer);rej(Error('startup exit '+c));});child.stdout.on('data',d=>{s+=d;const m=/dsh web: (http:\/\/127\.0\.0\.1:\d+\/\?token=\S+)/.exec(s);if(m){clearTimeout(timer);res(m[1]);}});child.stderr.on('data',()=>{});});
   const auth=await fetch(url,{redirect:'manual'});
-  control={base:new URL(url).origin,cookie:auth.headers.getSetCookie().map(c=>c.split(';')[0]).join('; '),dir,home,workspace,host:exe?'desktop':'web',pid:process.pid};
+  control={base:new URL(url).origin,url,cookie:auth.headers.getSetCookie().map(c=>c.split(';')[0]).join('; '),dir,home,workspace,host:exe?'desktop':'web',pid:process.pid};
 }
 try {
   await mkdir(workspace);

@@ -16,3 +16,4 @@ packages/dsh-room/test/.mcp-build/
 packages/dsh-room/test/.commands.bundle.mjs
 packages/dsh-room/test/.lma-build/
 packages/dsh-room/test/.http-build/
+packages/dsh-room/test/.artifacts-build/

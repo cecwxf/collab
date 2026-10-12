@@ -54,6 +54,7 @@ export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId" | "membe
     memberConfig?: (ReturnType<typeof publicMemberConfig> & {
         workspacePath?: string;
         resolvedModel?: ModelChoice | null;
+        effectiveReasoningEffort?: string;
         peerGrants?: RoomMemberConfig["peerGrants"];
     }) | null;
     peerConfigs?: Record<string, ReturnType<typeof publicMemberConfig> & {
@@ -295,6 +296,7 @@ export declare class CollabBridge {
         memberConfig?: (ReturnType<typeof publicMemberConfig> & {
             workspacePath?: string;
             resolvedModel?: ModelChoice | null;
+            effectiveReasoningEffort?: string;
             peerGrants?: RoomMemberConfig["peerGrants"];
         }) | null;
         peerConfigs?: Record<string, ReturnType<typeof publicMemberConfig> & {
@@ -351,6 +353,7 @@ export declare class CollabBridge {
         memberConfig?: (ReturnType<typeof publicMemberConfig> & {
             workspacePath?: string;
             resolvedModel?: ModelChoice | null;
+            effectiveReasoningEffort?: string;
             peerGrants?: RoomMemberConfig["peerGrants"];
         }) | null;
         peerConfigs?: Record<string, ReturnType<typeof publicMemberConfig> & {
@@ -568,6 +571,7 @@ export declare class CollabBridge {
         memberConfig?: (ReturnType<typeof publicMemberConfig> & {
             workspacePath?: string;
             resolvedModel?: ModelChoice | null;
+            effectiveReasoningEffort?: string;
             peerGrants?: RoomMemberConfig["peerGrants"];
         }) | null;
         peerConfigs?: Record<string, ReturnType<typeof publicMemberConfig> & {
@@ -604,6 +608,18 @@ export declare class CollabBridge {
         stopped: number;
     };
     private execRun;
+    /** Create or resume the agent's native session without starting a model turn. */
+    openAgentSession(roomId: string, agentId: string): Promise<{
+        sessionId: string;
+    }>;
+    previewFile(roomId: string, path: string, agentId?: string): Promise<{
+        path: string;
+        workspacePath: string;
+        sessionId: string | undefined;
+    }>;
+    inspectFiles(roomId: string, paths: string[], agentId?: string): Promise<{
+        files: Record<string, string>;
+    }>;
     /** Working directory of an agent: private worktree (write + git), else the room workspace. */
     agentCwd(conn: RoomConn, a: LocalAgentConfig): Promise<string>;
     private runInSession;

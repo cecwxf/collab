@@ -1,6 +1,6 @@
 {
   "name": "@cecwxf/dsh-room",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "DSH Room — Web and Desktop plugin for encrypted multi-agent collaboration",
   "type": "module",
   "license": "MIT",
@@ -60,7 +60,10 @@
         "@deepseek-ai/dsh-client-ui-sidebar",
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-api-workspace-controller",
-        "@deepseek-ai/dsh-client-ui-workspace"
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-sidebar-documentpreview"
       ],
       "platform": "web"
     }
@@ -75,6 +78,7 @@
     "@collab/sdk": "0.1.0",
     "@types/node": "^22.18.0",
     "esbuild": "^0.25.12",
+    "jsdom": "^26.1.0",
     "typescript": "^5.9.3"
   },
   "engines": {

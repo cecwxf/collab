@@ -10,7 +10,7 @@ The same package supports **dsh web** and the official **DeepSeek Harness Deskto
 ### Web
 
 ```sh
-dsh plugin --profile web add @cecwxf/dsh-room@0.3.7
+dsh plugin --profile web add @cecwxf/dsh-room@0.3.8
 dsh web
 ```
 
@@ -21,7 +21,7 @@ Open the printed URL and select **DSH Room** in the sidebar.
 Launch Desktop once to initialize its profile, then **fully quit** it. Use the Desktop-provided `dsh` command to install into its own profile:
 
 ```sh
-dsh plugin --profile desktop add @cecwxf/dsh-room@0.3.7
+dsh plugin --profile desktop add @cecwxf/dsh-room@0.3.8
 ```
 
 Reopen Desktop and select **DSH Room**. Its plugin manager can also install the package. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
@@ -29,7 +29,7 @@ Reopen Desktop and select **DSH Room**. Its plugin manager can also install the 
 If `dsh` on PATH is the npm CLI, use **Manage dsh Command…** in Desktop's application menu or invoke its bundled command directly. For a macOS app in `/Applications`:
 
 ```sh
-"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.7
+"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.8
 ```
 
 Desktop owns its executable profile: the npm CLI cannot initialize or mutate that profile. See the [official Desktop installation rules](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/desktop/README.md#bundled-command-runtime).
@@ -122,7 +122,7 @@ Display name: **dsh room** / **DSH Room**. Package id: `@cecwxf/dsh-room`.
 
 Create room → defaults to **LAN / VPS** with `62.234.113.56:80` (public directory supported). Blank host embeds `collab-lan-relay` + mDNS. Cloudflare is an advanced option. See `docs/VPS_RELAY.md`.
 
-**Rooms live in your dsh workspaces** (0.2+): the native left-sidebar workspace list is untouched. Hover a workspace and click the room icon next to "New session", or open its "…" menu → **New room** (the menu also has **New session**). The wide Create room dialog opens with that workspace preset; the room's member config workspace, MCP sandbox and woken agent session all use that path, and the room's agent session nests under the workspace natively (marked with the room icon). The **DSH Room** panel lists rooms grouped by workspace, with Join by invite and Browse public rooms.
+**Rooms live in your dsh workspaces** (0.2+): the native left-sidebar workspace list is untouched. Hover a workspace and click the room icon next to "New session", or open its "…" menu → **New room** (the menu also has **New session**). The wide Create room dialog opens with that workspace preset; the room's member config workspace, MCP sandbox and woken agent session all use that path, and the room's agent session nests under the workspace natively (marked with the room icon). The native sidebar groups rooms beneath their workspaces and local agent sessions beneath each room. The **DSH Room** panel shows the selected room; its Rooms switcher also offers Join by invite and Browse public rooms.
 
 **Agent config** (per room, local): model, reasoning effort, workspace path, auto-allow flags, MCP on/off. Announced to peers without secrets.
 
@@ -169,3 +169,13 @@ DSH_DESKTOP_APP="/Applications/DeepSeek Harness.app" npm run e2e:dsh:real
 ```
 
 On Windows, pass the installed `DeepSeek Harness.exe` path. The script initializes a disposable Desktop profile, quits before installing with its bundled CLI, restarts the actual app, and checks real sessions plus per-profile default storage. It does not alter the ordinary Desktop profile. Windows execution is supported by the harness path adapter but has not been run in this macOS validation.
+
+## Native workspace navigation and previews (0.3.8)
+
+The permanent Rooms navigation column is removed. Rooms are collapsible groups directly below the native workspace; click the room to see the shared conversation, or a local agent to open its actual dsh session. A room's host session, when present, also stays inside its group. Members, tasks, runs, permissions and merge controls are in a details panel that starts closed and can be toggled from the header. The native session catalog, search, flat view and original rows remain available; unloading the plugin restores their regular presentation. Workspace New room controls also work with Chinese dsh labels.
+
+Room chat and task results use dsh's native Markdown renderer for headings, tables, code, math and file links. Local output links open dsh's native preview in the owning session. For a writing agent, the file is resolved in its worktree first, then in the shared workspace: an unmerged HTML report, Markdown document or image can be viewed before deciding whether to merge. Review & merge file chips are preview buttons too. Clicking a preview switches to the author's native conversation and opens the existing right-side preview; click the room in the workspace tree to return to the shared conversation. File inspection neither starts a model turn nor creates a branch; only verified local files become inline-code file links. Remote member files require a local copy before using the local native preview.
+
+The host APIs `POST /api/collab/rooms/:id/session`, `/preview`, and `/files` reuse the dsh connection fence. File resolution checks real paths against the room workspace and its owned agent worktree, rejecting outside links. Session navigation cancels stale preview responses. Reasoning labels display the effective inherited effort separately from the model name.
+
+Validation: `DSH_PREVIEW_HOST=/private/control.json DSH_PREVIEW_CONTROL=/private/ui-control.json DSH_PREVIEW_EVIDENCE=/path/evidence.json node scripts/e2e-dsh-preview-real.mjs` asks a real DeepSeek agent to produce HTML, Markdown and SVG in an unmerged worktree and verifies native-session/file resolution and boundary rejection. The disposable host utility described above provides the private control file. UI interaction was verified in Safari Web and the official macOS Desktop 0.2.0-rc.2, including actual HTML/Markdown/image previews. Workspace groups use owned DOM decorations because that dsh version has no workspace-child extension seat; dsh upgrades should rerun the sidebar integration tests. Preview navigation itself uses the public `uiWorkspace` and `sidebarRight` services.

@@ -37,7 +37,27 @@ var import_react = require("react");
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/rooms.css
-var rooms_default = '/* Collab Rooms UI \u2014 original surface inside the dsh shell. Uses only dsh --dsw-* tokens.\n   Independent Rooms surface. Prefix: rm- (rooms). */\n\n.rm-root {\n  --rm-accent: var(--dsw-alias-state-business-primary);\n  --rm-hover: var(--dsw-alias-interactive-bg-hover);\n  --rm-border: var(--dsw-alias-border-l2);\n  --rm-bg: var(--dsw-alias-bg-base);\n  --rm-panel: var(--dsw-alias-bg-module-platform);\n  --rm-elev: var(--dsw-alias-bg-module-platform);\n  --rm-label: var(--dsw-alias-label-primary);\n  --rm-muted: var(--dsw-alias-label-secondary);\n  --rm-quiet: var(--dsw-alias-label-tertiary);\n  font: 13px/1.5 var(--dsw-font-family);\n  color: var(--rm-label);\n  box-sizing: border-box;\n}\n.rm-root *, .rm-root *::before, .rm-root *::after { box-sizing: border-box; }\n.rm-root button, .rm-root input, .rm-root textarea { font: inherit; }\n\n/* \u2500\u2500 sidebar (joined rooms + public search) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-side {\n  display: flex; flex-direction: column; height: 100%; min-height: 0;\n  padding: 0 8px 8px 0; gap: 8px;\n}\n.rm-side-toolbar {\n  display: flex; align-items: center; gap: 6px; flex: none; padding: 4px 0 2px;\n}\n.rm-side-title {\n  flex: 1; font-size: 12px; font-weight: 600; letter-spacing: .04em;\n  text-transform: uppercase; color: var(--rm-quiet);\n}\n.rm-icon-btn {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; padding: 0;\n}\n.rm-icon-btn:hover { background: var(--rm-hover); color: var(--rm-label); }\n.rm-search {\n  display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;\n  border: .5px solid var(--rm-border); border-radius: 8px; background: var(--rm-panel);\n}\n.rm-search input {\n  flex: 1; min-width: 0; border: 0; background: transparent; outline: none; color: var(--rm-label); font-size: 13px;\n}\n.rm-search input::placeholder { color: var(--rm-quiet); }\n.rm-side-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }\n.rm-group-label { font-size: 11px; font-weight: 600; color: var(--rm-quiet); padding: 0 4px 4px; text-transform: uppercase; letter-spacing: .03em; }\n.rm-room-list { display: flex; flex-direction: column; gap: 2px; }\n.rm-room-item {\n  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px;\n  border: 0; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; text-align: left;\n}\n.rm-room-item:hover { background: var(--rm-hover); }\n.rm-room-item[aria-current="true"] { background: var(--rm-hover); }\n.rm-room-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }\n.rm-room-item-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-meta { font-size: 11.5px; color: var(--rm-quiet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-trail { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }\n.rm-badge {\n  display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px;\n  border-radius: 999px; font-size: 10.5px; font-weight: 500; background: var(--rm-panel); color: var(--rm-muted);\n  border: .5px solid var(--rm-border);\n}\n.rm-badge-public { color: var(--rm-accent); border-color: color-mix(in srgb, var(--rm-accent) 35%, transparent); background: color-mix(in srgb, var(--rm-accent) 8%, transparent); }\n.rm-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--rm-quiet); }\n.rm-dot-online { background: var(--dsw-alias-state-success-primary, #2bb673); }\n.rm-dot-connecting { background: var(--dsw-alias-state-warn-primary, #e9a23b); }\n.rm-dot-offline { background: var(--dsw-alias-state-error-primary, #e5484d); }\n.rm-empty-hint { padding: 8px 10px; font-size: 12px; color: var(--rm-quiet); line-height: 1.45; }\n.rm-dir-item {\n  display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 10px;\n  border: .5px solid var(--rm-border); background: var(--rm-bg); margin-bottom: 6px;\n}\n.rm-dir-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }\n.rm-dir-tags { display: flex; flex-wrap: wrap; gap: 4px; }\n.rm-tag { font-size: 11px; color: var(--rm-muted); background: var(--rm-hover); border-radius: 4px; padding: 0 5px; }\n.rm-menu {\n  position: fixed; z-index: 1000; min-width: 180px; padding: 4px;\n  border-radius: 10px; background: var(--dsw-alias-bg-layer-1, var(--rm-bg));\n  border: .5px solid var(--rm-border);\n  box-shadow: 0 8px 24px color-mix(in srgb, var(--rm-label) 12%, transparent);\n  display: flex; flex-direction: column;\n}\n.rm-menu button {\n  display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-menu button:hover { background: var(--rm-hover); }\n\n/* \u2500\u2500 main: room workspace \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-main { display: flex; flex: 1; min-height: 0; height: 100%; width: 100%; background: var(--rm-bg); }\n.rm-workspace { display: flex; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat-header {\n  flex: none; display: flex; align-items: center; gap: 10px; height: 48px;\n  padding: 0 16px; border-bottom: .5px solid var(--rm-border);\n}\n.rm-chat-header-title { font-size: 14px; font-weight: 600; }\n.rm-chat-header-sub { font-size: 12px; color: var(--rm-quiet); }\n.rm-messages {\n  flex: 1; min-height: 0; overflow: auto; padding: 16px 18px 8px;\n  display: flex; flex-direction: column; gap: 2px;\n}\n.rm-day {\n  align-self: center; margin: 10px 0 12px; padding: 2px 10px; border-radius: 999px;\n  font-size: 11px; color: var(--rm-quiet); background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n}\n.rm-msg {\n  display: grid; grid-template-columns: 32px 1fr; gap: 0 10px; padding: 4px 6px; border-radius: 8px;\n  max-width: 720px;\n}\n.rm-msg:hover { background: color-mix(in srgb, var(--rm-hover) 60%, transparent); }\n.rm-msg-self { margin-left: auto; grid-template-columns: 1fr; max-width: 640px; }\n.rm-msg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 1px; }\n.rm-msg-author { font-size: 12px; font-weight: 600; color: var(--rm-muted); }\n.rm-msg-time { font-size: 11px; color: var(--rm-quiet); }\n.rm-msg-body { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }\n.rm-msg-self .rm-msg-body {\n  background: var(--dsw-alias-label-primary); color: var(--dsw-alias-label-primary-foreground);\n  padding: 8px 12px; border-radius: 12px 12px 4px 12px; width: fit-content; margin-left: auto;\n}\n.rm-msg-event {\n  grid-template-columns: 1fr; max-width: 560px; margin: 6px 0;\n  padding: 8px 12px; border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-panel);\n}\n.rm-mention { color: var(--rm-accent); font-weight: 500; }\n.rm-msg-self .rm-mention { color: inherit; text-decoration: underline; text-underline-offset: 2px; }\n.rm-task-card { display: flex; flex-direction: column; gap: 4px; }\n.rm-task-head { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--rm-muted); }\n.rm-task-title { font-weight: 600; font-size: 13.5px; }\n.rm-composer {\n  flex: none; display: flex; align-items: flex-end; gap: 8px; padding: 10px 16px 14px;\n  border-top: .5px solid var(--rm-border);\n}\n.rm-composer-box {\n  flex: 1; display: flex; align-items: flex-end; gap: 6px; min-height: 44px;\n  padding: 8px 10px; border: .5px solid var(--rm-border); border-radius: 12px; background: var(--rm-panel);\n}\n.rm-composer-box:focus-within { border-color: color-mix(in srgb, var(--rm-accent) 50%, var(--rm-border)); }\n.rm-composer-box textarea {\n  flex: 1; min-height: 28px; max-height: 120px; border: 0; background: transparent; outline: none;\n  resize: none; color: var(--rm-label); line-height: 1.45;\n}\n.rm-composer-box textarea::placeholder { color: var(--rm-quiet); }\n.rm-composer-mode {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; flex: none;\n}\n.rm-composer-mode:hover, .rm-composer-mode[aria-pressed="true"] {\n  color: var(--rm-accent); background: color-mix(in srgb, var(--rm-accent) 12%, transparent);\n}\n.rm-chat-hint { margin: 48px auto; text-align: center; color: var(--rm-quiet); font-size: 13px; max-width: 360px; line-height: 1.5; }\n\n/* \u2500\u2500 detail column (members / invite / about) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-detail {\n  flex: 0 0 280px; width: 280px; display: flex; flex-direction: column; min-height: 0;\n  border-left: .5px solid var(--rm-border); background: var(--rm-bg); overflow: auto;\n}\n.rm-detail-section { padding: 14px 14px 8px; border-bottom: .5px solid var(--rm-border); }\n.rm-detail-section:last-child { border-bottom: 0; }\n.rm-detail-h {\n  display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;\n  text-transform: uppercase; letter-spacing: .04em; color: var(--rm-quiet); margin-bottom: 8px;\n}\n.rm-member {\n  display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 8px; min-height: 34px;\n}\n.rm-member:hover { background: var(--rm-hover); }\n.rm-member-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }\n.rm-member-actions { display: none; gap: 2px; }\n.rm-member:hover .rm-member-actions, .rm-member:focus-within .rm-member-actions { display: inline-flex; }\n.rm-mini {\n  width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-muted); cursor: pointer; font-size: 12px;\n}\n.rm-mini:hover { background: var(--dsw-alias-interactive-bg-active); color: var(--rm-label); }\n.rm-task-row { display: flex; align-items: center; gap: 6px; padding: 4px; font-size: 12.5px; }\n.rm-task-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-about { display: grid; grid-template-columns: 88px 1fr; gap: 6px 8px; font-size: 12.5px; margin: 0; }\n.rm-about dt { color: var(--rm-quiet); margin: 0; }\n.rm-about dd { margin: 0; min-width: 0; overflow-wrap: anywhere; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }\n.rm-mono { font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace); font-size: 11.5px; }\n.rm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }\n.rm-danger { color: var(--dsw-alias-state-error-primary, #e5484d) !important; }\n.rm-note { font-size: 12px; color: var(--rm-quiet); line-height: 1.45; margin: 0 0 8px; }\n\n/* \u2500\u2500 empty / welcome \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-welcome-wrap {\n  flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px; background: var(--rm-bg);\n}\n.rm-welcome {\n  width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px;\n  padding: 20px; border-radius: 14px; border: .5px solid var(--rm-border); background: var(--rm-panel);\n}\n.rm-welcome h1 { margin: 0; font-size: 16px; font-weight: 600; }\n.rm-welcome p { margin: 0; font-size: 13px; color: var(--rm-muted); line-height: 1.5; }\n.rm-welcome-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }\n.rm-welcome-action {\n  display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 12px;\n  border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-bg);\n  color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-welcome-action:hover { background: var(--rm-hover); }\n.rm-welcome-action b { display: block; font-size: 13px; }\n.rm-welcome-action span { display: block; font-size: 12px; color: var(--rm-quiet); margin-top: 2px; }\n\n/* \u2500\u2500 avatars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-avatar {\n  display: inline-flex; align-items: center; justify-content: center; flex: none;\n  font-weight: 600; letter-spacing: .02em; user-select: none;\n}\n.rm-avatar-wrap { position: relative; display: inline-flex; flex: none; }\n\n/* \u2500\u2500 dialogs (inside dsh Modal) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-form { display: flex; flex-direction: column; gap: 14px; }\n.rm-field { display: flex; flex-direction: column; gap: 6px; }\n.rm-field-label { font-size: 13px; font-weight: 500; }\n.rm-field-hint { font-size: 12px; color: var(--rm-quiet); }\n.rm-name-row { display: flex; align-items: center; gap: 10px; }\n.rm-name-row > :last-child { flex: 1; }\n.rm-switch-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 14px;\n  padding: 10px 12px; border-radius: 10px; background: var(--rm-panel);\n}\n.rm-error { color: var(--dsw-alias-state-error-primary, #e5484d); font-size: 12.5px; }\n.rm-invite {\n  display: block; padding: 10px 12px; border-radius: 8px; background: var(--rm-panel);\n  font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace);\n  font-size: 12px; word-break: break-all; user-select: all;\n}\n\n/* Dual transport + approvals + agent config */\n.rm-mode-row { display: flex; gap: 8px; }\n.rm-mode-btn {\n  flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer; font: inherit;\n}\n.rm-mode-btn.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent); }\n.rm-lan-browse { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }\n.rm-lan-peer {\n  font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer;\n}\n.rm-approvals { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); background: color-mix(in srgb, #f5a524 12%, transparent); }\n.rm-approval { display: flex; gap: 12px; align-items: center; justify-content: space-between; }\n.rm-approval-body { font-size: 13px; }\n.rm-approval-actions { display: flex; gap: 6px; flex-shrink: 0; }\n.rm-input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; font: inherit; }\n\n.rm-ws-bar { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); }\n.rm-ws-chip { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12.5px; }\n.rm-ws-path { font-size: 11px; color: var(--rm-quiet, #8b93a7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item.is-active { background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); }\n\n/* Native-aligned room composer (mirrors dsh conversation control row) */\n.rm-composer-card {\n  box-sizing: border-box;\n  width: 100%;\n  max-width: 920px;\n  margin: 0 auto;\n  border-radius: 16px;\n  background: var(--rm-elev, var(--rm-panel, #12151c));\n  border: 1px solid var(--rm-border, #2a2f3a);\n  box-shadow: 0 1px 2px rgba(0,0,0,.06);\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  padding: 8px 0 6px;\n}\n.rm-composer-grow { position: relative; padding: 0 4px; }\n.rm-composer-grow textarea {\n  box-sizing: border-box; width: 100%; min-height: 36px; max-height: 160px;\n  resize: none; border: none; outline: none; background: transparent;\n  color: inherit; font: inherit; font-size: 14px; line-height: 22px;\n  padding: 4px 12px 0 14px;\n}\n.rm-composer-grow textarea:disabled { opacity: .55; cursor: not-allowed; }\n.rm-composer-row {\n  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;\n  gap: 10px; min-width: 0; padding: 2px 8px 4px;\n}\n.rm-composer-tools, .rm-composer-modes, .rm-composer-trailing {\n  display: flex; align-items: center; min-width: 0; gap: 8px;\n}\n.rm-composer-modes { flex-wrap: wrap; gap: 4px; }\n.rm-composer-trailing { flex: none; margin-left: auto; }\n.rm-composer-add {\n  width: 28px; height: 28px; border: none; border-radius: 999px;\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n  color: inherit; cursor: pointer; display: grid; place-items: center;\n}\n.rm-composer-add:hover, .rm-composer-add[aria-pressed="true"] {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 22%, transparent);\n}\n.rm-composer-select {\n  max-width: 220px; height: 28px; border: none; border-radius: 8px;\n  background: transparent; color: var(--rm-quiet, #8b93a7);\n  font: inherit; font-size: 13px; font-weight: 500; line-height: 20px;\n  padding: 0 8px; cursor: pointer; white-space: nowrap;\n}\n.rm-composer-select:hover:not(:disabled) {\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n}\n.rm-composer-select:disabled { opacity: .5; cursor: default; }\n.rm-composer-model-text { display: inline; }\n.rm-composer-model-icon { display: none; font-size: 10px; }\n\n.rm-composer-send {\n  width: 34px; height: 34px; border: none; border-radius: 999px;\n  background: var(--rm-accent, #5b8cff); color: #fff; cursor: pointer;\n  display: grid; place-items: center; transform: translateY(-2px);\n}\n.rm-composer-send:hover:not(:disabled) { filter: brightness(1.08); }\n.rm-composer-send:disabled { opacity: .4; cursor: default; }\n.rm-composer-popwrap { position: relative; }\n.rm-composer-menu {\n  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 40;\n  min-width: 200px; max-height: 320px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 8px 24px rgba(0,0,0,.28);\n  padding: 6px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-composer-menu-wide { min-width: 280px; max-width: 340px; }\n.rm-composer-menu-label {\n  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;\n  color: var(--rm-quiet, #8b93a7); padding: 6px 8px 2px;\n}\n.rm-composer-menu button[role="menuitem"] {\n  text-align: left; border: none; background: transparent; color: inherit;\n  font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-composer-menu button[role="menuitem"]:hover,\n.rm-composer-menu button[role="menuitem"].is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent);\n}\n.rm-composer-check {\n  display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 8px; cursor: pointer;\n}\n.rm-grant-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 8px;\n  padding: 2px 8px; font-size: 12.5px;\n}\n.rm-grant-row select {\n  font: inherit; font-size: 12px; border-radius: 6px;\n  border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; padding: 2px 6px;\n}\n.rm-peer-grant-block { border-top: 1px solid var(--rm-border, #2a2f3a); padding-top: 4px; margin-top: 4px; }\n.rm-peer-grant-name { font-size: 12px; font-weight: 600; padding: 4px 8px; overflow: hidden; text-overflow: ellipsis; }\n\n/* Hide legacy tight composer if still referenced */\n.rm-composer { display: none; }\n\n.rm-composer-grow { position: relative; }\n.rm-mention-menu {\n  position: absolute; left: 8px; right: 8px; bottom: calc(100% + 6px); z-index: 50;\n  max-height: 240px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 10px 28px rgba(0,0,0,.32);\n  padding: 4px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-mention-item {\n  display: flex; align-items: center; gap: 8px; text-align: left;\n  border: none; background: transparent; color: inherit; font: inherit;\n  padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-mention-item:hover, .rm-mention-item.is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 18%, transparent);\n}\n.rm-mention-item-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }\n.rm-mention-item-name { font-size: 13px; font-weight: 600; }\n.rm-mention-item-meta { font-size: 11px; color: var(--rm-quiet, #8b93a7); }\n\n\n/* New Room shortcut under workspace (mirrors New Session affordance) */\n.rm-new-room {\n  display: flex; align-items: center; justify-content: center; gap: 6px;\n  width: 100%; height: 36px; margin-top: 8px;\n  border: .5px solid var(--rm-border); border-radius: 10px;\n  background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n  color: var(--rm-label); cursor: pointer; font-weight: 500; font-size: 13.5px;\n}\n.rm-new-room:hover { background: var(--dsw-alias-button-floating-hover, var(--rm-hover)); }\n.rm-new-room svg { flex: none; }\n\n/* Wide / landscape create + browse modals (overrides default 380px Modal card) */\n.rm-modal-wide {\n  width: min(720px, calc(100vw - 48px)) !important;\n  max-height: min(640px, calc(100vh - 48px));\n}\n.rm-form-wide {\n  display: grid;\n  grid-template-columns: 1fr 1fr;\n  gap: 12px 18px;\n  align-items: start;\n}\n.rm-form-wide .rm-span-2 { grid-column: 1 / -1; }\n.rm-browse { display: flex; flex-direction: column; gap: 12px; min-height: 280px; max-height: 420px; }\n.rm-browse-search { flex: none; }\n.rm-browse-status { font-size: 11.5px; color: var(--rm-quiet); white-space: nowrap; }\n.rm-browse-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }\n@media (max-width: 640px) {\n  .rm-form-wide { grid-template-columns: 1fr; }\n  .rm-modal-wide { width: min(420px, calc(100vw - 32px)) !important; }\n}\n\n\n/* \u2500\u2500 panel layout: rooms nav (grouped by native dsh workspace) + content \u2500\u2500 */\n.rm-main { flex-direction: row; }\n.rm-main-body { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }\n.rm-main-body > .rm-welcome-wrap { flex: 1; }\n.rm-main-body > .rm-workspace { flex: 1; }\n.rm-nav {\n  flex: 0 0 248px; width: 248px; display: flex; flex-direction: column; gap: 8px; min-height: 0;\n  padding: 10px 8px; border-right: .5px solid var(--rm-border); background: var(--rm-bg);\n}\n.rm-nav-head { display: flex; align-items: center; gap: 4px; padding: 0 4px; }\n.rm-nav-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; }\n.rm-ws-group { display: flex; flex-direction: column; gap: 2px; }\n.rm-ws-head {\n  display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 2px 0 8px;\n  font-size: 12.5px; font-weight: 600; color: var(--rm-muted);\n}\n.rm-ws-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-ws-add { width: 24px; height: 24px; }\n.rm-ws-empty { padding: 2px 10px 6px 30px; font-size: 11.5px; }\n.rm-nav .rm-room-item { padding: 6px 8px 6px 14px; }\n.rm-session-mark { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; color: var(--rm-accent, var(--dsw-alias-state-business-primary)); }\n\n/* \u2500\u2500 local multi-agent (0.3) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-dot-busy { background: var(--dsw-alias-state-warning-primary, #f0a020); }\n.rm-agent-tag { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 10.5px; line-height: 17px; color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); white-space: nowrap; }\n.rm-msg-id { margin-left: 6px; font-size: 11px; color: var(--rm-quiet); font-family: var(--dsw-font-mono, ui-monospace, monospace); }\n.rm-agent-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 8px; }\n.rm-agent-row:hover { background: var(--rm-hover); }\n.rm-agent-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }\n.rm-agent-name { font-size: 13px; font-weight: 600; color: var(--rm-label); display: flex; align-items: center; }\n.rm-agent-sub { font-size: 11px; color: var(--rm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.rm-agent-row .rm-member-actions { display: inline-flex !important; opacity: 0.65; }\n.rm-agent-row:hover .rm-member-actions { opacity: 1; }\n.rm-num-row { display: flex; gap: 8px; margin: 4px 0 8px; }\n.rm-num-setting { flex: 1; display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--rm-muted); }\n.rm-num-setting input { width: 100%; box-sizing: border-box; padding: 5px 8px; border: 1px solid var(--rm-border); border-radius: 7px; background: var(--rm-bg); color: var(--rm-label); font: inherit; font-size: 13px; }\n.rm-runs { display: flex; flex-direction: column; gap: 4px; }\n.rm-run { display: grid; grid-template-columns: 22px auto 1fr auto; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 7px; font-size: 12px; border: 1px solid var(--rm-border); }\n.rm-run-running { border-color: color-mix(in srgb, var(--dsw-alias-state-warning-primary, #f0a020) 55%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-warning-primary, #f0a020) 8%, transparent); }\n.rm-run-queued, .rm-run-approval { border-style: dashed; }\n.rm-run-done, .rm-run-stopped, .rm-run-failed { opacity: 0.7; }\n.rm-run-pos { font-size: 11px; color: var(--rm-quiet); text-align: center; font-variant-numeric: tabular-nums; }\n.rm-run-who { font-weight: 600; color: var(--rm-label); white-space: nowrap; }\n.rm-run-what { color: var(--rm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }\n.rm-stop-btn { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-danger-primary, #e5484d) 60%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-danger-primary, #e5484d) 10%, transparent); color: var(--dsw-alias-state-danger-primary, #e5484d); font-size: 12px; cursor: pointer; white-space: nowrap; }\n.rm-stop-btn:hover { background: color-mix(in srgb, var(--dsw-alias-state-danger-primary, #e5484d) 18%, transparent); }\n.rm-badge-local { color: var(--dsw-alias-state-success-primary, #2bb673); }\n.rm-session-agent { color: var(--rm-accent, #5b8cff); }\n.rm-preset-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }\n.rm-preset { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 150px; flex: 1; padding: 8px 10px; border: 1px solid var(--rm-border); border-radius: 10px; background: transparent; color: var(--rm-label); text-align: left; cursor: pointer; font: inherit; font-size: 12px; }\n.rm-preset span { color: var(--rm-muted); font-size: 11px; line-height: 1.35; }\n.rm-preset.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); }\n.rm-preset-check { flex-direction: row; align-items: center; gap: 8px; min-width: 120px; flex: 0 1 auto; }\n.rm-local-box { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px dashed var(--rm-border); border-radius: 12px; }\n.rm-textarea { width: 100%; box-sizing: border-box; min-height: 84px; resize: vertical; font: inherit; font-size: 13px; padding: 8px 10px; }\n.rm-switch-col { display: flex; flex-direction: column; gap: 6px; }\n.rm-modal-xl { width: min(1180px, 96vw) !important; max-width: 96vw !important; }\n.rm-merge { display: grid; grid-template-columns: 260px 1fr; gap: 14px; min-height: 420px; }\n.rm-merge-list { display: flex; flex-direction: column; gap: 6px; border-right: 1px solid var(--rm-border); padding-right: 12px; }\n.rm-merge-agent { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--rm-label); cursor: pointer; text-align: left; font: inherit; }\n.rm-merge-agent:hover { background: var(--rm-hover); }\n.rm-merge-agent.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 10%, transparent); }\n.rm-merge-agent-body { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 12px; }\n.rm-merge-agent-body .rm-mono { font-size: 10.5px; color: var(--rm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.rm-merge-main { min-width: 0; display: flex; flex-direction: column; gap: 8px; }\n.rm-merge-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; }\n.rm-merge-files { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; }\n.rm-confirm-text { font-size: 12px; color: var(--rm-label); margin-right: 4px; }\n.rm-diff { margin: 0; max-height: 52vh; overflow: auto; padding: 8px 0; border: 1px solid var(--rm-border); border-radius: 10px; background: var(--rm-panel); font-family: var(--dsw-font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.5; }\n.rm-diff > div { padding: 0 12px; white-space: pre; }\n.rm-diff-add { background: color-mix(in srgb, #2bb673 16%, transparent); }\n.rm-diff-del { background: color-mix(in srgb, #e5484d 16%, transparent); }\n.rm-diff-hunk { color: var(--rm-accent, #5b8cff); }\n.rm-diff-head, .rm-diff-file { color: var(--rm-muted); font-weight: 600; }\n.rm-diff-addn { color: #2bb673; }\n.rm-diff-deln { color: #e5484d; }\n.rm-ok { padding: 8px 10px; border-radius: 8px; font-size: 12.5px; color: var(--dsw-alias-state-success-primary, #2bb673); background: color-mix(in srgb, #2bb673 10%, transparent); }\n\n/* \u2500\u2500 create-room dialog (0.3.1): wide, scrollable, tabbed \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-modal-scrollable {\n  width: min(920px, calc(100vw - 48px)) !important;\n  max-width: 96vw !important;\n  /* Bound height so the flex child (.rm-modal-scroll) can scroll instead of clipping. */\n  height: min(720px, 100%) !important;\n  max-height: 100% !important;\n}\n.rm-modal-create { width: min(960px, calc(100vw - 48px)) !important; }\n.rm-modal-scroll {\n  flex: 1 1 auto;\n  min-height: 0;\n  overflow-x: hidden;\n  overflow-y: auto;\n  overscroll-behavior: contain;\n}\n.rm-create { display: flex; flex-direction: column; gap: 12px; }\n.rm-tabs {\n  display: flex; gap: 4px; padding: 2px; border-radius: 10px;\n  background: color-mix(in srgb, var(--rm-border) 55%, transparent);\n  flex-wrap: wrap;\n}\n.rm-tab {\n  flex: 1 1 auto; min-width: 88px; height: 32px; padding: 0 12px; border: 0; border-radius: 8px;\n  background: transparent; color: var(--rm-muted); font: inherit; font-size: 13px; font-weight: 560;\n  cursor: pointer;\n}\n.rm-tab.is-on { background: var(--rm-panel, var(--dsw-alias-bg-layer-2)); color: var(--rm-label); box-shadow: 0 0 0 1px var(--rm-border); }\n.rm-create-pane { min-height: 280px; }\n.rm-mode-wrap { flex-wrap: wrap; }\n.rm-preset-sub { display: block; color: var(--rm-muted); font-size: 11px; font-weight: 400; line-height: 1.35; margin-top: 1px; }\n.rm-create-custom {\n  margin-top: 14px; padding: 12px; border: 1px dashed var(--rm-border); border-radius: 12px;\n  display: flex; flex-direction: column; gap: 10px;\n}\n.rm-create-custom-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }\n.rm-draft-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }\n.rm-draft-item {\n  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px;\n  border: 1px solid var(--rm-border); background: var(--rm-panel);\n}\n.rm-draft-main { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 12.5px; }\n.rm-draft-main span { color: var(--rm-muted); font-size: 11px; }\n.rm-draft-form { margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--rm-border); }\n.rm-linkish { background: none; border: 0; color: var(--rm-accent, #5b8cff); cursor: pointer; font: inherit; font-size: inherit; padding: 0; text-decoration: underline; }\n@media (max-width: 720px) {\n  .rm-modal-create, .rm-modal-scrollable { width: min(100vw - 24px, 520px) !important; }\n}\n';
+var rooms_default = '/* Collab Rooms UI \u2014 original surface inside the dsh shell. Uses only dsh --dsw-* tokens.\n   Independent Rooms surface. Prefix: rm- (rooms). */\n\n.rm-root {\n  --rm-accent: var(--dsw-alias-state-business-primary);\n  --rm-hover: var(--dsw-alias-interactive-bg-hover);\n  --rm-border: var(--dsw-alias-border-l2);\n  --rm-bg: var(--dsw-alias-bg-base);\n  --rm-panel: var(--dsw-alias-bg-module-platform);\n  --rm-elev: var(--dsw-alias-bg-module-platform);\n  --rm-label: var(--dsw-alias-label-primary);\n  --rm-muted: var(--dsw-alias-label-secondary);\n  --rm-quiet: var(--dsw-alias-label-tertiary);\n  font: 13px/1.5 var(--dsw-font-family);\n  color: var(--rm-label);\n  box-sizing: border-box;\n}\n.rm-root *, .rm-root *::before, .rm-root *::after { box-sizing: border-box; }\n.rm-root button, .rm-root input, .rm-root textarea { font: inherit; }\n\n/* \u2500\u2500 sidebar (joined rooms + public search) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-side {\n  display: flex; flex-direction: column; height: 100%; min-height: 0;\n  padding: 0 8px 8px 0; gap: 8px;\n}\n.rm-side-toolbar {\n  display: flex; align-items: center; gap: 6px; flex: none; padding: 4px 0 2px;\n}\n.rm-side-title {\n  flex: 1; font-size: 12px; font-weight: 600; letter-spacing: .04em;\n  text-transform: uppercase; color: var(--rm-quiet);\n}\n.rm-icon-btn {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; padding: 0;\n}\n.rm-icon-btn:hover { background: var(--rm-hover); color: var(--rm-label); }\n.rm-search {\n  display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;\n  border: .5px solid var(--rm-border); border-radius: 8px; background: var(--rm-panel);\n}\n.rm-search input {\n  flex: 1; min-width: 0; border: 0; background: transparent; outline: none; color: var(--rm-label); font-size: 13px;\n}\n.rm-search input::placeholder { color: var(--rm-quiet); }\n.rm-side-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }\n.rm-group-label { font-size: 11px; font-weight: 600; color: var(--rm-quiet); padding: 0 4px 4px; text-transform: uppercase; letter-spacing: .03em; }\n.rm-room-list { display: flex; flex-direction: column; gap: 2px; }\n.rm-room-item {\n  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px;\n  border: 0; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; text-align: left;\n}\n.rm-room-item:hover { background: var(--rm-hover); }\n.rm-room-item[aria-current="true"] { background: var(--rm-hover); }\n.rm-room-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }\n.rm-room-item-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-meta { font-size: 11.5px; color: var(--rm-quiet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-trail { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }\n.rm-badge {\n  display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px;\n  border-radius: 999px; font-size: 10.5px; font-weight: 500; background: var(--rm-panel); color: var(--rm-muted);\n  border: .5px solid var(--rm-border);\n}\n.rm-badge-public { color: var(--rm-accent); border-color: color-mix(in srgb, var(--rm-accent) 35%, transparent); background: color-mix(in srgb, var(--rm-accent) 8%, transparent); }\n.rm-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--rm-quiet); }\n.rm-dot-online { background: var(--dsw-alias-state-success-primary, #2bb673); }\n.rm-dot-connecting { background: var(--dsw-alias-state-warn-primary, #e9a23b); }\n.rm-dot-offline { background: var(--dsw-alias-state-error-primary, #e5484d); }\n.rm-empty-hint { padding: 8px 10px; font-size: 12px; color: var(--rm-quiet); line-height: 1.45; }\n.rm-dir-item {\n  display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 10px;\n  border: .5px solid var(--rm-border); background: var(--rm-bg); margin-bottom: 6px;\n}\n.rm-dir-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }\n.rm-dir-tags { display: flex; flex-wrap: wrap; gap: 4px; }\n.rm-tag { font-size: 11px; color: var(--rm-muted); background: var(--rm-hover); border-radius: 4px; padding: 0 5px; }\n.rm-menu {\n  position: fixed; z-index: 1000; min-width: 180px; padding: 4px;\n  border-radius: 10px; background: var(--dsw-alias-bg-layer-1, var(--rm-bg));\n  border: .5px solid var(--rm-border);\n  box-shadow: 0 8px 24px color-mix(in srgb, var(--rm-label) 12%, transparent);\n  display: flex; flex-direction: column;\n}\n.rm-menu button {\n  display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-menu button:hover { background: var(--rm-hover); }\n\n/* \u2500\u2500 main: room workspace \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-main { display: flex; flex: 1; min-height: 0; height: 100%; width: 100%; background: var(--rm-bg); }\n.rm-workspace { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat-header {\n  flex: none; display: flex; align-items: center; gap: 10px; height: 48px;\n  padding: 0 16px; border-bottom: .5px solid var(--rm-border);\n}\n.rm-chat-header-title { font-size: 14px; font-weight: 600; }\n.rm-chat-header-sub { font-size: 12px; color: var(--rm-quiet); }\n.rm-messages {\n  flex: 1; min-height: 0; overflow: auto; padding: 16px 18px 8px;\n  display: flex; flex-direction: column; gap: 2px;\n}\n.rm-day {\n  align-self: center; margin: 10px 0 12px; padding: 2px 10px; border-radius: 999px;\n  font-size: 11px; color: var(--rm-quiet); background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n}\n.rm-msg {\n  display: grid; grid-template-columns: 32px 1fr; gap: 0 10px; padding: 4px 6px; border-radius: 8px;\n  max-width: 720px;\n}\n.rm-msg:hover { background: color-mix(in srgb, var(--rm-hover) 60%, transparent); }\n.rm-msg-self { margin-left: auto; grid-template-columns: 1fr; max-width: 640px; }\n.rm-msg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 1px; }\n.rm-msg-author { font-size: 12px; font-weight: 600; color: var(--rm-muted); }\n.rm-msg-time { font-size: 11px; color: var(--rm-quiet); }\n.rm-msg-body { font-size: 13.5px; line-height: 1.55; word-break: break-word; min-width: 0; }\n.rm-msg-self .rm-msg-body {\n  background: var(--dsw-alias-label-primary); color: var(--dsw-alias-label-primary-foreground);\n  padding: 8px 12px; border-radius: 12px 12px 4px 12px; width: fit-content; margin-left: auto;\n}\n.rm-msg-event {\n  grid-template-columns: 1fr; max-width: 560px; margin: 6px 0;\n  padding: 8px 12px; border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-panel);\n}\n.rm-mention { color: var(--rm-accent); font-weight: 500; }\n.rm-msg-self .rm-mention { color: inherit; text-decoration: underline; text-underline-offset: 2px; }\n.rm-task-card { display: flex; flex-direction: column; gap: 4px; }\n.rm-task-head { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--rm-muted); }\n.rm-task-title { font-weight: 600; font-size: 13.5px; }\n.rm-composer {\n  flex: none; display: flex; align-items: flex-end; gap: 8px; padding: 10px 16px 14px;\n  border-top: .5px solid var(--rm-border);\n}\n.rm-composer-box {\n  flex: 1; display: flex; align-items: flex-end; gap: 6px; min-height: 44px;\n  padding: 8px 10px; border: .5px solid var(--rm-border); border-radius: 12px; background: var(--rm-panel);\n}\n.rm-composer-box:focus-within { border-color: color-mix(in srgb, var(--rm-accent) 50%, var(--rm-border)); }\n.rm-composer-box textarea {\n  flex: 1; min-height: 28px; max-height: 120px; border: 0; background: transparent; outline: none;\n  resize: none; color: var(--rm-label); line-height: 1.45;\n}\n.rm-composer-box textarea::placeholder { color: var(--rm-quiet); }\n.rm-composer-mode {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; flex: none;\n}\n.rm-composer-mode:hover, .rm-composer-mode[aria-pressed="true"] {\n  color: var(--rm-accent); background: color-mix(in srgb, var(--rm-accent) 12%, transparent);\n}\n.rm-chat-hint { margin: 48px auto; text-align: center; color: var(--rm-quiet); font-size: 13px; max-width: 360px; line-height: 1.5; }\n\n/* \u2500\u2500 detail column (members / invite / about) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-detail {\n  flex: 0 0 280px; width: 280px; display: flex; flex-direction: column; min-height: 0;\n  border-left: .5px solid var(--rm-border); background: var(--rm-bg); overflow: auto;\n}\n.rm-detail-section { padding: 14px 14px 8px; border-bottom: .5px solid var(--rm-border); }\n.rm-detail-heading { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: .5px solid var(--rm-border); }\n.rm-output-link { cursor: pointer; color: var(--rm-accent); background: var(--rm-hover); border: .5px solid var(--rm-border); border-radius: 6px; padding: 3px 7px; font: inherit; }\n.rm-output-link:hover { text-decoration: underline; }\n.rm-native-rooms { padding-left: 10px; }\n.rm-native-room-heading { display: flex; align-items: center; }\n.rm-native-row { display: flex; align-items: center; gap: 7px; min-width: 0; width: 100%; min-height: 30px; padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--rm-muted); text-align: left; cursor: pointer; }\n.rm-native-row:hover, .rm-native-row[aria-current="true"] { background: var(--rm-hover); color: var(--rm-label); }\n.rm-native-row-label { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }\n.rm-native-row-count { font-size: 11px; color: var(--rm-quiet); }\n.rm-native-room-caret { flex: none; border: 0; width: 18px; background: transparent; color: var(--rm-muted); cursor: pointer; }\n.rm-native-agent { padding-left: 34px; font-size: 12px; }\n[data-rm-grouped-session] { display: none !important; }\n.rm-native-rooms[hidden] { display: none; }\n.rm-nav[aria-label="Rooms by workspace"] { width: 100%; border: 0; max-height: 55vh; }\n@media (max-width: 900px) {\n  .rm-detail { position: absolute; top: 0; bottom: 0; right: 0; z-index: 10; width: min(320px, 90%); box-shadow: -8px 0 24px color-mix(in srgb, var(--rm-label) 10%, transparent); }\n}\n.rm-detail-section:last-child { border-bottom: 0; }\n.rm-detail-h {\n  display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;\n  text-transform: uppercase; letter-spacing: .04em; color: var(--rm-quiet); margin-bottom: 8px;\n}\n.rm-member {\n  display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 8px; min-height: 34px;\n}\n.rm-member:hover { background: var(--rm-hover); }\n.rm-member-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }\n.rm-member-actions { display: none; gap: 2px; }\n.rm-member:hover .rm-member-actions, .rm-member:focus-within .rm-member-actions { display: inline-flex; }\n.rm-mini {\n  width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-muted); cursor: pointer; font-size: 12px;\n}\n.rm-mini:hover { background: var(--dsw-alias-interactive-bg-active); color: var(--rm-label); }\n.rm-task-row { display: flex; align-items: center; gap: 6px; padding: 4px; font-size: 12.5px; }\n.rm-task-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-about { display: grid; grid-template-columns: 88px 1fr; gap: 6px 8px; font-size: 12.5px; margin: 0; }\n.rm-about dt { color: var(--rm-quiet); margin: 0; }\n.rm-about dd { margin: 0; min-width: 0; overflow-wrap: anywhere; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }\n.rm-mono { font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace); font-size: 11.5px; }\n.rm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }\n.rm-danger { color: var(--dsw-alias-state-error-primary, #e5484d) !important; }\n.rm-note { font-size: 12px; color: var(--rm-quiet); line-height: 1.45; margin: 0 0 8px; }\n\n/* \u2500\u2500 empty / welcome \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-welcome-wrap {\n  flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px; background: var(--rm-bg);\n}\n.rm-welcome {\n  width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px;\n  padding: 20px; border-radius: 14px; border: .5px solid var(--rm-border); background: var(--rm-panel);\n}\n.rm-welcome h1 { margin: 0; font-size: 16px; font-weight: 600; }\n.rm-welcome p { margin: 0; font-size: 13px; color: var(--rm-muted); line-height: 1.5; }\n.rm-welcome-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }\n.rm-welcome-action {\n  display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 12px;\n  border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-bg);\n  color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-welcome-action:hover { background: var(--rm-hover); }\n.rm-welcome-action b { display: block; font-size: 13px; }\n.rm-welcome-action span { display: block; font-size: 12px; color: var(--rm-quiet); margin-top: 2px; }\n\n/* \u2500\u2500 avatars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-avatar {\n  display: inline-flex; align-items: center; justify-content: center; flex: none;\n  font-weight: 600; letter-spacing: .02em; user-select: none;\n}\n.rm-avatar-wrap { position: relative; display: inline-flex; flex: none; }\n\n/* \u2500\u2500 dialogs (inside dsh Modal) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-form { display: flex; flex-direction: column; gap: 14px; }\n.rm-field { display: flex; flex-direction: column; gap: 6px; }\n.rm-field-label { font-size: 13px; font-weight: 500; }\n.rm-field-hint { font-size: 12px; color: var(--rm-quiet); }\n.rm-name-row { display: flex; align-items: center; gap: 10px; }\n.rm-name-row > :last-child { flex: 1; }\n.rm-switch-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 14px;\n  padding: 10px 12px; border-radius: 10px; background: var(--rm-panel);\n}\n.rm-error { color: var(--dsw-alias-state-error-primary, #e5484d); font-size: 12.5px; }\n.rm-invite {\n  display: block; padding: 10px 12px; border-radius: 8px; background: var(--rm-panel);\n  font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace);\n  font-size: 12px; word-break: break-all; user-select: all;\n}\n\n/* Dual transport + approvals + agent config */\n.rm-mode-row { display: flex; gap: 8px; }\n.rm-mode-btn {\n  flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer; font: inherit;\n}\n.rm-mode-btn.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent); }\n.rm-lan-browse { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }\n.rm-lan-peer {\n  font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer;\n}\n.rm-approvals { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); background: color-mix(in srgb, #f5a524 12%, transparent); }\n.rm-approval { display: flex; gap: 12px; align-items: center; justify-content: space-between; }\n.rm-approval-body { font-size: 13px; }\n.rm-approval-actions { display: flex; gap: 6px; flex-shrink: 0; }\n.rm-input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; font: inherit; }\n\n.rm-ws-bar { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); }\n.rm-ws-chip { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12.5px; }\n.rm-ws-path { font-size: 11px; color: var(--rm-quiet, #8b93a7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item.is-active { background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); }\n\n/* Native-aligned room composer (mirrors dsh conversation control row) */\n.rm-composer-card {\n  box-sizing: border-box;\n  width: 100%;\n  max-width: 920px;\n  margin: 0 auto;\n  border-radius: 16px;\n  background: var(--rm-elev, var(--rm-panel, #12151c));\n  border: 1px solid var(--rm-border, #2a2f3a);\n  box-shadow: 0 1px 2px rgba(0,0,0,.06);\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  padding: 8px 0 6px;\n}\n.rm-composer-grow { position: relative; padding: 0 4px; }\n.rm-composer-grow textarea {\n  box-sizing: border-box; width: 100%; min-height: 36px; max-height: 160px;\n  resize: none; border: none; outline: none; background: transparent;\n  color: inherit; font: inherit; font-size: 14px; line-height: 22px;\n  padding: 4px 12px 0 14px;\n}\n.rm-composer-grow textarea:disabled { opacity: .55; cursor: not-allowed; }\n.rm-composer-row {\n  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;\n  gap: 10px; min-width: 0; padding: 2px 8px 4px;\n}\n.rm-composer-tools, .rm-composer-modes, .rm-composer-trailing {\n  display: flex; align-items: center; min-width: 0; gap: 8px;\n}\n.rm-composer-modes { flex-wrap: wrap; gap: 4px; }\n.rm-composer-trailing { flex: none; margin-left: auto; }\n.rm-composer-add {\n  width: 28px; height: 28px; border: none; border-radius: 999px;\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n  color: inherit; cursor: pointer; display: grid; place-items: center;\n}\n.rm-composer-add:hover, .rm-composer-add[aria-pressed="true"] {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 22%, transparent);\n}\n.rm-composer-select {\n  max-width: 220px; height: 28px; border: none; border-radius: 8px;\n  background: transparent; color: var(--rm-quiet, #8b93a7);\n  font: inherit; font-size: 13px; font-weight: 500; line-height: 20px;\n  padding: 0 8px; cursor: pointer; white-space: nowrap;\n}\n.rm-composer-select:hover:not(:disabled) {\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n}\n.rm-composer-select:disabled { opacity: .5; cursor: default; }\n.rm-composer-model-text { display: inline; }\n.rm-composer-model-icon { display: none; font-size: 10px; }\n\n.rm-composer-send {\n  width: 34px; height: 34px; border: none; border-radius: 999px;\n  background: var(--rm-accent, #5b8cff); color: #fff; cursor: pointer;\n  display: grid; place-items: center; transform: translateY(-2px);\n}\n.rm-composer-send:hover:not(:disabled) { filter: brightness(1.08); }\n.rm-composer-send:disabled { opacity: .4; cursor: default; }\n.rm-composer-popwrap { position: relative; }\n.rm-composer-menu {\n  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 40;\n  min-width: 200px; max-height: 320px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 8px 24px rgba(0,0,0,.28);\n  padding: 6px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-composer-menu-wide { min-width: 280px; max-width: 340px; }\n.rm-composer-menu-label {\n  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;\n  color: var(--rm-quiet, #8b93a7); padding: 6px 8px 2px;\n}\n.rm-composer-menu button[role="menuitem"] {\n  text-align: left; border: none; background: transparent; color: inherit;\n  font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-composer-menu button[role="menuitem"]:hover,\n.rm-composer-menu button[role="menuitem"].is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent);\n}\n.rm-composer-check {\n  display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 8px; cursor: pointer;\n}\n.rm-grant-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 8px;\n  padding: 2px 8px; font-size: 12.5px;\n}\n.rm-grant-row select {\n  font: inherit; font-size: 12px; border-radius: 6px;\n  border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; padding: 2px 6px;\n}\n.rm-peer-grant-block { border-top: 1px solid var(--rm-border, #2a2f3a); padding-top: 4px; margin-top: 4px; }\n.rm-peer-grant-name { font-size: 12px; font-weight: 600; padding: 4px 8px; overflow: hidden; text-overflow: ellipsis; }\n\n/* Hide legacy tight composer if still referenced */\n.rm-composer { display: none; }\n\n.rm-composer-grow { position: relative; }\n.rm-mention-menu {\n  position: absolute; left: 8px; right: 8px; bottom: calc(100% + 6px); z-index: 50;\n  max-height: 240px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 10px 28px rgba(0,0,0,.32);\n  padding: 4px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-mention-item {\n  display: flex; align-items: center; gap: 8px; text-align: left;\n  border: none; background: transparent; color: inherit; font: inherit;\n  padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-mention-item:hover, .rm-mention-item.is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 18%, transparent);\n}\n.rm-mention-item-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }\n.rm-mention-item-name { font-size: 13px; font-weight: 600; }\n.rm-mention-item-meta { font-size: 11px; color: var(--rm-quiet, #8b93a7); }\n\n\n/* New Room shortcut under workspace (mirrors New Session affordance) */\n.rm-new-room {\n  display: flex; align-items: center; justify-content: center; gap: 6px;\n  width: 100%; height: 36px; margin-top: 8px;\n  border: .5px solid var(--rm-border); border-radius: 10px;\n  background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n  color: var(--rm-label); cursor: pointer; font-weight: 500; font-size: 13.5px;\n}\n.rm-new-room:hover { background: var(--dsw-alias-button-floating-hover, var(--rm-hover)); }\n.rm-new-room svg { flex: none; }\n\n/* Wide / landscape create + browse modals (overrides default 380px Modal card) */\n.rm-modal-wide {\n  width: min(720px, calc(100vw - 48px)) !important;\n  max-height: min(640px, calc(100vh - 48px));\n}\n.rm-form-wide {\n  display: grid;\n  grid-template-columns: 1fr 1fr;\n  gap: 12px 18px;\n  align-items: start;\n}\n.rm-form-wide .rm-span-2 { grid-column: 1 / -1; }\n.rm-browse { display: flex; flex-direction: column; gap: 12px; min-height: 280px; max-height: 420px; }\n.rm-browse-search { flex: none; }\n.rm-browse-status { font-size: 11.5px; color: var(--rm-quiet); white-space: nowrap; }\n.rm-browse-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }\n@media (max-width: 640px) {\n  .rm-form-wide { grid-template-columns: 1fr; }\n  .rm-modal-wide { width: min(420px, calc(100vw - 32px)) !important; }\n}\n\n\n/* \u2500\u2500 panel layout: rooms nav (grouped by native dsh workspace) + content \u2500\u2500 */\n.rm-main { flex-direction: row; }\n.rm-main-body { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }\n.rm-main-body > .rm-welcome-wrap { flex: 1; }\n.rm-main-body > .rm-workspace { flex: 1; }\n.rm-nav {\n  flex: 0 0 248px; width: 248px; display: flex; flex-direction: column; gap: 8px; min-height: 0;\n  padding: 10px 8px; border-right: .5px solid var(--rm-border); background: var(--rm-bg);\n}\n.rm-nav-head { display: flex; align-items: center; gap: 4px; padding: 0 4px; }\n.rm-nav-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; }\n.rm-ws-group { display: flex; flex-direction: column; gap: 2px; }\n.rm-ws-head {\n  display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 2px 0 8px;\n  font-size: 12.5px; font-weight: 600; color: var(--rm-muted);\n}\n.rm-ws-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-ws-add { width: 24px; height: 24px; }\n.rm-ws-empty { padding: 2px 10px 6px 30px; font-size: 11.5px; }\n.rm-nav .rm-room-item { padding: 6px 8px 6px 14px; }\n.rm-session-mark { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; color: var(--rm-accent, var(--dsw-alias-state-business-primary)); }\n\n/* \u2500\u2500 local multi-agent (0.3) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-dot-busy { background: var(--dsw-alias-state-warning-primary, #f0a020); }\n.rm-agent-tag { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 10.5px; line-height: 17px; color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); white-space: nowrap; }\n.rm-msg-id { margin-left: 6px; font-size: 11px; color: var(--rm-quiet); font-family: var(--dsw-font-mono, ui-monospace, monospace); }\n.rm-agent-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 8px; }\n.rm-agent-row:hover { background: var(--rm-hover); }\n.rm-agent-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }\n.rm-agent-name { font-size: 13px; font-weight: 600; color: var(--rm-label); display: flex; align-items: center; }\n.rm-agent-sub { font-size: 11px; color: var(--rm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.rm-agent-row .rm-member-actions { display: inline-flex !important; opacity: 0.65; }\n.rm-agent-row:hover .rm-member-actions { opacity: 1; }\n.rm-num-row { display: flex; gap: 8px; margin: 4px 0 8px; }\n.rm-num-setting { flex: 1; display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--rm-muted); }\n.rm-num-setting input { width: 100%; box-sizing: border-box; padding: 5px 8px; border: 1px solid var(--rm-border); border-radius: 7px; background: var(--rm-bg); color: var(--rm-label); font: inherit; font-size: 13px; }\n.rm-runs { display: flex; flex-direction: column; gap: 4px; }\n.rm-run { display: grid; grid-template-columns: 22px auto 1fr auto; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 7px; font-size: 12px; border: 1px solid var(--rm-border); }\n.rm-run-running { border-color: color-mix(in srgb, var(--dsw-alias-state-warning-primary, #f0a020) 55%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-warning-primary, #f0a020) 8%, transparent); }\n.rm-run-queued, .rm-run-approval { border-style: dashed; }\n.rm-run-done, .rm-run-stopped, .rm-run-failed { opacity: 0.7; }\n.rm-run-pos { font-size: 11px; color: var(--rm-quiet); text-align: center; font-variant-numeric: tabular-nums; }\n.rm-run-who { font-weight: 600; color: var(--rm-label); white-space: nowrap; }\n.rm-run-what { color: var(--rm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }\n.rm-stop-btn { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-danger-primary, #e5484d) 60%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-danger-primary, #e5484d) 10%, transparent); color: var(--dsw-alias-state-danger-primary, #e5484d); font-size: 12px; cursor: pointer; white-space: nowrap; }\n.rm-stop-btn:hover { background: color-mix(in srgb, var(--dsw-alias-state-danger-primary, #e5484d) 18%, transparent); }\n.rm-badge-local { color: var(--dsw-alias-state-success-primary, #2bb673); }\n.rm-session-agent { color: var(--rm-accent, #5b8cff); }\n.rm-preset-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }\n.rm-preset { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 150px; flex: 1; padding: 8px 10px; border: 1px solid var(--rm-border); border-radius: 10px; background: transparent; color: var(--rm-label); text-align: left; cursor: pointer; font: inherit; font-size: 12px; }\n.rm-preset span { color: var(--rm-muted); font-size: 11px; line-height: 1.35; }\n.rm-preset.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); }\n.rm-preset-check { flex-direction: row; align-items: center; gap: 8px; min-width: 120px; flex: 0 1 auto; }\n.rm-local-box { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px dashed var(--rm-border); border-radius: 12px; }\n.rm-textarea { width: 100%; box-sizing: border-box; min-height: 84px; resize: vertical; font: inherit; font-size: 13px; padding: 8px 10px; }\n.rm-switch-col { display: flex; flex-direction: column; gap: 6px; }\n.rm-modal-xl { width: min(1180px, 96vw) !important; max-width: 96vw !important; }\n.rm-merge { display: grid; grid-template-columns: 260px 1fr; gap: 14px; min-height: 420px; }\n.rm-merge-list { display: flex; flex-direction: column; gap: 6px; border-right: 1px solid var(--rm-border); padding-right: 12px; }\n.rm-merge-agent { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--rm-label); cursor: pointer; text-align: left; font: inherit; }\n.rm-merge-agent:hover { background: var(--rm-hover); }\n.rm-merge-agent.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 10%, transparent); }\n.rm-merge-agent-body { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 12px; }\n.rm-merge-agent-body .rm-mono { font-size: 10.5px; color: var(--rm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.rm-merge-main { min-width: 0; display: flex; flex-direction: column; gap: 8px; }\n.rm-merge-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; }\n.rm-merge-files { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; }\n.rm-confirm-text { font-size: 12px; color: var(--rm-label); margin-right: 4px; }\n.rm-diff { margin: 0; max-height: 52vh; overflow: auto; padding: 8px 0; border: 1px solid var(--rm-border); border-radius: 10px; background: var(--rm-panel); font-family: var(--dsw-font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.5; }\n.rm-diff > div { padding: 0 12px; white-space: pre; }\n.rm-diff-add { background: color-mix(in srgb, #2bb673 16%, transparent); }\n.rm-diff-del { background: color-mix(in srgb, #e5484d 16%, transparent); }\n.rm-diff-hunk { color: var(--rm-accent, #5b8cff); }\n.rm-diff-head, .rm-diff-file { color: var(--rm-muted); font-weight: 600; }\n.rm-diff-addn { color: #2bb673; }\n.rm-diff-deln { color: #e5484d; }\n.rm-ok { padding: 8px 10px; border-radius: 8px; font-size: 12.5px; color: var(--dsw-alias-state-success-primary, #2bb673); background: color-mix(in srgb, #2bb673 10%, transparent); }\n\n/* \u2500\u2500 create-room dialog (0.3.1): wide, scrollable, tabbed \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-modal-scrollable {\n  width: min(920px, calc(100vw - 48px)) !important;\n  max-width: 96vw !important;\n  /* Bound height so the flex child (.rm-modal-scroll) can scroll instead of clipping. */\n  height: min(720px, 100%) !important;\n  max-height: 100% !important;\n}\n.rm-modal-create { width: min(960px, calc(100vw - 48px)) !important; }\n.rm-modal-scroll {\n  flex: 1 1 auto;\n  min-height: 0;\n  overflow-x: hidden;\n  overflow-y: auto;\n  overscroll-behavior: contain;\n}\n.rm-create { display: flex; flex-direction: column; gap: 12px; }\n.rm-tabs {\n  display: flex; gap: 4px; padding: 2px; border-radius: 10px;\n  background: color-mix(in srgb, var(--rm-border) 55%, transparent);\n  flex-wrap: wrap;\n}\n.rm-tab {\n  flex: 1 1 auto; min-width: 88px; height: 32px; padding: 0 12px; border: 0; border-radius: 8px;\n  background: transparent; color: var(--rm-muted); font: inherit; font-size: 13px; font-weight: 560;\n  cursor: pointer;\n}\n.rm-tab.is-on { background: var(--rm-panel, var(--dsw-alias-bg-layer-2)); color: var(--rm-label); box-shadow: 0 0 0 1px var(--rm-border); }\n.rm-create-pane { min-height: 280px; }\n.rm-mode-wrap { flex-wrap: wrap; }\n.rm-preset-sub { display: block; color: var(--rm-muted); font-size: 11px; font-weight: 400; line-height: 1.35; margin-top: 1px; }\n.rm-create-custom {\n  margin-top: 14px; padding: 12px; border: 1px dashed var(--rm-border); border-radius: 12px;\n  display: flex; flex-direction: column; gap: 10px;\n}\n.rm-create-custom-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }\n.rm-draft-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }\n.rm-draft-item {\n  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px;\n  border: 1px solid var(--rm-border); background: var(--rm-panel);\n}\n.rm-draft-main { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 12.5px; }\n.rm-draft-main span { color: var(--rm-muted); font-size: 11px; }\n.rm-draft-form { margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--rm-border); }\n.rm-linkish { background: none; border: 0; color: var(--rm-accent, #5b8cff); cursor: pointer; font: inherit; font-size: inherit; padding: 0; text-decoration: underline; }\n@media (max-width: 720px) {\n  .rm-modal-create, .rm-modal-scrollable { width: min(100vw - 24px, 520px) !important; }\n}\n';
+
+// src/client/files.js
+function sameWorkspacePath(a, b) {
+  const normal = (p) => (p || "").replace(/\\/g, "/").replace(/^\/private\/var(?=\/)/, "/var").replace(/\/+$/, "");
+  return !!a && !!b && normal(a) === normal(b);
+}
+function sessionFileAddress(sessionId, path) {
+  const normalized = path.replace(/\\/g, "/").replace(/^(?:\.\/)+/, "");
+  const segment = (s) => encodeURIComponent(s).replace(/%3A/gi, ":");
+  return `dsh-resource://file/session/${segment(sessionId)}/${normalized.split("/").map(segment).join("/")}`;
+}
+function inlineFile(value) {
+  const match = /^(.*?)(?::(\d+)|#L(\d+)(?:-L?\d+)?)?$/.exec(value);
+  return { path: match[1], line: Number(match[2] || match[3]) || void 0 };
+}
+function fileCandidates(text) {
+  const values = [...text.matchAll(/`([^`\n]{1,4096})`/g)].map((m) => inlineFile(m[1]).path);
+  const images = [...text.matchAll(/!\[[^\]]*\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g)].map((m) => m[1]);
+  return { paths: [...new Set([...values, ...images].filter((p) => !/^[a-z]+:\/\//i.test(p) && /[./\\]/.test(p)))].slice(0, 50), images };
+}
 
 // src/client/store.js
 var API = "/api/collab";
@@ -79,7 +99,9 @@ function createRoomsStore() {
     dialog: null,
     toast: null,
     approvals: [],
-    search: { open: false, query: "", results: [], loading: false, error: null }
+    search: { open: false, query: "", results: [], loading: false, error: null },
+    detailsOpen: false,
+    expandedRooms: {}
   };
   const subs = /* @__PURE__ */ new Set();
   const set = (patch) => {
@@ -88,6 +110,7 @@ function createRoomsStore() {
   };
   let es = null;
   let searchTimer = null;
+  let navigation = 0;
   function connect() {
     if (es) return;
     es = new EventSource(API + "/stream");
@@ -144,6 +167,11 @@ function createRoomsStore() {
   }
   const actions = {
     select(roomId) {
+      navigation++;
+      try {
+        api.onRoomOpened && api.onRoomOpened();
+      } catch {
+      }
       set({ selected: roomId });
       if (!snap.messages[roomId]) void loadMessages(roomId);
       void post(`/rooms/${encodeURIComponent(roomId)}/active`).catch(() => {
@@ -154,6 +182,12 @@ function createRoomsStore() {
     },
     closeDialog() {
       set({ dialog: null });
+    },
+    toggleDetails() {
+      set((s) => ({ detailsOpen: !s.detailsOpen }));
+    },
+    toggleRoom(roomId) {
+      set((s) => ({ expandedRooms: { ...s.expandedRooms, [roomId]: s.expandedRooms[roomId] === false } }));
     },
     toast,
     clearToast() {
@@ -264,6 +298,54 @@ function createRoomsStore() {
     async diffs(roomId) {
       return call(`/rooms/${encodeURIComponent(roomId)}/diffs`);
     },
+    async openSession(roomId, agentId) {
+      const request = ++navigation;
+      const result = await post(`/rooms/${encodeURIComponent(roomId)}/session`, { agentId });
+      if (request !== navigation) return result;
+      if (!api.uiWorkspace) throw new Error("Native dsh session navigation is unavailable");
+      api.uiWorkspace.openSession(result.sessionId);
+      return result;
+    },
+    openRoomSession(roomId) {
+      navigation++;
+      const id = snap.rooms.find((r) => r.roomId === roomId)?.sessionId;
+      if (!id || !api.uiWorkspace) throw new Error("Room session is unavailable");
+      api.uiWorkspace.openSession(id);
+    },
+    async inspectFiles(roomId, paths, agentId) {
+      return post(`/rooms/${encodeURIComponent(roomId)}/files`, { paths, agentId });
+    },
+    async preview(roomId, path, agentId, line) {
+      const request = ++navigation;
+      const result = await post(`/rooms/${encodeURIComponent(roomId)}/preview`, { path, agentId });
+      if (request !== navigation) return;
+      if (!api.uiWorkspace || !api.sidebarRight) throw new Error("Native dsh preview is unavailable");
+      let sessionId = result.sessionId;
+      if (sessionId) api.uiWorkspace.openSession(sessionId);
+      else {
+        const workspace = api.native?.list.getSnapshot().items.find((w) => sameWorkspacePath(w.path, result.workspacePath));
+        if (!workspace) throw new Error("Open this room's workspace in dsh before previewing files");
+        await api.uiWorkspace.openWorkspace(workspace.workspaceId, (id) => {
+          sessionId = id;
+        });
+      }
+      if (!sessionId) throw new Error("No native session available for preview");
+      const address = sessionFileAddress(sessionId, result.path);
+      for (let attempt = 0; attempt < 100; attempt++) {
+        if (request !== navigation) return;
+        if (api.sidebarRight.mounted?.getSnapshot() === sessionId) {
+          try {
+            api.sidebarRight.openResource(address, line ? { params: { line } } : void 0);
+            api.actions.closeDialog();
+            return;
+          } catch (e) {
+            if (attempt === 99) throw e;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      throw new Error("Native preview did not become ready");
+    },
     async merge(roomId, agentId) {
       return post(`/rooms/${encodeURIComponent(roomId)}/merge`, { agentId, approve: true });
     },
@@ -280,6 +362,7 @@ function createRoomsStore() {
     },
     actions,
     dispose() {
+      navigation++;
       if (es) es.close();
       es = null;
       subs.clear();
@@ -288,16 +371,170 @@ function createRoomsStore() {
     /** Native dsh workspaces service (set by apply). */
     native: null,
     nativeList: null,
+    uiWorkspace: null,
+    sidebarRight: null,
     /** Called after a room is created/joined (apply switches to the DSH Room panel). */
     onRoomOpened: null
   };
   return api;
 }
 
+// src/client/workspace-rooms.js
+var ROOM_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="2"/><path d="M5.5 6.5h5M5.5 9.5h3.5"/></svg>';
+var AGENT_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" aria-hidden="true"><rect x="3" y="5" width="10" height="7.5" rx="2"/><path d="M8 2.5V5M6 8.5h.01M10 8.5h.01"/></svg>';
+function installRoomGroups(store, native, layout, sessions) {
+  if (typeof document === "undefined" || !native) return () => {
+  };
+  let frame = 0, alive = true;
+  const wrappers = /* @__PURE__ */ new Set();
+  const markHidden = (row, hidden) => {
+    if (hidden) row.setAttribute("data-rm-grouped-session", "");
+    else row.removeAttribute("data-rm-grouped-session");
+  };
+  const decorate = () => {
+    const state = store.getSnapshot(), workspaces = native.list.getSnapshot().items || [];
+    const panelActive = layout.panelInfo.getSnapshot().activePanelId === "collab";
+    const current = Object.values(sessions?.list.getSnapshot().byId || {}).find((s) => (s.retainedBy?.mainView || 0) > 0)?.id;
+    const hidden = /* @__PURE__ */ new Set();
+    for (const row of document.querySelectorAll('[data-row-key^="workspace:"]')) {
+      const key = row.getAttribute("data-row-key").slice("workspace:".length);
+      const ws = workspaces.find((w) => w.workspaceId === key);
+      const rooms = ws ? (state.rooms || []).filter((r) => sameWorkspacePath(r.memberConfig?.workspacePath, ws.path)) : [];
+      const anchor = row.parentElement?.tagName === "SPAN" ? row.parentElement : row;
+      const parent = anchor.parentElement;
+      if (!parent) continue;
+      let group = [...parent.children].find((e) => e.getAttribute("data-rm-workspace-rooms") === key);
+      if (!rooms.length) {
+        group?.remove();
+        continue;
+      }
+      if (!group) {
+        group = document.createElement("div");
+        group.className = "rm-root rm-native-rooms";
+        group.setAttribute("data-rm-workspace-rooms", key);
+        group.setAttribute("role", "group");
+        parent.insertBefore(group, anchor.nextSibling);
+        wrappers.add(group);
+      }
+      group.hidden = row.getAttribute("aria-expanded") === "false";
+      const signature = JSON.stringify([panelActive, state.selected, current, rooms.map((r) => [r.roomId, r.name, r.status, r.sessionId, r.local?.agents.map((a) => [a.agentId, a.name, a.sessionId, a.state, a.online]), state.expandedRooms[r.roomId] !== false])]);
+      if (group.getAttribute("data-rm-signature") !== signature) {
+        group.setAttribute("data-rm-signature", signature);
+        group.replaceChildren();
+        for (const room of rooms) {
+          const expanded = state.expandedRooms[room.roomId] !== false;
+          const section = document.createElement("div");
+          section.setAttribute("data-rm-room-group", room.roomId);
+          const heading = document.createElement("div");
+          heading.className = "rm-native-room-heading";
+          const caret = document.createElement("button");
+          caret.type = "button";
+          caret.className = "rm-native-room-caret";
+          caret.textContent = expanded ? "\u2304" : "\u203A";
+          caret.setAttribute("aria-label", `${expanded ? "Collapse" : "Expand"} room ${room.name}`);
+          caret.setAttribute("aria-expanded", String(expanded));
+          caret.onclick = (e) => {
+            e.stopPropagation();
+            store.actions.toggleRoom(room.roomId);
+          };
+          const open = document.createElement("button");
+          open.type = "button";
+          open.className = "rm-native-row";
+          open.setAttribute("data-rm-open-room", room.roomId);
+          open.setAttribute("aria-current", String(panelActive && state.selected === room.roomId));
+          const icon = document.createElement("span");
+          icon.innerHTML = ROOM_ICON;
+          const label = document.createElement("span");
+          label.className = "rm-native-row-label";
+          label.textContent = room.name;
+          open.title = room.name;
+          const count = document.createElement("span");
+          count.className = "rm-native-row-count";
+          count.textContent = String((room.local?.agents.length || 0) + (room.sessionId ? 1 : 0));
+          open.append(icon, label, count);
+          open.onclick = () => store.actions.select(room.roomId);
+          heading.append(caret, open);
+          section.append(heading);
+          if (expanded && room.sessionId) {
+            const host = document.createElement("button");
+            host.type = "button";
+            host.className = "rm-native-row rm-native-agent";
+            host.textContent = "Room session";
+            host.setAttribute("data-rm-open-host", room.roomId);
+            host.setAttribute("aria-current", String(!panelActive && current === room.sessionId));
+            host.onclick = () => {
+              try {
+                store.actions.openRoomSession(room.roomId);
+              } catch (e) {
+                store.actions.toast(e.message);
+              }
+            };
+            section.append(host);
+          }
+          if (expanded) for (const agent of room.local?.agents || []) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "rm-native-row rm-native-agent";
+            button.setAttribute("data-rm-open-agent", agent.agentId);
+            button.setAttribute("aria-current", String(!panelActive && current === agent.sessionId));
+            button.title = `${agent.name} \xB7 native dsh session`;
+            const glyph = document.createElement("span");
+            glyph.innerHTML = AGENT_ICON;
+            const title = document.createElement("span");
+            title.className = "rm-native-row-label";
+            title.textContent = agent.name;
+            button.append(glyph, title);
+            if (agent.state && agent.state !== "idle") {
+              const status = document.createElement("span");
+              status.className = "rm-native-row-count";
+              status.textContent = agent.state;
+              button.append(status);
+            }
+            button.onclick = () => {
+              button.disabled = true;
+              store.actions.openSession(room.roomId, agent.agentId).catch((e) => store.actions.toast(e.message)).finally(() => {
+                button.disabled = false;
+              });
+            };
+            section.append(button);
+          }
+          group.append(section);
+        }
+      }
+      for (const room of rooms) if (room.sessionId) for (const sessionRow of parent.querySelectorAll(`[data-row-key="session:${CSS.escape(room.sessionId)}"]`)) hidden.add(sessionRow.parentElement?.tagName === "SPAN" ? sessionRow.parentElement : sessionRow);
+      for (const room of rooms) for (const agent of room.local?.agents || []) {
+        if (!agent.sessionId) continue;
+        for (const sessionRow of parent.querySelectorAll(`[data-row-key="session:${CSS.escape(agent.sessionId)}"]`)) hidden.add(sessionRow.parentElement?.tagName === "SPAN" ? sessionRow.parentElement : sessionRow);
+      }
+    }
+    for (const row of document.querySelectorAll("[data-rm-grouped-session]")) if (!hidden.has(row)) markHidden(row, false);
+    for (const row of hidden) if (!row.hasAttribute("data-rm-grouped-session")) markHidden(row, true);
+    for (const wrapper of wrappers) if (!wrapper.isConnected) wrappers.delete(wrapper);
+  };
+  const schedule = () => {
+    if (alive && !frame) frame = requestAnimationFrame(() => {
+      frame = 0;
+      decorate();
+    });
+  };
+  const observer = new MutationObserver(schedule);
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-expanded"] });
+  const unsubscribers = [store.subscribe(schedule), native.list.subscribe(schedule), layout.panelInfo.subscribe(schedule), sessions?.list.subscribe(schedule)].filter(Boolean);
+  schedule();
+  return () => {
+    alive = false;
+    observer.disconnect();
+    for (const off of unsubscribers) off();
+    if (frame) cancelAnimationFrame(frame);
+    for (const wrapper of wrappers) wrapper.remove();
+    for (const row of document.querySelectorAll("[data-rm-grouped-session]")) markHidden(row, false);
+  };
+}
+
 // src/client/index.jsx
 var import_jsx_runtime = require("react/jsx-runtime");
 var name = "dsh-room-client";
-var inject = ["slots", "layout", "workspaces"];
+var inject = ["slots", "layout", "workspaces", "uiWorkspace", "sidebarRight"];
 var PANEL_ID = "collab";
 var Svg = ({ size = 16, children }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { width: size, height: size, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "1.15", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children });
 var RoomsIcon = ({ size }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Svg, { size, children: [
@@ -310,6 +547,7 @@ var SearchIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Svg, { child
   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "m10.2 10.2 3.3 3.3" })
 ] });
 var PlusIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Svg, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M8 3v10M3 8h10" }) });
+var CloseIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Svg, { size: 14, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M3.5 3.5l9 9M12.5 3.5l-9 9" }) });
 var SendIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Svg, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M8 13V3.5M4 7.5l4-4 4 4" }) });
 var LinkIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Svg, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M6.5 9.5l3-3M7 4.75l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11.25l-1 1a2.5 2.5 0 0 1-3.5-3.5l1-1" }) });
 var TaskIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Svg, { children: [
@@ -374,7 +612,7 @@ function useNativeWorkspaces(store) {
   const snap = (0, import_react.useSyncExternalStore)(src ? src.subscribe : NO_SUB, src ? src.getSnapshot : NO_SNAP);
   return snap && snap.items || [];
 }
-var samePath = (a, b) => !!a && !!b && a.replace(/[\\/]+$/, "") === b.replace(/[\\/]+$/, "");
+var samePath = sameWorkspacePath;
 function groupRooms(rooms, workspaces) {
   const groups = workspaces.map((w) => ({ ws: w, rooms: [] }));
   const other = [];
@@ -408,7 +646,10 @@ function RoomsNav({ store }) {
   const qq = q.trim().toLowerCase();
   const match = (r) => !qq || r.name.toLowerCase().includes(qq) || (r.description || "").toLowerCase().includes(qq) || (r.tags || []).some((t) => ("#" + t).includes(qq));
   const { groups, other } = groupRooms((s.rooms || []).filter(match), workspaces);
-  const sel = (r) => a.select(r.roomId);
+  const sel = (r) => {
+    a.select(r.roomId);
+    if (s.dialog?.kind === "rooms") a.closeDialog();
+  };
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("nav", { className: "rm-nav", "aria-label": "Rooms by workspace", "data-rm-nav": "", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-nav-head", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-side-title", children: "Rooms" }),
@@ -478,13 +719,39 @@ function WorkspaceSelect({ store, value, onChange, id }) {
     w.path
   ] }, w.workspaceId)) });
 }
-function renderMentions(text) {
-  return text.split(/(@[A-Za-z0-9][\w.:-]*)/g).map((part, i) => part.startsWith("@") ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-mention", children: part }, i) : part);
-}
 function PanelIcon({ size }) {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomsIcon, { size });
 }
-function Message({ m, showAuthor, who }) {
+var MARKDOWN_LABELS = { code: { copyLabel: "Copy", copiedLabel: "Copied" }, footnotes: "Footnotes" };
+function MessageBody({ text, room, store, from }) {
+  const agent = room.local?.agents.find((a) => a.agentId === from);
+  const candidates = (0, import_react.useMemo)(() => fileCandidates(text), [text]);
+  const [files, setFiles] = (0, import_react.useState)({});
+  (0, import_react.useEffect)(() => {
+    let active = true;
+    setFiles({});
+    if (candidates.paths.length) store.actions.inspectFiles(room.roomId, candidates.paths, agent?.agentId).then((r) => {
+      if (active) setFiles(r.files || {});
+    }).catch(() => {
+    });
+    return () => {
+      active = false;
+    };
+  }, [room.roomId, agent?.agentId, candidates]);
+  const open = (path, options) => store.actions.preview(room.roomId, path, agent?.agentId, options?.line).catch((e) => store.actions.toast(e.message));
+  const mentions = { resolve(value) {
+    const parsed = inlineFile(value);
+    return Object.hasOwn(files, parsed.path) ? { title: files[parsed.path], label: `Preview ${value}`, open: () => open(parsed.path, { line: parsed.line }) } : void 0;
+  } };
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_dsh_client_ui_primitives.MarkdownDelegateProvider, { openFile: open, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.MarkdownText, { text, labels: MARKDOWN_LABELS, fileMentions: mentions }),
+    candidates.images.filter((path) => files[path]).map((path) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { className: "rm-output-link", type: "button", onClick: () => open(path), "data-rm-preview": path, children: [
+      "Preview ",
+      path
+    ] }, path))
+  ] });
+}
+function Message({ m, showAuthor, who, room, store }) {
   if (m.kind === "task.create") {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-msg rm-msg-event", "data-message-id": m.id, children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-task-card", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-task-head", children: [
@@ -510,13 +777,13 @@ function Message({ m, showAuthor, who }) {
         " task"
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Tag, { tone: STATUS_TONE[m.status] || "neutral", children: m.status }),
-      m.kind === "task.update" && m.text.includes(": ") ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: m.text.slice(m.text.indexOf(": ") + 2) }) : null,
+      m.kind === "task.update" && m.text.includes(": ") ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MessageBody, { text: m.text.slice(m.text.indexOf(": ") + 2), room, store, from: m.from }) : null,
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-msg-time", children: fmtTime(m.ts) })
     ] }) });
   }
   if (m.self) {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-msg rm-msg-self", "data-message-id": m.id, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-msg-body", children: renderMentions(m.text) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-msg-body", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MessageBody, { text: m.text, room, store, from: m.from }) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-msg-time", style: { textAlign: "right", marginTop: 2 }, children: fmtTime(m.ts) })
     ] });
   }
@@ -532,11 +799,11 @@ function Message({ m, showAuthor, who }) {
         ] }) : null,
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-msg-time", children: fmtTime(m.ts) })
       ] }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-msg-body", children: renderMentions(m.text) })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-msg-body", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MessageBody, { text: m.text, room, store, from: m.from }) })
     ] })
   ] });
 }
-function ChatBody({ messages, members }) {
+function ChatBody({ messages, members, room, store }) {
   const byId = (0, import_react.useMemo)(() => Object.fromEntries((members || []).map((x) => [x.agentId, x])), [members]);
   const ref = (0, import_react.useRef)(null);
   (0, import_react.useEffect)(() => {
@@ -553,7 +820,7 @@ function ChatBody({ messages, members }) {
       prev = null;
     }
     const showAuthor = !prev || prev.from !== m.from || m.ts - prev.ts > 5 * 6e4;
-    nodes.push(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Message, { m, showAuthor, who: byId[m.from] }, m.id));
+    nodes.push(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Message, { m, showAuthor, who: byId[m.from], room, store }, m.id));
     prev = m;
   }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-messages", ref, children: nodes.length ? nodes : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-chat-hint", children: "No messages yet. Send a message, @mention an agent to wake it, or create a task from the composer." }) });
@@ -635,7 +902,7 @@ function Composer({ room, store, draft, setDraft }) {
   const mc = room.memberConfig || {};
   const catalog = useStore(store).models || [];
   const modelLabel = mc.resolvedModel?.name || mc.model || "Model unavailable";
-  const effort = mc.reasoningEffort || "medium";
+  const effort = mc.reasoningEffort || mc.effectiveReasoningEffort || "medium";
   const permSummary = (() => {
     const p = mc.permissions || {};
     const bits = [];
@@ -876,6 +1143,10 @@ function RoomDetail({ room, messages, store, mention, assign }) {
     a.toast(await (0, import_dsh_client_ui_primitives.writeClipboard)(inv) ? "Invite copied" : inv);
   };
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", { className: "rm-detail", "aria-label": "Room details", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-detail-heading", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "Room details" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "rm-icon-btn", type: "button", "aria-label": "Close room details", onClick: a.toggleDetails, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CloseIcon, {}) })
+    ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-detail-section", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-detail-h", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PeopleIcon, {}),
@@ -1347,7 +1618,7 @@ function MergeDialog({ store, d }) {
             "Uncommitted changes in the main workspace touch: ",
             ag.mainDirty.join(", ")
           ] }) : null,
-          ag.files && ag.files.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-merge-files", children: ag.files.map((f) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-merge-file", children: [
+          ag.files && ag.files.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-merge-files", children: ag.files.map((f) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-merge-file rm-output-link", "data-rm-preview": f.path, onClick: () => a.preview(d.roomId, f.path, ag.agentId).catch((e) => a.toast(e.message)), children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-mono", children: f.path }),
             " ",
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-diff-addn", children: [
@@ -1404,76 +1675,72 @@ function RoomsMain({ store }) {
   const s = useStore(store);
   const [drafts, setDrafts] = (0, import_react.useState)({});
   const room = s.rooms.find((r) => r.roomId === s.selected);
-  if (!room) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-main", "data-collab-main": "", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomsNav, { store }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-main-body", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalBanner, { store }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmptyMain, { store })
-    ] })
-  ] });
+  if (!room) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-root rm-main", "data-collab-main": "", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-main-body", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalBanner, { store }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmptyMain, { store })
+  ] }) });
   const messages = s.messages[room.roomId] || [];
   const draft = drafts[room.roomId] || "";
   const setDraft = (v) => setDrafts((d) => ({ ...d, [room.roomId]: typeof v === "function" ? v(d[room.roomId] || "") : v }));
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-main", "data-collab-main": "", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomsNav, { store }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-main-body", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalBanner, { store }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-workspace", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rm-chat", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "rm-chat-header", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: room.name, size: 28 }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { flex: 1, minWidth: 0 }, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-chat-header-title", children: room.name }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-chat-header-sub", children: [
-                room.members.filter((m) => m.online !== false).length,
-                " online",
-                room.local && room.local.agents.length ? ` \xB7 ${room.local.agents.length} local agent${room.local.agents.length === 1 ? "" : "s"}` : "",
-                " \xB7 ",
-                room.public ? "public" : "private",
-                room.status !== "online" ? ` \xB7 room ${room.status}` : ""
-              ] })
-            ] }),
-            (() => {
-              const act = (room.runs || []).filter((r) => r.state === "running" || r.state === "queued" || r.state === "approval");
-              if (!act.length) return null;
-              const running = act.filter((r) => r.state === "running").length;
-              return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-stop-btn", "data-rm-stop": "", title: "Stop all local agent runs", onClick: () => store.actions.stop(room.roomId).then((r) => store.actions.toast(`Stopped ${r.stopped} run(s)`)).catch((e) => store.actions.toast(e.message)), children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StopIcon, {}),
-                "Stop \xB7 ",
-                running,
-                " running",
-                act.length > running ? `, ${act.length - running} queued` : ""
-              ] });
-            })(),
-            room.public ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-badge rm-badge-public", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlobeIcon, {}),
-              "Public"
-            ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-badge", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LockIcon, {}),
-              "Private"
-            ] }),
-            room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge rm-badge-local", children: "Local only" }) : room.transport === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge", children: "LAN/VPS" }) : null,
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.StateDot, { state: room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error", size: 8 })
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-root rm-main", "data-collab-main": "", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-main-body", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalBanner, { store }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-workspace", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rm-chat", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "rm-chat-header", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: room.name, size: 28 }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { flex: 1, minWidth: 0 }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-chat-header-title", children: room.name }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-chat-header-sub", children: [
+              room.members.filter((m) => m.online !== false).length,
+              " online",
+              room.local && room.local.agents.length ? ` \xB7 ${room.local.agents.length} local agent${room.local.agents.length === 1 ? "" : "s"}` : "",
+              " \xB7 ",
+              room.public ? "public" : "private",
+              room.status !== "online" ? ` \xB7 room ${room.status}` : ""
+            ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatBody, { messages, members: room.members }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Composer, { room, store, draft, setDraft })
+          (() => {
+            const act = (room.runs || []).filter((r) => r.state === "running" || r.state === "queued" || r.state === "approval");
+            if (!act.length) return null;
+            const running = act.filter((r) => r.state === "running").length;
+            return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-stop-btn", "data-rm-stop": "", title: "Stop all local agent runs", onClick: () => store.actions.stop(room.roomId).then((r) => store.actions.toast(`Stopped ${r.stopped} run(s)`)).catch((e) => store.actions.toast(e.message)), children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StopIcon, {}),
+              "Stop \xB7 ",
+              running,
+              " running",
+              act.length > running ? `, ${act.length - running} queued` : ""
+            ] });
+          })(),
+          room.public ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-badge rm-badge-public", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlobeIcon, {}),
+            "Public"
+          ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-badge", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LockIcon, {}),
+            "Private"
+          ] }),
+          room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge rm-badge-local", children: "Local only" }) : room.transport === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge", children: "LAN/VPS" }) : null,
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.StateDot, { state: room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error", size: 8 }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "ghost", onClick: () => store.actions.openDialog({ kind: "rooms" }), children: "Rooms" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", "aria-label": "Room members and settings", "aria-expanded": s.detailsOpen, title: "Room members and settings", "data-rm-details-toggle": "", onClick: store.actions.toggleDetails, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PeopleIcon, {}) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-          RoomDetail,
-          {
-            room,
-            messages,
-            store,
-            mention: (id) => setDraft((d) => `${d}${d && !d.endsWith(" ") ? " " : ""}@${id} `),
-            assign: (id) => {
-              setDraft(`@${id} `);
-              store.actions.toast(`Switch to task mode, then describe the task for @${id}`);
-            }
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatBody, { messages, members: room.members, room, store }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Composer, { room, store, draft, setDraft })
+      ] }),
+      s.detailsOpen ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        RoomDetail,
+        {
+          room,
+          messages,
+          store,
+          mention: (id) => setDraft((d) => `${d}${d && !d.endsWith(" ") ? " " : ""}@${id} `),
+          assign: (id) => {
+            setDraft(`@${id} `);
+            store.actions.toast(`Switch to task mode, then describe the task for @${id}`);
           }
-        )
-      ] })
+        }
+      ) : null
     ] })
-  ] });
+  ] }) });
 }
 function Field({ label, hint, children, htmlFor }) {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-field", children: [
@@ -1814,7 +2081,7 @@ function ConfigDialog({ store, d }) {
   const [f, setF] = (0, import_react.useState)({
     model: mc.model || "",
     provider: mc.provider || "",
-    reasoningEffort: mc.reasoningEffort || "medium",
+    reasoningEffort: mc.reasoningEffort || mc.effectiveReasoningEffort || "medium",
     workspacePath: "",
     workspaceLabel: mc.workspaceLabel || "",
     autoRead: mc.permissions?.autoRead !== false,
@@ -1826,7 +2093,7 @@ function ConfigDialog({ store, d }) {
   const [err, setErr] = (0, import_react.useState)(null);
   const [busy, setBusy] = (0, import_react.useState)(false);
   (0, import_react.useEffect)(() => {
-    a.getConfig(d.roomId).then((c) => setF((x) => ({ ...x, workspacePath: c.workspacePath || "", workspaceLabel: c.workspaceLabel || x.workspaceLabel, model: c.model || "", provider: c.provider || "", reasoningEffort: c.reasoningEffort || "medium", autoRead: c.permissions?.autoRead !== false, autoWrite: !!c.permissions?.autoWrite, autoShell: !!c.permissions?.autoShell, autoNetwork: !!c.permissions?.autoNetwork, mcpEnabled: c.mcpEnabled !== false }))).catch(() => {
+    a.getConfig(d.roomId).then((c) => setF((x) => ({ ...x, workspacePath: c.workspacePath || "", workspaceLabel: c.workspaceLabel || x.workspaceLabel, model: c.model || "", provider: c.provider || "", reasoningEffort: c.reasoningEffort || mc.effectiveReasoningEffort || "medium", autoRead: c.permissions?.autoRead !== false, autoWrite: !!c.permissions?.autoWrite, autoShell: !!c.permissions?.autoShell, autoNetwork: !!c.permissions?.autoNetwork, mcpEnabled: c.mcpEnabled !== false }))).catch(() => {
     });
   }, [d.roomId]);
   const submit = async () => {
@@ -2053,6 +2320,7 @@ function Overlay({ store }) {
     d?.kind === "browse" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BrowseDialog, { store }) : null,
     d?.kind === "agent" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AgentDialog, { store, d }) : null,
     d?.kind === "merge" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MergeDialog, { store, d }) : null,
+    d?.kind === "rooms" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Modal, { open: true, onClose: store.actions.closeDialog, title: "Rooms", description: "Rooms are grouped beneath their native workspaces in the sidebar.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-root", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomsNav, { store }) }) }) : null,
     s.toast ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Toast, { text: s.toast, onDone: store.actions.clearToast, holdMs: 2200 }) : null
   ] });
 }
@@ -2075,16 +2343,20 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
     const w = wsFor(key);
     if (w) onNewRoom({ id: w.workspaceId, path: w.path, title: wsTitle(w) });
   };
+  const newSessionButton = (row) => {
+    const buttons = [...row.querySelectorAll("button")].filter((b) => !b.hasAttribute("data-rm-ws-new-room"));
+    return buttons.find((b) => /New session in|中新建会话/.test(b.getAttribute("aria-label") || "")) || buttons[buttons.length - 1];
+  };
   const decorate = () => {
     for (const row of document.querySelectorAll('[data-row-key^="workspace:"]')) {
       const key = rowKey(row);
       if (!key || row.querySelector("[data-rm-ws-new-room]")) continue;
-      const newSess = row.querySelector('button[aria-label^="New session in"]');
+      const newSess = newSessionButton(row);
       if (!newSess) continue;
       let anchor = newSess;
-      while (anchor.parentElement && anchor.parentElement !== row && !anchor.parentElement.querySelector('button[aria-label^="Workspace actions"]')) anchor = anchor.parentElement;
+      while (anchor.parentElement && anchor.parentElement !== row && anchor.parentElement.querySelectorAll("button").length < 2) anchor = anchor.parentElement;
       if (!anchor.parentElement) continue;
-      const label = (newSess.getAttribute("aria-label") || "").replace(/^New session in /, "");
+      const label = wsFor(key) ? wsTitle(wsFor(key)) : (newSess.getAttribute("aria-label") || "").replace(/^New session in /, "");
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = newSess.className;
@@ -2102,9 +2374,10 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
   };
   let pendingKey = null;
   const onClickCapture = (e) => {
-    const trigger = e.target instanceof Element ? e.target.closest('button[aria-label^="Workspace actions for"]') : null;
+    const trigger = e.target instanceof Element ? e.target.closest("button") : null;
     if (!trigger) return;
     const row = trigger.closest('[data-row-key^="workspace:"]');
+    if (!row || trigger !== [...row.querySelectorAll("button")].filter((b) => !b.hasAttribute("data-rm-ws-new-room"))[0]) return;
     pendingKey = row ? rowKey(row) : null;
     if (!pendingKey) return;
     const key = pendingKey;
@@ -2140,7 +2413,7 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
       const first = menu.firstElementChild;
       menu.insertBefore(mk("New session", newSessSvg, () => {
         const row2 = document.querySelector(`[data-row-key="workspace:${CSS.escape(key)}"]`);
-        row2?.querySelector('button[aria-label^="New session in"]')?.click();
+        if (row2) newSessionButton(row2)?.click();
       }), first);
       menu.insertBefore(mk("New room", ROOM_SVG, () => open(key)), first);
     };
@@ -2173,6 +2446,8 @@ function apply(ctx) {
     native = ctx.workspaces || null;
   }
   store.native = native || null;
+  store.uiWorkspace = ctx.uiWorkspace;
+  store.sidebarRight = ctx.sidebarRight;
   store.nativeList = native && native.list ? {
     subscribe: (listener) => native.list.subscribe(listener),
     getSnapshot: () => native.list.getSnapshot()
@@ -2192,6 +2467,7 @@ function apply(ctx) {
   ctx.slots.inject("shell.overlay", () => ctx.slots.register({ name: "shell.overlay", id: "dsh-room-dialogs", inject: () => ({ store }) }, Overlay));
   ctx.slots.inject("sidebar.session.row.leading", () => ctx.slots.register({ name: "sidebar.session.row.leading", id: "dsh-room-session-mark", inject: () => ({ store }) }, RoomSessionMark));
   ctx.effect(() => installWorkspaceDecorator(store, native, (workspace) => store.actions.openDialog({ kind: "create", workspace })), "dsh-room: workspace New room");
+  ctx.effect(() => installRoomGroups(store, native, ctx.layout, ctx.get ? ctx.get("sessions", false) : ctx.sessions), "dsh-room: workspace room groups");
 }
 
 		return module.exports;
@@ -2235,7 +2511,27 @@ var import_react = require("react");
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/client/rooms.css
-var rooms_default = '/* Collab Rooms UI \u2014 original surface inside the dsh shell. Uses only dsh --dsw-* tokens.\n   Independent Rooms surface. Prefix: rm- (rooms). */\n\n.rm-root {\n  --rm-accent: var(--dsw-alias-state-business-primary);\n  --rm-hover: var(--dsw-alias-interactive-bg-hover);\n  --rm-border: var(--dsw-alias-border-l2);\n  --rm-bg: var(--dsw-alias-bg-base);\n  --rm-panel: var(--dsw-alias-bg-module-platform);\n  --rm-elev: var(--dsw-alias-bg-module-platform);\n  --rm-label: var(--dsw-alias-label-primary);\n  --rm-muted: var(--dsw-alias-label-secondary);\n  --rm-quiet: var(--dsw-alias-label-tertiary);\n  font: 13px/1.5 var(--dsw-font-family);\n  color: var(--rm-label);\n  box-sizing: border-box;\n}\n.rm-root *, .rm-root *::before, .rm-root *::after { box-sizing: border-box; }\n.rm-root button, .rm-root input, .rm-root textarea { font: inherit; }\n\n/* \u2500\u2500 sidebar (joined rooms + public search) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-side {\n  display: flex; flex-direction: column; height: 100%; min-height: 0;\n  padding: 0 8px 8px 0; gap: 8px;\n}\n.rm-side-toolbar {\n  display: flex; align-items: center; gap: 6px; flex: none; padding: 4px 0 2px;\n}\n.rm-side-title {\n  flex: 1; font-size: 12px; font-weight: 600; letter-spacing: .04em;\n  text-transform: uppercase; color: var(--rm-quiet);\n}\n.rm-icon-btn {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; padding: 0;\n}\n.rm-icon-btn:hover { background: var(--rm-hover); color: var(--rm-label); }\n.rm-search {\n  display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;\n  border: .5px solid var(--rm-border); border-radius: 8px; background: var(--rm-panel);\n}\n.rm-search input {\n  flex: 1; min-width: 0; border: 0; background: transparent; outline: none; color: var(--rm-label); font-size: 13px;\n}\n.rm-search input::placeholder { color: var(--rm-quiet); }\n.rm-side-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }\n.rm-group-label { font-size: 11px; font-weight: 600; color: var(--rm-quiet); padding: 0 4px 4px; text-transform: uppercase; letter-spacing: .03em; }\n.rm-room-list { display: flex; flex-direction: column; gap: 2px; }\n.rm-room-item {\n  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px;\n  border: 0; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; text-align: left;\n}\n.rm-room-item:hover { background: var(--rm-hover); }\n.rm-room-item[aria-current="true"] { background: var(--rm-hover); }\n.rm-room-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }\n.rm-room-item-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-meta { font-size: 11.5px; color: var(--rm-quiet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-trail { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }\n.rm-badge {\n  display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px;\n  border-radius: 999px; font-size: 10.5px; font-weight: 500; background: var(--rm-panel); color: var(--rm-muted);\n  border: .5px solid var(--rm-border);\n}\n.rm-badge-public { color: var(--rm-accent); border-color: color-mix(in srgb, var(--rm-accent) 35%, transparent); background: color-mix(in srgb, var(--rm-accent) 8%, transparent); }\n.rm-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--rm-quiet); }\n.rm-dot-online { background: var(--dsw-alias-state-success-primary, #2bb673); }\n.rm-dot-connecting { background: var(--dsw-alias-state-warn-primary, #e9a23b); }\n.rm-dot-offline { background: var(--dsw-alias-state-error-primary, #e5484d); }\n.rm-empty-hint { padding: 8px 10px; font-size: 12px; color: var(--rm-quiet); line-height: 1.45; }\n.rm-dir-item {\n  display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 10px;\n  border: .5px solid var(--rm-border); background: var(--rm-bg); margin-bottom: 6px;\n}\n.rm-dir-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }\n.rm-dir-tags { display: flex; flex-wrap: wrap; gap: 4px; }\n.rm-tag { font-size: 11px; color: var(--rm-muted); background: var(--rm-hover); border-radius: 4px; padding: 0 5px; }\n.rm-menu {\n  position: fixed; z-index: 1000; min-width: 180px; padding: 4px;\n  border-radius: 10px; background: var(--dsw-alias-bg-layer-1, var(--rm-bg));\n  border: .5px solid var(--rm-border);\n  box-shadow: 0 8px 24px color-mix(in srgb, var(--rm-label) 12%, transparent);\n  display: flex; flex-direction: column;\n}\n.rm-menu button {\n  display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-menu button:hover { background: var(--rm-hover); }\n\n/* \u2500\u2500 main: room workspace \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-main { display: flex; flex: 1; min-height: 0; height: 100%; width: 100%; background: var(--rm-bg); }\n.rm-workspace { display: flex; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat-header {\n  flex: none; display: flex; align-items: center; gap: 10px; height: 48px;\n  padding: 0 16px; border-bottom: .5px solid var(--rm-border);\n}\n.rm-chat-header-title { font-size: 14px; font-weight: 600; }\n.rm-chat-header-sub { font-size: 12px; color: var(--rm-quiet); }\n.rm-messages {\n  flex: 1; min-height: 0; overflow: auto; padding: 16px 18px 8px;\n  display: flex; flex-direction: column; gap: 2px;\n}\n.rm-day {\n  align-self: center; margin: 10px 0 12px; padding: 2px 10px; border-radius: 999px;\n  font-size: 11px; color: var(--rm-quiet); background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n}\n.rm-msg {\n  display: grid; grid-template-columns: 32px 1fr; gap: 0 10px; padding: 4px 6px; border-radius: 8px;\n  max-width: 720px;\n}\n.rm-msg:hover { background: color-mix(in srgb, var(--rm-hover) 60%, transparent); }\n.rm-msg-self { margin-left: auto; grid-template-columns: 1fr; max-width: 640px; }\n.rm-msg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 1px; }\n.rm-msg-author { font-size: 12px; font-weight: 600; color: var(--rm-muted); }\n.rm-msg-time { font-size: 11px; color: var(--rm-quiet); }\n.rm-msg-body { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }\n.rm-msg-self .rm-msg-body {\n  background: var(--dsw-alias-label-primary); color: var(--dsw-alias-label-primary-foreground);\n  padding: 8px 12px; border-radius: 12px 12px 4px 12px; width: fit-content; margin-left: auto;\n}\n.rm-msg-event {\n  grid-template-columns: 1fr; max-width: 560px; margin: 6px 0;\n  padding: 8px 12px; border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-panel);\n}\n.rm-mention { color: var(--rm-accent); font-weight: 500; }\n.rm-msg-self .rm-mention { color: inherit; text-decoration: underline; text-underline-offset: 2px; }\n.rm-task-card { display: flex; flex-direction: column; gap: 4px; }\n.rm-task-head { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--rm-muted); }\n.rm-task-title { font-weight: 600; font-size: 13.5px; }\n.rm-composer {\n  flex: none; display: flex; align-items: flex-end; gap: 8px; padding: 10px 16px 14px;\n  border-top: .5px solid var(--rm-border);\n}\n.rm-composer-box {\n  flex: 1; display: flex; align-items: flex-end; gap: 6px; min-height: 44px;\n  padding: 8px 10px; border: .5px solid var(--rm-border); border-radius: 12px; background: var(--rm-panel);\n}\n.rm-composer-box:focus-within { border-color: color-mix(in srgb, var(--rm-accent) 50%, var(--rm-border)); }\n.rm-composer-box textarea {\n  flex: 1; min-height: 28px; max-height: 120px; border: 0; background: transparent; outline: none;\n  resize: none; color: var(--rm-label); line-height: 1.45;\n}\n.rm-composer-box textarea::placeholder { color: var(--rm-quiet); }\n.rm-composer-mode {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; flex: none;\n}\n.rm-composer-mode:hover, .rm-composer-mode[aria-pressed="true"] {\n  color: var(--rm-accent); background: color-mix(in srgb, var(--rm-accent) 12%, transparent);\n}\n.rm-chat-hint { margin: 48px auto; text-align: center; color: var(--rm-quiet); font-size: 13px; max-width: 360px; line-height: 1.5; }\n\n/* \u2500\u2500 detail column (members / invite / about) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-detail {\n  flex: 0 0 280px; width: 280px; display: flex; flex-direction: column; min-height: 0;\n  border-left: .5px solid var(--rm-border); background: var(--rm-bg); overflow: auto;\n}\n.rm-detail-section { padding: 14px 14px 8px; border-bottom: .5px solid var(--rm-border); }\n.rm-detail-section:last-child { border-bottom: 0; }\n.rm-detail-h {\n  display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;\n  text-transform: uppercase; letter-spacing: .04em; color: var(--rm-quiet); margin-bottom: 8px;\n}\n.rm-member {\n  display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 8px; min-height: 34px;\n}\n.rm-member:hover { background: var(--rm-hover); }\n.rm-member-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }\n.rm-member-actions { display: none; gap: 2px; }\n.rm-member:hover .rm-member-actions, .rm-member:focus-within .rm-member-actions { display: inline-flex; }\n.rm-mini {\n  width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-muted); cursor: pointer; font-size: 12px;\n}\n.rm-mini:hover { background: var(--dsw-alias-interactive-bg-active); color: var(--rm-label); }\n.rm-task-row { display: flex; align-items: center; gap: 6px; padding: 4px; font-size: 12.5px; }\n.rm-task-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-about { display: grid; grid-template-columns: 88px 1fr; gap: 6px 8px; font-size: 12.5px; margin: 0; }\n.rm-about dt { color: var(--rm-quiet); margin: 0; }\n.rm-about dd { margin: 0; min-width: 0; overflow-wrap: anywhere; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }\n.rm-mono { font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace); font-size: 11.5px; }\n.rm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }\n.rm-danger { color: var(--dsw-alias-state-error-primary, #e5484d) !important; }\n.rm-note { font-size: 12px; color: var(--rm-quiet); line-height: 1.45; margin: 0 0 8px; }\n\n/* \u2500\u2500 empty / welcome \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-welcome-wrap {\n  flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px; background: var(--rm-bg);\n}\n.rm-welcome {\n  width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px;\n  padding: 20px; border-radius: 14px; border: .5px solid var(--rm-border); background: var(--rm-panel);\n}\n.rm-welcome h1 { margin: 0; font-size: 16px; font-weight: 600; }\n.rm-welcome p { margin: 0; font-size: 13px; color: var(--rm-muted); line-height: 1.5; }\n.rm-welcome-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }\n.rm-welcome-action {\n  display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 12px;\n  border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-bg);\n  color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-welcome-action:hover { background: var(--rm-hover); }\n.rm-welcome-action b { display: block; font-size: 13px; }\n.rm-welcome-action span { display: block; font-size: 12px; color: var(--rm-quiet); margin-top: 2px; }\n\n/* \u2500\u2500 avatars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-avatar {\n  display: inline-flex; align-items: center; justify-content: center; flex: none;\n  font-weight: 600; letter-spacing: .02em; user-select: none;\n}\n.rm-avatar-wrap { position: relative; display: inline-flex; flex: none; }\n\n/* \u2500\u2500 dialogs (inside dsh Modal) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-form { display: flex; flex-direction: column; gap: 14px; }\n.rm-field { display: flex; flex-direction: column; gap: 6px; }\n.rm-field-label { font-size: 13px; font-weight: 500; }\n.rm-field-hint { font-size: 12px; color: var(--rm-quiet); }\n.rm-name-row { display: flex; align-items: center; gap: 10px; }\n.rm-name-row > :last-child { flex: 1; }\n.rm-switch-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 14px;\n  padding: 10px 12px; border-radius: 10px; background: var(--rm-panel);\n}\n.rm-error { color: var(--dsw-alias-state-error-primary, #e5484d); font-size: 12.5px; }\n.rm-invite {\n  display: block; padding: 10px 12px; border-radius: 8px; background: var(--rm-panel);\n  font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace);\n  font-size: 12px; word-break: break-all; user-select: all;\n}\n\n/* Dual transport + approvals + agent config */\n.rm-mode-row { display: flex; gap: 8px; }\n.rm-mode-btn {\n  flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer; font: inherit;\n}\n.rm-mode-btn.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent); }\n.rm-lan-browse { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }\n.rm-lan-peer {\n  font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer;\n}\n.rm-approvals { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); background: color-mix(in srgb, #f5a524 12%, transparent); }\n.rm-approval { display: flex; gap: 12px; align-items: center; justify-content: space-between; }\n.rm-approval-body { font-size: 13px; }\n.rm-approval-actions { display: flex; gap: 6px; flex-shrink: 0; }\n.rm-input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; font: inherit; }\n\n.rm-ws-bar { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); }\n.rm-ws-chip { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12.5px; }\n.rm-ws-path { font-size: 11px; color: var(--rm-quiet, #8b93a7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item.is-active { background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); }\n\n/* Native-aligned room composer (mirrors dsh conversation control row) */\n.rm-composer-card {\n  box-sizing: border-box;\n  width: 100%;\n  max-width: 920px;\n  margin: 0 auto;\n  border-radius: 16px;\n  background: var(--rm-elev, var(--rm-panel, #12151c));\n  border: 1px solid var(--rm-border, #2a2f3a);\n  box-shadow: 0 1px 2px rgba(0,0,0,.06);\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  padding: 8px 0 6px;\n}\n.rm-composer-grow { position: relative; padding: 0 4px; }\n.rm-composer-grow textarea {\n  box-sizing: border-box; width: 100%; min-height: 36px; max-height: 160px;\n  resize: none; border: none; outline: none; background: transparent;\n  color: inherit; font: inherit; font-size: 14px; line-height: 22px;\n  padding: 4px 12px 0 14px;\n}\n.rm-composer-grow textarea:disabled { opacity: .55; cursor: not-allowed; }\n.rm-composer-row {\n  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;\n  gap: 10px; min-width: 0; padding: 2px 8px 4px;\n}\n.rm-composer-tools, .rm-composer-modes, .rm-composer-trailing {\n  display: flex; align-items: center; min-width: 0; gap: 8px;\n}\n.rm-composer-modes { flex-wrap: wrap; gap: 4px; }\n.rm-composer-trailing { flex: none; margin-left: auto; }\n.rm-composer-add {\n  width: 28px; height: 28px; border: none; border-radius: 999px;\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n  color: inherit; cursor: pointer; display: grid; place-items: center;\n}\n.rm-composer-add:hover, .rm-composer-add[aria-pressed="true"] {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 22%, transparent);\n}\n.rm-composer-select {\n  max-width: 220px; height: 28px; border: none; border-radius: 8px;\n  background: transparent; color: var(--rm-quiet, #8b93a7);\n  font: inherit; font-size: 13px; font-weight: 500; line-height: 20px;\n  padding: 0 8px; cursor: pointer; white-space: nowrap;\n}\n.rm-composer-select:hover:not(:disabled) {\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n}\n.rm-composer-select:disabled { opacity: .5; cursor: default; }\n.rm-composer-model-text { display: inline; }\n.rm-composer-model-icon { display: none; font-size: 10px; }\n\n.rm-composer-send {\n  width: 34px; height: 34px; border: none; border-radius: 999px;\n  background: var(--rm-accent, #5b8cff); color: #fff; cursor: pointer;\n  display: grid; place-items: center; transform: translateY(-2px);\n}\n.rm-composer-send:hover:not(:disabled) { filter: brightness(1.08); }\n.rm-composer-send:disabled { opacity: .4; cursor: default; }\n.rm-composer-popwrap { position: relative; }\n.rm-composer-menu {\n  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 40;\n  min-width: 200px; max-height: 320px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 8px 24px rgba(0,0,0,.28);\n  padding: 6px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-composer-menu-wide { min-width: 280px; max-width: 340px; }\n.rm-composer-menu-label {\n  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;\n  color: var(--rm-quiet, #8b93a7); padding: 6px 8px 2px;\n}\n.rm-composer-menu button[role="menuitem"] {\n  text-align: left; border: none; background: transparent; color: inherit;\n  font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-composer-menu button[role="menuitem"]:hover,\n.rm-composer-menu button[role="menuitem"].is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent);\n}\n.rm-composer-check {\n  display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 8px; cursor: pointer;\n}\n.rm-grant-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 8px;\n  padding: 2px 8px; font-size: 12.5px;\n}\n.rm-grant-row select {\n  font: inherit; font-size: 12px; border-radius: 6px;\n  border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; padding: 2px 6px;\n}\n.rm-peer-grant-block { border-top: 1px solid var(--rm-border, #2a2f3a); padding-top: 4px; margin-top: 4px; }\n.rm-peer-grant-name { font-size: 12px; font-weight: 600; padding: 4px 8px; overflow: hidden; text-overflow: ellipsis; }\n\n/* Hide legacy tight composer if still referenced */\n.rm-composer { display: none; }\n\n.rm-composer-grow { position: relative; }\n.rm-mention-menu {\n  position: absolute; left: 8px; right: 8px; bottom: calc(100% + 6px); z-index: 50;\n  max-height: 240px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 10px 28px rgba(0,0,0,.32);\n  padding: 4px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-mention-item {\n  display: flex; align-items: center; gap: 8px; text-align: left;\n  border: none; background: transparent; color: inherit; font: inherit;\n  padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-mention-item:hover, .rm-mention-item.is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 18%, transparent);\n}\n.rm-mention-item-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }\n.rm-mention-item-name { font-size: 13px; font-weight: 600; }\n.rm-mention-item-meta { font-size: 11px; color: var(--rm-quiet, #8b93a7); }\n\n\n/* New Room shortcut under workspace (mirrors New Session affordance) */\n.rm-new-room {\n  display: flex; align-items: center; justify-content: center; gap: 6px;\n  width: 100%; height: 36px; margin-top: 8px;\n  border: .5px solid var(--rm-border); border-radius: 10px;\n  background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n  color: var(--rm-label); cursor: pointer; font-weight: 500; font-size: 13.5px;\n}\n.rm-new-room:hover { background: var(--dsw-alias-button-floating-hover, var(--rm-hover)); }\n.rm-new-room svg { flex: none; }\n\n/* Wide / landscape create + browse modals (overrides default 380px Modal card) */\n.rm-modal-wide {\n  width: min(720px, calc(100vw - 48px)) !important;\n  max-height: min(640px, calc(100vh - 48px));\n}\n.rm-form-wide {\n  display: grid;\n  grid-template-columns: 1fr 1fr;\n  gap: 12px 18px;\n  align-items: start;\n}\n.rm-form-wide .rm-span-2 { grid-column: 1 / -1; }\n.rm-browse { display: flex; flex-direction: column; gap: 12px; min-height: 280px; max-height: 420px; }\n.rm-browse-search { flex: none; }\n.rm-browse-status { font-size: 11.5px; color: var(--rm-quiet); white-space: nowrap; }\n.rm-browse-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }\n@media (max-width: 640px) {\n  .rm-form-wide { grid-template-columns: 1fr; }\n  .rm-modal-wide { width: min(420px, calc(100vw - 32px)) !important; }\n}\n\n\n/* \u2500\u2500 panel layout: rooms nav (grouped by native dsh workspace) + content \u2500\u2500 */\n.rm-main { flex-direction: row; }\n.rm-main-body { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }\n.rm-main-body > .rm-welcome-wrap { flex: 1; }\n.rm-main-body > .rm-workspace { flex: 1; }\n.rm-nav {\n  flex: 0 0 248px; width: 248px; display: flex; flex-direction: column; gap: 8px; min-height: 0;\n  padding: 10px 8px; border-right: .5px solid var(--rm-border); background: var(--rm-bg);\n}\n.rm-nav-head { display: flex; align-items: center; gap: 4px; padding: 0 4px; }\n.rm-nav-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; }\n.rm-ws-group { display: flex; flex-direction: column; gap: 2px; }\n.rm-ws-head {\n  display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 2px 0 8px;\n  font-size: 12.5px; font-weight: 600; color: var(--rm-muted);\n}\n.rm-ws-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-ws-add { width: 24px; height: 24px; }\n.rm-ws-empty { padding: 2px 10px 6px 30px; font-size: 11.5px; }\n.rm-nav .rm-room-item { padding: 6px 8px 6px 14px; }\n.rm-session-mark { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; color: var(--rm-accent, var(--dsw-alias-state-business-primary)); }\n\n/* \u2500\u2500 local multi-agent (0.3) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-dot-busy { background: var(--dsw-alias-state-warning-primary, #f0a020); }\n.rm-agent-tag { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 10.5px; line-height: 17px; color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); white-space: nowrap; }\n.rm-msg-id { margin-left: 6px; font-size: 11px; color: var(--rm-quiet); font-family: var(--dsw-font-mono, ui-monospace, monospace); }\n.rm-agent-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 8px; }\n.rm-agent-row:hover { background: var(--rm-hover); }\n.rm-agent-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }\n.rm-agent-name { font-size: 13px; font-weight: 600; color: var(--rm-label); display: flex; align-items: center; }\n.rm-agent-sub { font-size: 11px; color: var(--rm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.rm-agent-row .rm-member-actions { display: inline-flex !important; opacity: 0.65; }\n.rm-agent-row:hover .rm-member-actions { opacity: 1; }\n.rm-num-row { display: flex; gap: 8px; margin: 4px 0 8px; }\n.rm-num-setting { flex: 1; display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--rm-muted); }\n.rm-num-setting input { width: 100%; box-sizing: border-box; padding: 5px 8px; border: 1px solid var(--rm-border); border-radius: 7px; background: var(--rm-bg); color: var(--rm-label); font: inherit; font-size: 13px; }\n.rm-runs { display: flex; flex-direction: column; gap: 4px; }\n.rm-run { display: grid; grid-template-columns: 22px auto 1fr auto; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 7px; font-size: 12px; border: 1px solid var(--rm-border); }\n.rm-run-running { border-color: color-mix(in srgb, var(--dsw-alias-state-warning-primary, #f0a020) 55%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-warning-primary, #f0a020) 8%, transparent); }\n.rm-run-queued, .rm-run-approval { border-style: dashed; }\n.rm-run-done, .rm-run-stopped, .rm-run-failed { opacity: 0.7; }\n.rm-run-pos { font-size: 11px; color: var(--rm-quiet); text-align: center; font-variant-numeric: tabular-nums; }\n.rm-run-who { font-weight: 600; color: var(--rm-label); white-space: nowrap; }\n.rm-run-what { color: var(--rm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }\n.rm-stop-btn { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-danger-primary, #e5484d) 60%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-danger-primary, #e5484d) 10%, transparent); color: var(--dsw-alias-state-danger-primary, #e5484d); font-size: 12px; cursor: pointer; white-space: nowrap; }\n.rm-stop-btn:hover { background: color-mix(in srgb, var(--dsw-alias-state-danger-primary, #e5484d) 18%, transparent); }\n.rm-badge-local { color: var(--dsw-alias-state-success-primary, #2bb673); }\n.rm-session-agent { color: var(--rm-accent, #5b8cff); }\n.rm-preset-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }\n.rm-preset { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 150px; flex: 1; padding: 8px 10px; border: 1px solid var(--rm-border); border-radius: 10px; background: transparent; color: var(--rm-label); text-align: left; cursor: pointer; font: inherit; font-size: 12px; }\n.rm-preset span { color: var(--rm-muted); font-size: 11px; line-height: 1.35; }\n.rm-preset.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); }\n.rm-preset-check { flex-direction: row; align-items: center; gap: 8px; min-width: 120px; flex: 0 1 auto; }\n.rm-local-box { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px dashed var(--rm-border); border-radius: 12px; }\n.rm-textarea { width: 100%; box-sizing: border-box; min-height: 84px; resize: vertical; font: inherit; font-size: 13px; padding: 8px 10px; }\n.rm-switch-col { display: flex; flex-direction: column; gap: 6px; }\n.rm-modal-xl { width: min(1180px, 96vw) !important; max-width: 96vw !important; }\n.rm-merge { display: grid; grid-template-columns: 260px 1fr; gap: 14px; min-height: 420px; }\n.rm-merge-list { display: flex; flex-direction: column; gap: 6px; border-right: 1px solid var(--rm-border); padding-right: 12px; }\n.rm-merge-agent { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--rm-label); cursor: pointer; text-align: left; font: inherit; }\n.rm-merge-agent:hover { background: var(--rm-hover); }\n.rm-merge-agent.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 10%, transparent); }\n.rm-merge-agent-body { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 12px; }\n.rm-merge-agent-body .rm-mono { font-size: 10.5px; color: var(--rm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.rm-merge-main { min-width: 0; display: flex; flex-direction: column; gap: 8px; }\n.rm-merge-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; }\n.rm-merge-files { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; }\n.rm-confirm-text { font-size: 12px; color: var(--rm-label); margin-right: 4px; }\n.rm-diff { margin: 0; max-height: 52vh; overflow: auto; padding: 8px 0; border: 1px solid var(--rm-border); border-radius: 10px; background: var(--rm-panel); font-family: var(--dsw-font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.5; }\n.rm-diff > div { padding: 0 12px; white-space: pre; }\n.rm-diff-add { background: color-mix(in srgb, #2bb673 16%, transparent); }\n.rm-diff-del { background: color-mix(in srgb, #e5484d 16%, transparent); }\n.rm-diff-hunk { color: var(--rm-accent, #5b8cff); }\n.rm-diff-head, .rm-diff-file { color: var(--rm-muted); font-weight: 600; }\n.rm-diff-addn { color: #2bb673; }\n.rm-diff-deln { color: #e5484d; }\n.rm-ok { padding: 8px 10px; border-radius: 8px; font-size: 12.5px; color: var(--dsw-alias-state-success-primary, #2bb673); background: color-mix(in srgb, #2bb673 10%, transparent); }\n\n/* \u2500\u2500 create-room dialog (0.3.1): wide, scrollable, tabbed \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-modal-scrollable {\n  width: min(920px, calc(100vw - 48px)) !important;\n  max-width: 96vw !important;\n  /* Bound height so the flex child (.rm-modal-scroll) can scroll instead of clipping. */\n  height: min(720px, 100%) !important;\n  max-height: 100% !important;\n}\n.rm-modal-create { width: min(960px, calc(100vw - 48px)) !important; }\n.rm-modal-scroll {\n  flex: 1 1 auto;\n  min-height: 0;\n  overflow-x: hidden;\n  overflow-y: auto;\n  overscroll-behavior: contain;\n}\n.rm-create { display: flex; flex-direction: column; gap: 12px; }\n.rm-tabs {\n  display: flex; gap: 4px; padding: 2px; border-radius: 10px;\n  background: color-mix(in srgb, var(--rm-border) 55%, transparent);\n  flex-wrap: wrap;\n}\n.rm-tab {\n  flex: 1 1 auto; min-width: 88px; height: 32px; padding: 0 12px; border: 0; border-radius: 8px;\n  background: transparent; color: var(--rm-muted); font: inherit; font-size: 13px; font-weight: 560;\n  cursor: pointer;\n}\n.rm-tab.is-on { background: var(--rm-panel, var(--dsw-alias-bg-layer-2)); color: var(--rm-label); box-shadow: 0 0 0 1px var(--rm-border); }\n.rm-create-pane { min-height: 280px; }\n.rm-mode-wrap { flex-wrap: wrap; }\n.rm-preset-sub { display: block; color: var(--rm-muted); font-size: 11px; font-weight: 400; line-height: 1.35; margin-top: 1px; }\n.rm-create-custom {\n  margin-top: 14px; padding: 12px; border: 1px dashed var(--rm-border); border-radius: 12px;\n  display: flex; flex-direction: column; gap: 10px;\n}\n.rm-create-custom-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }\n.rm-draft-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }\n.rm-draft-item {\n  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px;\n  border: 1px solid var(--rm-border); background: var(--rm-panel);\n}\n.rm-draft-main { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 12.5px; }\n.rm-draft-main span { color: var(--rm-muted); font-size: 11px; }\n.rm-draft-form { margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--rm-border); }\n.rm-linkish { background: none; border: 0; color: var(--rm-accent, #5b8cff); cursor: pointer; font: inherit; font-size: inherit; padding: 0; text-decoration: underline; }\n@media (max-width: 720px) {\n  .rm-modal-create, .rm-modal-scrollable { width: min(100vw - 24px, 520px) !important; }\n}\n';
+var rooms_default = '/* Collab Rooms UI \u2014 original surface inside the dsh shell. Uses only dsh --dsw-* tokens.\n   Independent Rooms surface. Prefix: rm- (rooms). */\n\n.rm-root {\n  --rm-accent: var(--dsw-alias-state-business-primary);\n  --rm-hover: var(--dsw-alias-interactive-bg-hover);\n  --rm-border: var(--dsw-alias-border-l2);\n  --rm-bg: var(--dsw-alias-bg-base);\n  --rm-panel: var(--dsw-alias-bg-module-platform);\n  --rm-elev: var(--dsw-alias-bg-module-platform);\n  --rm-label: var(--dsw-alias-label-primary);\n  --rm-muted: var(--dsw-alias-label-secondary);\n  --rm-quiet: var(--dsw-alias-label-tertiary);\n  font: 13px/1.5 var(--dsw-font-family);\n  color: var(--rm-label);\n  box-sizing: border-box;\n}\n.rm-root *, .rm-root *::before, .rm-root *::after { box-sizing: border-box; }\n.rm-root button, .rm-root input, .rm-root textarea { font: inherit; }\n\n/* \u2500\u2500 sidebar (joined rooms + public search) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-side {\n  display: flex; flex-direction: column; height: 100%; min-height: 0;\n  padding: 0 8px 8px 0; gap: 8px;\n}\n.rm-side-toolbar {\n  display: flex; align-items: center; gap: 6px; flex: none; padding: 4px 0 2px;\n}\n.rm-side-title {\n  flex: 1; font-size: 12px; font-weight: 600; letter-spacing: .04em;\n  text-transform: uppercase; color: var(--rm-quiet);\n}\n.rm-icon-btn {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; padding: 0;\n}\n.rm-icon-btn:hover { background: var(--rm-hover); color: var(--rm-label); }\n.rm-search {\n  display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;\n  border: .5px solid var(--rm-border); border-radius: 8px; background: var(--rm-panel);\n}\n.rm-search input {\n  flex: 1; min-width: 0; border: 0; background: transparent; outline: none; color: var(--rm-label); font-size: 13px;\n}\n.rm-search input::placeholder { color: var(--rm-quiet); }\n.rm-side-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }\n.rm-group-label { font-size: 11px; font-weight: 600; color: var(--rm-quiet); padding: 0 4px 4px; text-transform: uppercase; letter-spacing: .03em; }\n.rm-room-list { display: flex; flex-direction: column; gap: 2px; }\n.rm-room-item {\n  display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px;\n  border: 0; border-radius: 10px; background: transparent; color: inherit; cursor: pointer; text-align: left;\n}\n.rm-room-item:hover { background: var(--rm-hover); }\n.rm-room-item[aria-current="true"] { background: var(--rm-hover); }\n.rm-room-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }\n.rm-room-item-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-meta { font-size: 11.5px; color: var(--rm-quiet); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item-trail { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }\n.rm-badge {\n  display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px;\n  border-radius: 999px; font-size: 10.5px; font-weight: 500; background: var(--rm-panel); color: var(--rm-muted);\n  border: .5px solid var(--rm-border);\n}\n.rm-badge-public { color: var(--rm-accent); border-color: color-mix(in srgb, var(--rm-accent) 35%, transparent); background: color-mix(in srgb, var(--rm-accent) 8%, transparent); }\n.rm-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--rm-quiet); }\n.rm-dot-online { background: var(--dsw-alias-state-success-primary, #2bb673); }\n.rm-dot-connecting { background: var(--dsw-alias-state-warn-primary, #e9a23b); }\n.rm-dot-offline { background: var(--dsw-alias-state-error-primary, #e5484d); }\n.rm-empty-hint { padding: 8px 10px; font-size: 12px; color: var(--rm-quiet); line-height: 1.45; }\n.rm-dir-item {\n  display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 10px;\n  border: .5px solid var(--rm-border); background: var(--rm-bg); margin-bottom: 6px;\n}\n.rm-dir-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }\n.rm-dir-tags { display: flex; flex-wrap: wrap; gap: 4px; }\n.rm-tag { font-size: 11px; color: var(--rm-muted); background: var(--rm-hover); border-radius: 4px; padding: 0 5px; }\n.rm-menu {\n  position: fixed; z-index: 1000; min-width: 180px; padding: 4px;\n  border-radius: 10px; background: var(--dsw-alias-bg-layer-1, var(--rm-bg));\n  border: .5px solid var(--rm-border);\n  box-shadow: 0 8px 24px color-mix(in srgb, var(--rm-label) 12%, transparent);\n  display: flex; flex-direction: column;\n}\n.rm-menu button {\n  display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-menu button:hover { background: var(--rm-hover); }\n\n/* \u2500\u2500 main: room workspace \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-main { display: flex; flex: 1; min-height: 0; height: 100%; width: 100%; background: var(--rm-bg); }\n.rm-workspace { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }\n.rm-chat-header {\n  flex: none; display: flex; align-items: center; gap: 10px; height: 48px;\n  padding: 0 16px; border-bottom: .5px solid var(--rm-border);\n}\n.rm-chat-header-title { font-size: 14px; font-weight: 600; }\n.rm-chat-header-sub { font-size: 12px; color: var(--rm-quiet); }\n.rm-messages {\n  flex: 1; min-height: 0; overflow: auto; padding: 16px 18px 8px;\n  display: flex; flex-direction: column; gap: 2px;\n}\n.rm-day {\n  align-self: center; margin: 10px 0 12px; padding: 2px 10px; border-radius: 999px;\n  font-size: 11px; color: var(--rm-quiet); background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n}\n.rm-msg {\n  display: grid; grid-template-columns: 32px 1fr; gap: 0 10px; padding: 4px 6px; border-radius: 8px;\n  max-width: 720px;\n}\n.rm-msg:hover { background: color-mix(in srgb, var(--rm-hover) 60%, transparent); }\n.rm-msg-self { margin-left: auto; grid-template-columns: 1fr; max-width: 640px; }\n.rm-msg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 1px; }\n.rm-msg-author { font-size: 12px; font-weight: 600; color: var(--rm-muted); }\n.rm-msg-time { font-size: 11px; color: var(--rm-quiet); }\n.rm-msg-body { font-size: 13.5px; line-height: 1.55; word-break: break-word; min-width: 0; }\n.rm-msg-self .rm-msg-body {\n  background: var(--dsw-alias-label-primary); color: var(--dsw-alias-label-primary-foreground);\n  padding: 8px 12px; border-radius: 12px 12px 4px 12px; width: fit-content; margin-left: auto;\n}\n.rm-msg-event {\n  grid-template-columns: 1fr; max-width: 560px; margin: 6px 0;\n  padding: 8px 12px; border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-panel);\n}\n.rm-mention { color: var(--rm-accent); font-weight: 500; }\n.rm-msg-self .rm-mention { color: inherit; text-decoration: underline; text-underline-offset: 2px; }\n.rm-task-card { display: flex; flex-direction: column; gap: 4px; }\n.rm-task-head { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--rm-muted); }\n.rm-task-title { font-weight: 600; font-size: 13.5px; }\n.rm-composer {\n  flex: none; display: flex; align-items: flex-end; gap: 8px; padding: 10px 16px 14px;\n  border-top: .5px solid var(--rm-border);\n}\n.rm-composer-box {\n  flex: 1; display: flex; align-items: flex-end; gap: 6px; min-height: 44px;\n  padding: 8px 10px; border: .5px solid var(--rm-border); border-radius: 12px; background: var(--rm-panel);\n}\n.rm-composer-box:focus-within { border-color: color-mix(in srgb, var(--rm-accent) 50%, var(--rm-border)); }\n.rm-composer-box textarea {\n  flex: 1; min-height: 28px; max-height: 120px; border: 0; background: transparent; outline: none;\n  resize: none; color: var(--rm-label); line-height: 1.45;\n}\n.rm-composer-box textarea::placeholder { color: var(--rm-quiet); }\n.rm-composer-mode {\n  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 8px; background: transparent; color: var(--rm-muted); cursor: pointer; flex: none;\n}\n.rm-composer-mode:hover, .rm-composer-mode[aria-pressed="true"] {\n  color: var(--rm-accent); background: color-mix(in srgb, var(--rm-accent) 12%, transparent);\n}\n.rm-chat-hint { margin: 48px auto; text-align: center; color: var(--rm-quiet); font-size: 13px; max-width: 360px; line-height: 1.5; }\n\n/* \u2500\u2500 detail column (members / invite / about) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-detail {\n  flex: 0 0 280px; width: 280px; display: flex; flex-direction: column; min-height: 0;\n  border-left: .5px solid var(--rm-border); background: var(--rm-bg); overflow: auto;\n}\n.rm-detail-section { padding: 14px 14px 8px; border-bottom: .5px solid var(--rm-border); }\n.rm-detail-heading { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: .5px solid var(--rm-border); }\n.rm-output-link { cursor: pointer; color: var(--rm-accent); background: var(--rm-hover); border: .5px solid var(--rm-border); border-radius: 6px; padding: 3px 7px; font: inherit; }\n.rm-output-link:hover { text-decoration: underline; }\n.rm-native-rooms { padding-left: 10px; }\n.rm-native-room-heading { display: flex; align-items: center; }\n.rm-native-row { display: flex; align-items: center; gap: 7px; min-width: 0; width: 100%; min-height: 30px; padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--rm-muted); text-align: left; cursor: pointer; }\n.rm-native-row:hover, .rm-native-row[aria-current="true"] { background: var(--rm-hover); color: var(--rm-label); }\n.rm-native-row-label { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }\n.rm-native-row-count { font-size: 11px; color: var(--rm-quiet); }\n.rm-native-room-caret { flex: none; border: 0; width: 18px; background: transparent; color: var(--rm-muted); cursor: pointer; }\n.rm-native-agent { padding-left: 34px; font-size: 12px; }\n[data-rm-grouped-session] { display: none !important; }\n.rm-native-rooms[hidden] { display: none; }\n.rm-nav[aria-label="Rooms by workspace"] { width: 100%; border: 0; max-height: 55vh; }\n@media (max-width: 900px) {\n  .rm-detail { position: absolute; top: 0; bottom: 0; right: 0; z-index: 10; width: min(320px, 90%); box-shadow: -8px 0 24px color-mix(in srgb, var(--rm-label) 10%, transparent); }\n}\n.rm-detail-section:last-child { border-bottom: 0; }\n.rm-detail-h {\n  display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;\n  text-transform: uppercase; letter-spacing: .04em; color: var(--rm-quiet); margin-bottom: 8px;\n}\n.rm-member {\n  display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 8px; min-height: 34px;\n}\n.rm-member:hover { background: var(--rm-hover); }\n.rm-member-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }\n.rm-member-actions { display: none; gap: 2px; }\n.rm-member:hover .rm-member-actions, .rm-member:focus-within .rm-member-actions { display: inline-flex; }\n.rm-mini {\n  width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;\n  border: 0; border-radius: 6px; background: transparent; color: var(--rm-muted); cursor: pointer; font-size: 12px;\n}\n.rm-mini:hover { background: var(--dsw-alias-interactive-bg-active); color: var(--rm-label); }\n.rm-task-row { display: flex; align-items: center; gap: 6px; padding: 4px; font-size: 12.5px; }\n.rm-task-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-about { display: grid; grid-template-columns: 88px 1fr; gap: 6px 8px; font-size: 12.5px; margin: 0; }\n.rm-about dt { color: var(--rm-quiet); margin: 0; }\n.rm-about dd { margin: 0; min-width: 0; overflow-wrap: anywhere; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }\n.rm-mono { font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace); font-size: 11.5px; }\n.rm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }\n.rm-danger { color: var(--dsw-alias-state-error-primary, #e5484d) !important; }\n.rm-note { font-size: 12px; color: var(--rm-quiet); line-height: 1.45; margin: 0 0 8px; }\n\n/* \u2500\u2500 empty / welcome \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-welcome-wrap {\n  flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px; background: var(--rm-bg);\n}\n.rm-welcome {\n  width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px;\n  padding: 20px; border-radius: 14px; border: .5px solid var(--rm-border); background: var(--rm-panel);\n}\n.rm-welcome h1 { margin: 0; font-size: 16px; font-weight: 600; }\n.rm-welcome p { margin: 0; font-size: 13px; color: var(--rm-muted); line-height: 1.5; }\n.rm-welcome-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }\n.rm-welcome-action {\n  display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 12px;\n  border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-bg);\n  color: var(--rm-label); cursor: pointer; text-align: left;\n}\n.rm-welcome-action:hover { background: var(--rm-hover); }\n.rm-welcome-action b { display: block; font-size: 13px; }\n.rm-welcome-action span { display: block; font-size: 12px; color: var(--rm-quiet); margin-top: 2px; }\n\n/* \u2500\u2500 avatars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-avatar {\n  display: inline-flex; align-items: center; justify-content: center; flex: none;\n  font-weight: 600; letter-spacing: .02em; user-select: none;\n}\n.rm-avatar-wrap { position: relative; display: inline-flex; flex: none; }\n\n/* \u2500\u2500 dialogs (inside dsh Modal) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-form { display: flex; flex-direction: column; gap: 14px; }\n.rm-field { display: flex; flex-direction: column; gap: 6px; }\n.rm-field-label { font-size: 13px; font-weight: 500; }\n.rm-field-hint { font-size: 12px; color: var(--rm-quiet); }\n.rm-name-row { display: flex; align-items: center; gap: 10px; }\n.rm-name-row > :last-child { flex: 1; }\n.rm-switch-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 14px;\n  padding: 10px 12px; border-radius: 10px; background: var(--rm-panel);\n}\n.rm-error { color: var(--dsw-alias-state-error-primary, #e5484d); font-size: 12.5px; }\n.rm-invite {\n  display: block; padding: 10px 12px; border-radius: 8px; background: var(--rm-panel);\n  font-family: var(--dsw-font-markdown-code-block-font-family, ui-monospace, monospace);\n  font-size: 12px; word-break: break-all; user-select: all;\n}\n\n/* Dual transport + approvals + agent config */\n.rm-mode-row { display: flex; gap: 8px; }\n.rm-mode-btn {\n  flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer; font: inherit;\n}\n.rm-mode-btn.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent); }\n.rm-lan-browse { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }\n.rm-lan-peer {\n  font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a);\n  background: transparent; color: inherit; cursor: pointer;\n}\n.rm-approvals { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); background: color-mix(in srgb, #f5a524 12%, transparent); }\n.rm-approval { display: flex; gap: 12px; align-items: center; justify-content: space-between; }\n.rm-approval-body { font-size: 13px; }\n.rm-approval-actions { display: flex; gap: 6px; flex-shrink: 0; }\n.rm-input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; font: inherit; }\n\n.rm-ws-bar { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--rm-border, #2a2f3a); }\n.rm-ws-chip { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12.5px; }\n.rm-ws-path { font-size: 11px; color: var(--rm-quiet, #8b93a7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-room-item.is-active { background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); }\n\n/* Native-aligned room composer (mirrors dsh conversation control row) */\n.rm-composer-card {\n  box-sizing: border-box;\n  width: 100%;\n  max-width: 920px;\n  margin: 0 auto;\n  border-radius: 16px;\n  background: var(--rm-elev, var(--rm-panel, #12151c));\n  border: 1px solid var(--rm-border, #2a2f3a);\n  box-shadow: 0 1px 2px rgba(0,0,0,.06);\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  padding: 8px 0 6px;\n}\n.rm-composer-grow { position: relative; padding: 0 4px; }\n.rm-composer-grow textarea {\n  box-sizing: border-box; width: 100%; min-height: 36px; max-height: 160px;\n  resize: none; border: none; outline: none; background: transparent;\n  color: inherit; font: inherit; font-size: 14px; line-height: 22px;\n  padding: 4px 12px 0 14px;\n}\n.rm-composer-grow textarea:disabled { opacity: .55; cursor: not-allowed; }\n.rm-composer-row {\n  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;\n  gap: 10px; min-width: 0; padding: 2px 8px 4px;\n}\n.rm-composer-tools, .rm-composer-modes, .rm-composer-trailing {\n  display: flex; align-items: center; min-width: 0; gap: 8px;\n}\n.rm-composer-modes { flex-wrap: wrap; gap: 4px; }\n.rm-composer-trailing { flex: none; margin-left: auto; }\n.rm-composer-add {\n  width: 28px; height: 28px; border: none; border-radius: 999px;\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n  color: inherit; cursor: pointer; display: grid; place-items: center;\n}\n.rm-composer-add:hover, .rm-composer-add[aria-pressed="true"] {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 22%, transparent);\n}\n.rm-composer-select {\n  max-width: 220px; height: 28px; border: none; border-radius: 8px;\n  background: transparent; color: var(--rm-quiet, #8b93a7);\n  font: inherit; font-size: 13px; font-weight: 500; line-height: 20px;\n  padding: 0 8px; cursor: pointer; white-space: nowrap;\n}\n.rm-composer-select:hover:not(:disabled) {\n  background: color-mix(in srgb, var(--rm-fg, #e8eaed) 8%, transparent);\n}\n.rm-composer-select:disabled { opacity: .5; cursor: default; }\n.rm-composer-model-text { display: inline; }\n.rm-composer-model-icon { display: none; font-size: 10px; }\n\n.rm-composer-send {\n  width: 34px; height: 34px; border: none; border-radius: 999px;\n  background: var(--rm-accent, #5b8cff); color: #fff; cursor: pointer;\n  display: grid; place-items: center; transform: translateY(-2px);\n}\n.rm-composer-send:hover:not(:disabled) { filter: brightness(1.08); }\n.rm-composer-send:disabled { opacity: .4; cursor: default; }\n.rm-composer-popwrap { position: relative; }\n.rm-composer-menu {\n  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 40;\n  min-width: 200px; max-height: 320px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 8px 24px rgba(0,0,0,.28);\n  padding: 6px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-composer-menu-wide { min-width: 280px; max-width: 340px; }\n.rm-composer-menu-label {\n  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;\n  color: var(--rm-quiet, #8b93a7); padding: 6px 8px 2px;\n}\n.rm-composer-menu button[role="menuitem"] {\n  text-align: left; border: none; background: transparent; color: inherit;\n  font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-composer-menu button[role="menuitem"]:hover,\n.rm-composer-menu button[role="menuitem"].is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 16%, transparent);\n}\n.rm-composer-check {\n  display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 8px; cursor: pointer;\n}\n.rm-grant-row {\n  display: flex; align-items: center; justify-content: space-between; gap: 8px;\n  padding: 2px 8px; font-size: 12.5px;\n}\n.rm-grant-row select {\n  font: inherit; font-size: 12px; border-radius: 6px;\n  border: 1px solid var(--rm-border, #2a2f3a); background: transparent; color: inherit; padding: 2px 6px;\n}\n.rm-peer-grant-block { border-top: 1px solid var(--rm-border, #2a2f3a); padding-top: 4px; margin-top: 4px; }\n.rm-peer-grant-name { font-size: 12px; font-weight: 600; padding: 4px 8px; overflow: hidden; text-overflow: ellipsis; }\n\n/* Hide legacy tight composer if still referenced */\n.rm-composer { display: none; }\n\n.rm-composer-grow { position: relative; }\n.rm-mention-menu {\n  position: absolute; left: 8px; right: 8px; bottom: calc(100% + 6px); z-index: 50;\n  max-height: 240px; overflow: auto;\n  border: 1px solid var(--rm-border, #2a2f3a); border-radius: 12px;\n  background: var(--rm-elev, #12151c); box-shadow: 0 10px 28px rgba(0,0,0,.32);\n  padding: 4px; display: flex; flex-direction: column; gap: 2px;\n}\n.rm-mention-item {\n  display: flex; align-items: center; gap: 8px; text-align: left;\n  border: none; background: transparent; color: inherit; font: inherit;\n  padding: 6px 8px; border-radius: 8px; cursor: pointer;\n}\n.rm-mention-item:hover, .rm-mention-item.is-active {\n  background: color-mix(in srgb, var(--rm-accent, #5b8cff) 18%, transparent);\n}\n.rm-mention-item-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }\n.rm-mention-item-name { font-size: 13px; font-weight: 600; }\n.rm-mention-item-meta { font-size: 11px; color: var(--rm-quiet, #8b93a7); }\n\n\n/* New Room shortcut under workspace (mirrors New Session affordance) */\n.rm-new-room {\n  display: flex; align-items: center; justify-content: center; gap: 6px;\n  width: 100%; height: 36px; margin-top: 8px;\n  border: .5px solid var(--rm-border); border-radius: 10px;\n  background: var(--dsw-alias-button-elevated-fill, var(--rm-panel));\n  color: var(--rm-label); cursor: pointer; font-weight: 500; font-size: 13.5px;\n}\n.rm-new-room:hover { background: var(--dsw-alias-button-floating-hover, var(--rm-hover)); }\n.rm-new-room svg { flex: none; }\n\n/* Wide / landscape create + browse modals (overrides default 380px Modal card) */\n.rm-modal-wide {\n  width: min(720px, calc(100vw - 48px)) !important;\n  max-height: min(640px, calc(100vh - 48px));\n}\n.rm-form-wide {\n  display: grid;\n  grid-template-columns: 1fr 1fr;\n  gap: 12px 18px;\n  align-items: start;\n}\n.rm-form-wide .rm-span-2 { grid-column: 1 / -1; }\n.rm-browse { display: flex; flex-direction: column; gap: 12px; min-height: 280px; max-height: 420px; }\n.rm-browse-search { flex: none; }\n.rm-browse-status { font-size: 11.5px; color: var(--rm-quiet); white-space: nowrap; }\n.rm-browse-list { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }\n@media (max-width: 640px) {\n  .rm-form-wide { grid-template-columns: 1fr; }\n  .rm-modal-wide { width: min(420px, calc(100vw - 32px)) !important; }\n}\n\n\n/* \u2500\u2500 panel layout: rooms nav (grouped by native dsh workspace) + content \u2500\u2500 */\n.rm-main { flex-direction: row; }\n.rm-main-body { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }\n.rm-main-body > .rm-welcome-wrap { flex: 1; }\n.rm-main-body > .rm-workspace { flex: 1; }\n.rm-nav {\n  flex: 0 0 248px; width: 248px; display: flex; flex-direction: column; gap: 8px; min-height: 0;\n  padding: 10px 8px; border-right: .5px solid var(--rm-border); background: var(--rm-bg);\n}\n.rm-nav-head { display: flex; align-items: center; gap: 4px; padding: 0 4px; }\n.rm-nav-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; }\n.rm-ws-group { display: flex; flex-direction: column; gap: 2px; }\n.rm-ws-head {\n  display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 2px 0 8px;\n  font-size: 12.5px; font-weight: 600; color: var(--rm-muted);\n}\n.rm-ws-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.rm-ws-add { width: 24px; height: 24px; }\n.rm-ws-empty { padding: 2px 10px 6px 30px; font-size: 11.5px; }\n.rm-nav .rm-room-item { padding: 6px 8px 6px 14px; }\n.rm-session-mark { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; color: var(--rm-accent, var(--dsw-alias-state-business-primary)); }\n\n/* \u2500\u2500 local multi-agent (0.3) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-dot-busy { background: var(--dsw-alias-state-warning-primary, #f0a020); }\n.rm-agent-tag { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 10.5px; line-height: 17px; color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); white-space: nowrap; }\n.rm-msg-id { margin-left: 6px; font-size: 11px; color: var(--rm-quiet); font-family: var(--dsw-font-mono, ui-monospace, monospace); }\n.rm-agent-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 8px; }\n.rm-agent-row:hover { background: var(--rm-hover); }\n.rm-agent-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }\n.rm-agent-name { font-size: 13px; font-weight: 600; color: var(--rm-label); display: flex; align-items: center; }\n.rm-agent-sub { font-size: 11px; color: var(--rm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.rm-agent-row .rm-member-actions { display: inline-flex !important; opacity: 0.65; }\n.rm-agent-row:hover .rm-member-actions { opacity: 1; }\n.rm-num-row { display: flex; gap: 8px; margin: 4px 0 8px; }\n.rm-num-setting { flex: 1; display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--rm-muted); }\n.rm-num-setting input { width: 100%; box-sizing: border-box; padding: 5px 8px; border: 1px solid var(--rm-border); border-radius: 7px; background: var(--rm-bg); color: var(--rm-label); font: inherit; font-size: 13px; }\n.rm-runs { display: flex; flex-direction: column; gap: 4px; }\n.rm-run { display: grid; grid-template-columns: 22px auto 1fr auto; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 7px; font-size: 12px; border: 1px solid var(--rm-border); }\n.rm-run-running { border-color: color-mix(in srgb, var(--dsw-alias-state-warning-primary, #f0a020) 55%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-warning-primary, #f0a020) 8%, transparent); }\n.rm-run-queued, .rm-run-approval { border-style: dashed; }\n.rm-run-done, .rm-run-stopped, .rm-run-failed { opacity: 0.7; }\n.rm-run-pos { font-size: 11px; color: var(--rm-quiet); text-align: center; font-variant-numeric: tabular-nums; }\n.rm-run-who { font-weight: 600; color: var(--rm-label); white-space: nowrap; }\n.rm-run-what { color: var(--rm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }\n.rm-stop-btn { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--dsw-alias-state-danger-primary, #e5484d) 60%, transparent); background: color-mix(in srgb, var(--dsw-alias-state-danger-primary, #e5484d) 10%, transparent); color: var(--dsw-alias-state-danger-primary, #e5484d); font-size: 12px; cursor: pointer; white-space: nowrap; }\n.rm-stop-btn:hover { background: color-mix(in srgb, var(--dsw-alias-state-danger-primary, #e5484d) 18%, transparent); }\n.rm-badge-local { color: var(--dsw-alias-state-success-primary, #2bb673); }\n.rm-session-agent { color: var(--rm-accent, #5b8cff); }\n.rm-preset-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }\n.rm-preset { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 150px; flex: 1; padding: 8px 10px; border: 1px solid var(--rm-border); border-radius: 10px; background: transparent; color: var(--rm-label); text-align: left; cursor: pointer; font: inherit; font-size: 12px; }\n.rm-preset span { color: var(--rm-muted); font-size: 11px; line-height: 1.35; }\n.rm-preset.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 12%, transparent); }\n.rm-preset-check { flex-direction: row; align-items: center; gap: 8px; min-width: 120px; flex: 0 1 auto; }\n.rm-local-box { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px dashed var(--rm-border); border-radius: 12px; }\n.rm-textarea { width: 100%; box-sizing: border-box; min-height: 84px; resize: vertical; font: inherit; font-size: 13px; padding: 8px 10px; }\n.rm-switch-col { display: flex; flex-direction: column; gap: 6px; }\n.rm-modal-xl { width: min(1180px, 96vw) !important; max-width: 96vw !important; }\n.rm-merge { display: grid; grid-template-columns: 260px 1fr; gap: 14px; min-height: 420px; }\n.rm-merge-list { display: flex; flex-direction: column; gap: 6px; border-right: 1px solid var(--rm-border); padding-right: 12px; }\n.rm-merge-agent { display: flex; align-items: center; gap: 8px; padding: 8px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--rm-label); cursor: pointer; text-align: left; font: inherit; }\n.rm-merge-agent:hover { background: var(--rm-hover); }\n.rm-merge-agent.is-on { border-color: var(--rm-accent, #5b8cff); background: color-mix(in srgb, var(--rm-accent, #5b8cff) 10%, transparent); }\n.rm-merge-agent-body { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 12px; }\n.rm-merge-agent-body .rm-mono { font-size: 10.5px; color: var(--rm-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.rm-merge-main { min-width: 0; display: flex; flex-direction: column; gap: 8px; }\n.rm-merge-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; }\n.rm-merge-files { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; }\n.rm-confirm-text { font-size: 12px; color: var(--rm-label); margin-right: 4px; }\n.rm-diff { margin: 0; max-height: 52vh; overflow: auto; padding: 8px 0; border: 1px solid var(--rm-border); border-radius: 10px; background: var(--rm-panel); font-family: var(--dsw-font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.5; }\n.rm-diff > div { padding: 0 12px; white-space: pre; }\n.rm-diff-add { background: color-mix(in srgb, #2bb673 16%, transparent); }\n.rm-diff-del { background: color-mix(in srgb, #e5484d 16%, transparent); }\n.rm-diff-hunk { color: var(--rm-accent, #5b8cff); }\n.rm-diff-head, .rm-diff-file { color: var(--rm-muted); font-weight: 600; }\n.rm-diff-addn { color: #2bb673; }\n.rm-diff-deln { color: #e5484d; }\n.rm-ok { padding: 8px 10px; border-radius: 8px; font-size: 12.5px; color: var(--dsw-alias-state-success-primary, #2bb673); background: color-mix(in srgb, #2bb673 10%, transparent); }\n\n/* \u2500\u2500 create-room dialog (0.3.1): wide, scrollable, tabbed \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.rm-modal-scrollable {\n  width: min(920px, calc(100vw - 48px)) !important;\n  max-width: 96vw !important;\n  /* Bound height so the flex child (.rm-modal-scroll) can scroll instead of clipping. */\n  height: min(720px, 100%) !important;\n  max-height: 100% !important;\n}\n.rm-modal-create { width: min(960px, calc(100vw - 48px)) !important; }\n.rm-modal-scroll {\n  flex: 1 1 auto;\n  min-height: 0;\n  overflow-x: hidden;\n  overflow-y: auto;\n  overscroll-behavior: contain;\n}\n.rm-create { display: flex; flex-direction: column; gap: 12px; }\n.rm-tabs {\n  display: flex; gap: 4px; padding: 2px; border-radius: 10px;\n  background: color-mix(in srgb, var(--rm-border) 55%, transparent);\n  flex-wrap: wrap;\n}\n.rm-tab {\n  flex: 1 1 auto; min-width: 88px; height: 32px; padding: 0 12px; border: 0; border-radius: 8px;\n  background: transparent; color: var(--rm-muted); font: inherit; font-size: 13px; font-weight: 560;\n  cursor: pointer;\n}\n.rm-tab.is-on { background: var(--rm-panel, var(--dsw-alias-bg-layer-2)); color: var(--rm-label); box-shadow: 0 0 0 1px var(--rm-border); }\n.rm-create-pane { min-height: 280px; }\n.rm-mode-wrap { flex-wrap: wrap; }\n.rm-preset-sub { display: block; color: var(--rm-muted); font-size: 11px; font-weight: 400; line-height: 1.35; margin-top: 1px; }\n.rm-create-custom {\n  margin-top: 14px; padding: 12px; border: 1px dashed var(--rm-border); border-radius: 12px;\n  display: flex; flex-direction: column; gap: 10px;\n}\n.rm-create-custom-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }\n.rm-draft-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }\n.rm-draft-item {\n  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px;\n  border: 1px solid var(--rm-border); background: var(--rm-panel);\n}\n.rm-draft-main { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 12.5px; }\n.rm-draft-main span { color: var(--rm-muted); font-size: 11px; }\n.rm-draft-form { margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--rm-border); }\n.rm-linkish { background: none; border: 0; color: var(--rm-accent, #5b8cff); cursor: pointer; font: inherit; font-size: inherit; padding: 0; text-decoration: underline; }\n@media (max-width: 720px) {\n  .rm-modal-create, .rm-modal-scrollable { width: min(100vw - 24px, 520px) !important; }\n}\n';
+
+// src/client/files.js
+function sameWorkspacePath(a, b) {
+  const normal = (p) => (p || "").replace(/\\/g, "/").replace(/^\/private\/var(?=\/)/, "/var").replace(/\/+$/, "");
+  return !!a && !!b && normal(a) === normal(b);
+}
+function sessionFileAddress(sessionId, path) {
+  const normalized = path.replace(/\\/g, "/").replace(/^(?:\.\/)+/, "");
+  const segment = (s) => encodeURIComponent(s).replace(/%3A/gi, ":");
+  return `dsh-resource://file/session/${segment(sessionId)}/${normalized.split("/").map(segment).join("/")}`;
+}
+function inlineFile(value) {
+  const match = /^(.*?)(?::(\d+)|#L(\d+)(?:-L?\d+)?)?$/.exec(value);
+  return { path: match[1], line: Number(match[2] || match[3]) || void 0 };
+}
+function fileCandidates(text) {
+  const values = [...text.matchAll(/`([^`\n]{1,4096})`/g)].map((m) => inlineFile(m[1]).path);
+  const images = [...text.matchAll(/!\[[^\]]*\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g)].map((m) => m[1]);
+  return { paths: [...new Set([...values, ...images].filter((p) => !/^[a-z]+:\/\//i.test(p) && /[./\\]/.test(p)))].slice(0, 50), images };
+}
 
 // src/client/store.js
 var API = "/api/collab";
@@ -2277,7 +2573,9 @@ function createRoomsStore() {
     dialog: null,
     toast: null,
     approvals: [],
-    search: { open: false, query: "", results: [], loading: false, error: null }
+    search: { open: false, query: "", results: [], loading: false, error: null },
+    detailsOpen: false,
+    expandedRooms: {}
   };
   const subs = /* @__PURE__ */ new Set();
   const set = (patch) => {
@@ -2286,6 +2584,7 @@ function createRoomsStore() {
   };
   let es = null;
   let searchTimer = null;
+  let navigation = 0;
   function connect() {
     if (es) return;
     es = new EventSource(API + "/stream");
@@ -2342,6 +2641,11 @@ function createRoomsStore() {
   }
   const actions = {
     select(roomId) {
+      navigation++;
+      try {
+        api.onRoomOpened && api.onRoomOpened();
+      } catch {
+      }
       set({ selected: roomId });
       if (!snap.messages[roomId]) void loadMessages(roomId);
       void post(`/rooms/${encodeURIComponent(roomId)}/active`).catch(() => {
@@ -2352,6 +2656,12 @@ function createRoomsStore() {
     },
     closeDialog() {
       set({ dialog: null });
+    },
+    toggleDetails() {
+      set((s) => ({ detailsOpen: !s.detailsOpen }));
+    },
+    toggleRoom(roomId) {
+      set((s) => ({ expandedRooms: { ...s.expandedRooms, [roomId]: s.expandedRooms[roomId] === false } }));
     },
     toast,
     clearToast() {
@@ -2462,6 +2772,54 @@ function createRoomsStore() {
     async diffs(roomId) {
       return call(`/rooms/${encodeURIComponent(roomId)}/diffs`);
     },
+    async openSession(roomId, agentId) {
+      const request = ++navigation;
+      const result = await post(`/rooms/${encodeURIComponent(roomId)}/session`, { agentId });
+      if (request !== navigation) return result;
+      if (!api.uiWorkspace) throw new Error("Native dsh session navigation is unavailable");
+      api.uiWorkspace.openSession(result.sessionId);
+      return result;
+    },
+    openRoomSession(roomId) {
+      navigation++;
+      const id = snap.rooms.find((r) => r.roomId === roomId)?.sessionId;
+      if (!id || !api.uiWorkspace) throw new Error("Room session is unavailable");
+      api.uiWorkspace.openSession(id);
+    },
+    async inspectFiles(roomId, paths, agentId) {
+      return post(`/rooms/${encodeURIComponent(roomId)}/files`, { paths, agentId });
+    },
+    async preview(roomId, path, agentId, line) {
+      const request = ++navigation;
+      const result = await post(`/rooms/${encodeURIComponent(roomId)}/preview`, { path, agentId });
+      if (request !== navigation) return;
+      if (!api.uiWorkspace || !api.sidebarRight) throw new Error("Native dsh preview is unavailable");
+      let sessionId = result.sessionId;
+      if (sessionId) api.uiWorkspace.openSession(sessionId);
+      else {
+        const workspace = api.native?.list.getSnapshot().items.find((w) => sameWorkspacePath(w.path, result.workspacePath));
+        if (!workspace) throw new Error("Open this room's workspace in dsh before previewing files");
+        await api.uiWorkspace.openWorkspace(workspace.workspaceId, (id) => {
+          sessionId = id;
+        });
+      }
+      if (!sessionId) throw new Error("No native session available for preview");
+      const address = sessionFileAddress(sessionId, result.path);
+      for (let attempt = 0; attempt < 100; attempt++) {
+        if (request !== navigation) return;
+        if (api.sidebarRight.mounted?.getSnapshot() === sessionId) {
+          try {
+            api.sidebarRight.openResource(address, line ? { params: { line } } : void 0);
+            api.actions.closeDialog();
+            return;
+          } catch (e) {
+            if (attempt === 99) throw e;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      throw new Error("Native preview did not become ready");
+    },
     async merge(roomId, agentId) {
       return post(`/rooms/${encodeURIComponent(roomId)}/merge`, { agentId, approve: true });
     },
@@ -2478,6 +2836,7 @@ function createRoomsStore() {
     },
     actions,
     dispose() {
+      navigation++;
       if (es) es.close();
       es = null;
       subs.clear();
@@ -2486,16 +2845,170 @@ function createRoomsStore() {
     /** Native dsh workspaces service (set by apply). */
     native: null,
     nativeList: null,
+    uiWorkspace: null,
+    sidebarRight: null,
     /** Called after a room is created/joined (apply switches to the DSH Room panel). */
     onRoomOpened: null
   };
   return api;
 }
 
+// src/client/workspace-rooms.js
+var ROOM_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="2"/><path d="M5.5 6.5h5M5.5 9.5h3.5"/></svg>';
+var AGENT_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" aria-hidden="true"><rect x="3" y="5" width="10" height="7.5" rx="2"/><path d="M8 2.5V5M6 8.5h.01M10 8.5h.01"/></svg>';
+function installRoomGroups(store, native, layout, sessions) {
+  if (typeof document === "undefined" || !native) return () => {
+  };
+  let frame = 0, alive = true;
+  const wrappers = /* @__PURE__ */ new Set();
+  const markHidden = (row, hidden) => {
+    if (hidden) row.setAttribute("data-rm-grouped-session", "");
+    else row.removeAttribute("data-rm-grouped-session");
+  };
+  const decorate = () => {
+    const state = store.getSnapshot(), workspaces = native.list.getSnapshot().items || [];
+    const panelActive = layout.panelInfo.getSnapshot().activePanelId === "collab";
+    const current = Object.values(sessions?.list.getSnapshot().byId || {}).find((s) => (s.retainedBy?.mainView || 0) > 0)?.id;
+    const hidden = /* @__PURE__ */ new Set();
+    for (const row of document.querySelectorAll('[data-row-key^="workspace:"]')) {
+      const key = row.getAttribute("data-row-key").slice("workspace:".length);
+      const ws = workspaces.find((w) => w.workspaceId === key);
+      const rooms = ws ? (state.rooms || []).filter((r) => sameWorkspacePath(r.memberConfig?.workspacePath, ws.path)) : [];
+      const anchor = row.parentElement?.tagName === "SPAN" ? row.parentElement : row;
+      const parent = anchor.parentElement;
+      if (!parent) continue;
+      let group = [...parent.children].find((e) => e.getAttribute("data-rm-workspace-rooms") === key);
+      if (!rooms.length) {
+        group?.remove();
+        continue;
+      }
+      if (!group) {
+        group = document.createElement("div");
+        group.className = "rm-root rm-native-rooms";
+        group.setAttribute("data-rm-workspace-rooms", key);
+        group.setAttribute("role", "group");
+        parent.insertBefore(group, anchor.nextSibling);
+        wrappers.add(group);
+      }
+      group.hidden = row.getAttribute("aria-expanded") === "false";
+      const signature = JSON.stringify([panelActive, state.selected, current, rooms.map((r) => [r.roomId, r.name, r.status, r.sessionId, r.local?.agents.map((a) => [a.agentId, a.name, a.sessionId, a.state, a.online]), state.expandedRooms[r.roomId] !== false])]);
+      if (group.getAttribute("data-rm-signature") !== signature) {
+        group.setAttribute("data-rm-signature", signature);
+        group.replaceChildren();
+        for (const room of rooms) {
+          const expanded = state.expandedRooms[room.roomId] !== false;
+          const section = document.createElement("div");
+          section.setAttribute("data-rm-room-group", room.roomId);
+          const heading = document.createElement("div");
+          heading.className = "rm-native-room-heading";
+          const caret = document.createElement("button");
+          caret.type = "button";
+          caret.className = "rm-native-room-caret";
+          caret.textContent = expanded ? "\u2304" : "\u203A";
+          caret.setAttribute("aria-label", `${expanded ? "Collapse" : "Expand"} room ${room.name}`);
+          caret.setAttribute("aria-expanded", String(expanded));
+          caret.onclick = (e) => {
+            e.stopPropagation();
+            store.actions.toggleRoom(room.roomId);
+          };
+          const open = document.createElement("button");
+          open.type = "button";
+          open.className = "rm-native-row";
+          open.setAttribute("data-rm-open-room", room.roomId);
+          open.setAttribute("aria-current", String(panelActive && state.selected === room.roomId));
+          const icon = document.createElement("span");
+          icon.innerHTML = ROOM_ICON;
+          const label = document.createElement("span");
+          label.className = "rm-native-row-label";
+          label.textContent = room.name;
+          open.title = room.name;
+          const count = document.createElement("span");
+          count.className = "rm-native-row-count";
+          count.textContent = String((room.local?.agents.length || 0) + (room.sessionId ? 1 : 0));
+          open.append(icon, label, count);
+          open.onclick = () => store.actions.select(room.roomId);
+          heading.append(caret, open);
+          section.append(heading);
+          if (expanded && room.sessionId) {
+            const host = document.createElement("button");
+            host.type = "button";
+            host.className = "rm-native-row rm-native-agent";
+            host.textContent = "Room session";
+            host.setAttribute("data-rm-open-host", room.roomId);
+            host.setAttribute("aria-current", String(!panelActive && current === room.sessionId));
+            host.onclick = () => {
+              try {
+                store.actions.openRoomSession(room.roomId);
+              } catch (e) {
+                store.actions.toast(e.message);
+              }
+            };
+            section.append(host);
+          }
+          if (expanded) for (const agent of room.local?.agents || []) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "rm-native-row rm-native-agent";
+            button.setAttribute("data-rm-open-agent", agent.agentId);
+            button.setAttribute("aria-current", String(!panelActive && current === agent.sessionId));
+            button.title = `${agent.name} \xB7 native dsh session`;
+            const glyph = document.createElement("span");
+            glyph.innerHTML = AGENT_ICON;
+            const title = document.createElement("span");
+            title.className = "rm-native-row-label";
+            title.textContent = agent.name;
+            button.append(glyph, title);
+            if (agent.state && agent.state !== "idle") {
+              const status = document.createElement("span");
+              status.className = "rm-native-row-count";
+              status.textContent = agent.state;
+              button.append(status);
+            }
+            button.onclick = () => {
+              button.disabled = true;
+              store.actions.openSession(room.roomId, agent.agentId).catch((e) => store.actions.toast(e.message)).finally(() => {
+                button.disabled = false;
+              });
+            };
+            section.append(button);
+          }
+          group.append(section);
+        }
+      }
+      for (const room of rooms) if (room.sessionId) for (const sessionRow of parent.querySelectorAll(`[data-row-key="session:${CSS.escape(room.sessionId)}"]`)) hidden.add(sessionRow.parentElement?.tagName === "SPAN" ? sessionRow.parentElement : sessionRow);
+      for (const room of rooms) for (const agent of room.local?.agents || []) {
+        if (!agent.sessionId) continue;
+        for (const sessionRow of parent.querySelectorAll(`[data-row-key="session:${CSS.escape(agent.sessionId)}"]`)) hidden.add(sessionRow.parentElement?.tagName === "SPAN" ? sessionRow.parentElement : sessionRow);
+      }
+    }
+    for (const row of document.querySelectorAll("[data-rm-grouped-session]")) if (!hidden.has(row)) markHidden(row, false);
+    for (const row of hidden) if (!row.hasAttribute("data-rm-grouped-session")) markHidden(row, true);
+    for (const wrapper of wrappers) if (!wrapper.isConnected) wrappers.delete(wrapper);
+  };
+  const schedule = () => {
+    if (alive && !frame) frame = requestAnimationFrame(() => {
+      frame = 0;
+      decorate();
+    });
+  };
+  const observer = new MutationObserver(schedule);
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-expanded"] });
+  const unsubscribers = [store.subscribe(schedule), native.list.subscribe(schedule), layout.panelInfo.subscribe(schedule), sessions?.list.subscribe(schedule)].filter(Boolean);
+  schedule();
+  return () => {
+    alive = false;
+    observer.disconnect();
+    for (const off of unsubscribers) off();
+    if (frame) cancelAnimationFrame(frame);
+    for (const wrapper of wrappers) wrapper.remove();
+    for (const row of document.querySelectorAll("[data-rm-grouped-session]")) markHidden(row, false);
+  };
+}
+
 // src/client/index.jsx
 var import_jsx_runtime = require("react/jsx-runtime");
 var name = "dsh-room-client";
-var inject = ["slots", "layout", "workspaces"];
+var inject = ["slots", "layout", "workspaces", "uiWorkspace", "sidebarRight"];
 var PANEL_ID = "collab";
 var Svg = ({ size = 16, children }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { width: size, height: size, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "1.15", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children });
 var RoomsIcon = ({ size }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Svg, { size, children: [
@@ -2508,6 +3021,7 @@ var SearchIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Svg, { child
   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "m10.2 10.2 3.3 3.3" })
 ] });
 var PlusIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Svg, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M8 3v10M3 8h10" }) });
+var CloseIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Svg, { size: 14, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M3.5 3.5l9 9M12.5 3.5l-9 9" }) });
 var SendIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Svg, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M8 13V3.5M4 7.5l4-4 4 4" }) });
 var LinkIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Svg, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M6.5 9.5l3-3M7 4.75l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11.25l-1 1a2.5 2.5 0 0 1-3.5-3.5l1-1" }) });
 var TaskIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Svg, { children: [
@@ -2572,7 +3086,7 @@ function useNativeWorkspaces(store) {
   const snap = (0, import_react.useSyncExternalStore)(src ? src.subscribe : NO_SUB, src ? src.getSnapshot : NO_SNAP);
   return snap && snap.items || [];
 }
-var samePath = (a, b) => !!a && !!b && a.replace(/[\\/]+$/, "") === b.replace(/[\\/]+$/, "");
+var samePath = sameWorkspacePath;
 function groupRooms(rooms, workspaces) {
   const groups = workspaces.map((w) => ({ ws: w, rooms: [] }));
   const other = [];
@@ -2606,7 +3120,10 @@ function RoomsNav({ store }) {
   const qq = q.trim().toLowerCase();
   const match = (r) => !qq || r.name.toLowerCase().includes(qq) || (r.description || "").toLowerCase().includes(qq) || (r.tags || []).some((t) => ("#" + t).includes(qq));
   const { groups, other } = groupRooms((s.rooms || []).filter(match), workspaces);
-  const sel = (r) => a.select(r.roomId);
+  const sel = (r) => {
+    a.select(r.roomId);
+    if (s.dialog?.kind === "rooms") a.closeDialog();
+  };
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("nav", { className: "rm-nav", "aria-label": "Rooms by workspace", "data-rm-nav": "", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-nav-head", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-side-title", children: "Rooms" }),
@@ -2676,13 +3193,39 @@ function WorkspaceSelect({ store, value, onChange, id }) {
     w.path
   ] }, w.workspaceId)) });
 }
-function renderMentions(text) {
-  return text.split(/(@[A-Za-z0-9][\w.:-]*)/g).map((part, i) => part.startsWith("@") ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-mention", children: part }, i) : part);
-}
 function PanelIcon({ size }) {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomsIcon, { size });
 }
-function Message({ m, showAuthor, who }) {
+var MARKDOWN_LABELS = { code: { copyLabel: "Copy", copiedLabel: "Copied" }, footnotes: "Footnotes" };
+function MessageBody({ text, room, store, from }) {
+  const agent = room.local?.agents.find((a) => a.agentId === from);
+  const candidates = (0, import_react.useMemo)(() => fileCandidates(text), [text]);
+  const [files, setFiles] = (0, import_react.useState)({});
+  (0, import_react.useEffect)(() => {
+    let active = true;
+    setFiles({});
+    if (candidates.paths.length) store.actions.inspectFiles(room.roomId, candidates.paths, agent?.agentId).then((r) => {
+      if (active) setFiles(r.files || {});
+    }).catch(() => {
+    });
+    return () => {
+      active = false;
+    };
+  }, [room.roomId, agent?.agentId, candidates]);
+  const open = (path, options) => store.actions.preview(room.roomId, path, agent?.agentId, options?.line).catch((e) => store.actions.toast(e.message));
+  const mentions = { resolve(value) {
+    const parsed = inlineFile(value);
+    return Object.hasOwn(files, parsed.path) ? { title: files[parsed.path], label: `Preview ${value}`, open: () => open(parsed.path, { line: parsed.line }) } : void 0;
+  } };
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_dsh_client_ui_primitives.MarkdownDelegateProvider, { openFile: open, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.MarkdownText, { text, labels: MARKDOWN_LABELS, fileMentions: mentions }),
+    candidates.images.filter((path) => files[path]).map((path) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { className: "rm-output-link", type: "button", onClick: () => open(path), "data-rm-preview": path, children: [
+      "Preview ",
+      path
+    ] }, path))
+  ] });
+}
+function Message({ m, showAuthor, who, room, store }) {
   if (m.kind === "task.create") {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-msg rm-msg-event", "data-message-id": m.id, children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-task-card", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-task-head", children: [
@@ -2708,13 +3251,13 @@ function Message({ m, showAuthor, who }) {
         " task"
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Tag, { tone: STATUS_TONE[m.status] || "neutral", children: m.status }),
-      m.kind === "task.update" && m.text.includes(": ") ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: m.text.slice(m.text.indexOf(": ") + 2) }) : null,
+      m.kind === "task.update" && m.text.includes(": ") ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MessageBody, { text: m.text.slice(m.text.indexOf(": ") + 2), room, store, from: m.from }) : null,
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-msg-time", children: fmtTime(m.ts) })
     ] }) });
   }
   if (m.self) {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-msg rm-msg-self", "data-message-id": m.id, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-msg-body", children: renderMentions(m.text) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-msg-body", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MessageBody, { text: m.text, room, store, from: m.from }) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-msg-time", style: { textAlign: "right", marginTop: 2 }, children: fmtTime(m.ts) })
     ] });
   }
@@ -2730,11 +3273,11 @@ function Message({ m, showAuthor, who }) {
         ] }) : null,
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-msg-time", children: fmtTime(m.ts) })
       ] }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-msg-body", children: renderMentions(m.text) })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-msg-body", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MessageBody, { text: m.text, room, store, from: m.from }) })
     ] })
   ] });
 }
-function ChatBody({ messages, members }) {
+function ChatBody({ messages, members, room, store }) {
   const byId = (0, import_react.useMemo)(() => Object.fromEntries((members || []).map((x) => [x.agentId, x])), [members]);
   const ref = (0, import_react.useRef)(null);
   (0, import_react.useEffect)(() => {
@@ -2751,7 +3294,7 @@ function ChatBody({ messages, members }) {
       prev = null;
     }
     const showAuthor = !prev || prev.from !== m.from || m.ts - prev.ts > 5 * 6e4;
-    nodes.push(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Message, { m, showAuthor, who: byId[m.from] }, m.id));
+    nodes.push(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Message, { m, showAuthor, who: byId[m.from], room, store }, m.id));
     prev = m;
   }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-messages", ref, children: nodes.length ? nodes : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-chat-hint", children: "No messages yet. Send a message, @mention an agent to wake it, or create a task from the composer." }) });
@@ -2833,7 +3376,7 @@ function Composer({ room, store, draft, setDraft }) {
   const mc = room.memberConfig || {};
   const catalog = useStore(store).models || [];
   const modelLabel = mc.resolvedModel?.name || mc.model || "Model unavailable";
-  const effort = mc.reasoningEffort || "medium";
+  const effort = mc.reasoningEffort || mc.effectiveReasoningEffort || "medium";
   const permSummary = (() => {
     const p = mc.permissions || {};
     const bits = [];
@@ -3074,6 +3617,10 @@ function RoomDetail({ room, messages, store, mention, assign }) {
     a.toast(await (0, import_dsh_client_ui_primitives.writeClipboard)(inv) ? "Invite copied" : inv);
   };
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", { className: "rm-detail", "aria-label": "Room details", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-detail-heading", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "Room details" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { className: "rm-icon-btn", type: "button", "aria-label": "Close room details", onClick: a.toggleDetails, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CloseIcon, {}) })
+    ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-detail-section", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-detail-h", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PeopleIcon, {}),
@@ -3545,7 +4092,7 @@ function MergeDialog({ store, d }) {
             "Uncommitted changes in the main workspace touch: ",
             ag.mainDirty.join(", ")
           ] }) : null,
-          ag.files && ag.files.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-merge-files", children: ag.files.map((f) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-merge-file", children: [
+          ag.files && ag.files.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-merge-files", children: ag.files.map((f) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-merge-file rm-output-link", "data-rm-preview": f.path, onClick: () => a.preview(d.roomId, f.path, ag.agentId).catch((e) => a.toast(e.message)), children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-mono", children: f.path }),
             " ",
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-diff-addn", children: [
@@ -3602,76 +4149,72 @@ function RoomsMain({ store }) {
   const s = useStore(store);
   const [drafts, setDrafts] = (0, import_react.useState)({});
   const room = s.rooms.find((r) => r.roomId === s.selected);
-  if (!room) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-main", "data-collab-main": "", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomsNav, { store }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-main-body", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalBanner, { store }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmptyMain, { store })
-    ] })
-  ] });
+  if (!room) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-root rm-main", "data-collab-main": "", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-main-body", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalBanner, { store }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmptyMain, { store })
+  ] }) });
   const messages = s.messages[room.roomId] || [];
   const draft = drafts[room.roomId] || "";
   const setDraft = (v) => setDrafts((d) => ({ ...d, [room.roomId]: typeof v === "function" ? v(d[room.roomId] || "") : v }));
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-main", "data-collab-main": "", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomsNav, { store }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-main-body", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalBanner, { store }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-workspace", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rm-chat", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "rm-chat-header", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: room.name, size: 28 }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { flex: 1, minWidth: 0 }, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-chat-header-title", children: room.name }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-chat-header-sub", children: [
-                room.members.filter((m) => m.online !== false).length,
-                " online",
-                room.local && room.local.agents.length ? ` \xB7 ${room.local.agents.length} local agent${room.local.agents.length === 1 ? "" : "s"}` : "",
-                " \xB7 ",
-                room.public ? "public" : "private",
-                room.status !== "online" ? ` \xB7 room ${room.status}` : ""
-              ] })
-            ] }),
-            (() => {
-              const act = (room.runs || []).filter((r) => r.state === "running" || r.state === "queued" || r.state === "approval");
-              if (!act.length) return null;
-              const running = act.filter((r) => r.state === "running").length;
-              return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-stop-btn", "data-rm-stop": "", title: "Stop all local agent runs", onClick: () => store.actions.stop(room.roomId).then((r) => store.actions.toast(`Stopped ${r.stopped} run(s)`)).catch((e) => store.actions.toast(e.message)), children: [
-                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StopIcon, {}),
-                "Stop \xB7 ",
-                running,
-                " running",
-                act.length > running ? `, ${act.length - running} queued` : ""
-              ] });
-            })(),
-            room.public ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-badge rm-badge-public", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlobeIcon, {}),
-              "Public"
-            ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-badge", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LockIcon, {}),
-              "Private"
-            ] }),
-            room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge rm-badge-local", children: "Local only" }) : room.transport === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge", children: "LAN/VPS" }) : null,
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.StateDot, { state: room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error", size: 8 })
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-root rm-main", "data-collab-main": "", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-main-body", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalBanner, { store }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-workspace", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { className: "rm-chat", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "rm-chat-header", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: room.name, size: 28 }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { flex: 1, minWidth: 0 }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-chat-header-title", children: room.name }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-chat-header-sub", children: [
+              room.members.filter((m) => m.online !== false).length,
+              " online",
+              room.local && room.local.agents.length ? ` \xB7 ${room.local.agents.length} local agent${room.local.agents.length === 1 ? "" : "s"}` : "",
+              " \xB7 ",
+              room.public ? "public" : "private",
+              room.status !== "online" ? ` \xB7 room ${room.status}` : ""
+            ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatBody, { messages, members: room.members }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Composer, { room, store, draft, setDraft })
+          (() => {
+            const act = (room.runs || []).filter((r) => r.state === "running" || r.state === "queued" || r.state === "approval");
+            if (!act.length) return null;
+            const running = act.filter((r) => r.state === "running").length;
+            return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-stop-btn", "data-rm-stop": "", title: "Stop all local agent runs", onClick: () => store.actions.stop(room.roomId).then((r) => store.actions.toast(`Stopped ${r.stopped} run(s)`)).catch((e) => store.actions.toast(e.message)), children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StopIcon, {}),
+              "Stop \xB7 ",
+              running,
+              " running",
+              act.length > running ? `, ${act.length - running} queued` : ""
+            ] });
+          })(),
+          room.public ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-badge rm-badge-public", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlobeIcon, {}),
+            "Public"
+          ] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-badge", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LockIcon, {}),
+            "Private"
+          ] }),
+          room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge rm-badge-local", children: "Local only" }) : room.transport === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge", children: "LAN/VPS" }) : null,
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.StateDot, { state: room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error", size: 8 }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "ghost", onClick: () => store.actions.openDialog({ kind: "rooms" }), children: "Rooms" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", "aria-label": "Room members and settings", "aria-expanded": s.detailsOpen, title: "Room members and settings", "data-rm-details-toggle": "", onClick: store.actions.toggleDetails, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PeopleIcon, {}) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-          RoomDetail,
-          {
-            room,
-            messages,
-            store,
-            mention: (id) => setDraft((d) => `${d}${d && !d.endsWith(" ") ? " " : ""}@${id} `),
-            assign: (id) => {
-              setDraft(`@${id} `);
-              store.actions.toast(`Switch to task mode, then describe the task for @${id}`);
-            }
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatBody, { messages, members: room.members, room, store }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Composer, { room, store, draft, setDraft })
+      ] }),
+      s.detailsOpen ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        RoomDetail,
+        {
+          room,
+          messages,
+          store,
+          mention: (id) => setDraft((d) => `${d}${d && !d.endsWith(" ") ? " " : ""}@${id} `),
+          assign: (id) => {
+            setDraft(`@${id} `);
+            store.actions.toast(`Switch to task mode, then describe the task for @${id}`);
           }
-        )
-      ] })
+        }
+      ) : null
     ] })
-  ] });
+  ] }) });
 }
 function Field({ label, hint, children, htmlFor }) {
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-field", children: [
@@ -4012,7 +4555,7 @@ function ConfigDialog({ store, d }) {
   const [f, setF] = (0, import_react.useState)({
     model: mc.model || "",
     provider: mc.provider || "",
-    reasoningEffort: mc.reasoningEffort || "medium",
+    reasoningEffort: mc.reasoningEffort || mc.effectiveReasoningEffort || "medium",
     workspacePath: "",
     workspaceLabel: mc.workspaceLabel || "",
     autoRead: mc.permissions?.autoRead !== false,
@@ -4024,7 +4567,7 @@ function ConfigDialog({ store, d }) {
   const [err, setErr] = (0, import_react.useState)(null);
   const [busy, setBusy] = (0, import_react.useState)(false);
   (0, import_react.useEffect)(() => {
-    a.getConfig(d.roomId).then((c) => setF((x) => ({ ...x, workspacePath: c.workspacePath || "", workspaceLabel: c.workspaceLabel || x.workspaceLabel, model: c.model || "", provider: c.provider || "", reasoningEffort: c.reasoningEffort || "medium", autoRead: c.permissions?.autoRead !== false, autoWrite: !!c.permissions?.autoWrite, autoShell: !!c.permissions?.autoShell, autoNetwork: !!c.permissions?.autoNetwork, mcpEnabled: c.mcpEnabled !== false }))).catch(() => {
+    a.getConfig(d.roomId).then((c) => setF((x) => ({ ...x, workspacePath: c.workspacePath || "", workspaceLabel: c.workspaceLabel || x.workspaceLabel, model: c.model || "", provider: c.provider || "", reasoningEffort: c.reasoningEffort || mc.effectiveReasoningEffort || "medium", autoRead: c.permissions?.autoRead !== false, autoWrite: !!c.permissions?.autoWrite, autoShell: !!c.permissions?.autoShell, autoNetwork: !!c.permissions?.autoNetwork, mcpEnabled: c.mcpEnabled !== false }))).catch(() => {
     });
   }, [d.roomId]);
   const submit = async () => {
@@ -4251,6 +4794,7 @@ function Overlay({ store }) {
     d?.kind === "browse" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BrowseDialog, { store }) : null,
     d?.kind === "agent" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AgentDialog, { store, d }) : null,
     d?.kind === "merge" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MergeDialog, { store, d }) : null,
+    d?.kind === "rooms" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Modal, { open: true, onClose: store.actions.closeDialog, title: "Rooms", description: "Rooms are grouped beneath their native workspaces in the sidebar.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-root", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomsNav, { store }) }) }) : null,
     s.toast ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Toast, { text: s.toast, onDone: store.actions.clearToast, holdMs: 2200 }) : null
   ] });
 }
@@ -4273,16 +4817,20 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
     const w = wsFor(key);
     if (w) onNewRoom({ id: w.workspaceId, path: w.path, title: wsTitle(w) });
   };
+  const newSessionButton = (row) => {
+    const buttons = [...row.querySelectorAll("button")].filter((b) => !b.hasAttribute("data-rm-ws-new-room"));
+    return buttons.find((b) => /New session in|中新建会话/.test(b.getAttribute("aria-label") || "")) || buttons[buttons.length - 1];
+  };
   const decorate = () => {
     for (const row of document.querySelectorAll('[data-row-key^="workspace:"]')) {
       const key = rowKey(row);
       if (!key || row.querySelector("[data-rm-ws-new-room]")) continue;
-      const newSess = row.querySelector('button[aria-label^="New session in"]');
+      const newSess = newSessionButton(row);
       if (!newSess) continue;
       let anchor = newSess;
-      while (anchor.parentElement && anchor.parentElement !== row && !anchor.parentElement.querySelector('button[aria-label^="Workspace actions"]')) anchor = anchor.parentElement;
+      while (anchor.parentElement && anchor.parentElement !== row && anchor.parentElement.querySelectorAll("button").length < 2) anchor = anchor.parentElement;
       if (!anchor.parentElement) continue;
-      const label = (newSess.getAttribute("aria-label") || "").replace(/^New session in /, "");
+      const label = wsFor(key) ? wsTitle(wsFor(key)) : (newSess.getAttribute("aria-label") || "").replace(/^New session in /, "");
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = newSess.className;
@@ -4300,9 +4848,10 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
   };
   let pendingKey = null;
   const onClickCapture = (e) => {
-    const trigger = e.target instanceof Element ? e.target.closest('button[aria-label^="Workspace actions for"]') : null;
+    const trigger = e.target instanceof Element ? e.target.closest("button") : null;
     if (!trigger) return;
     const row = trigger.closest('[data-row-key^="workspace:"]');
+    if (!row || trigger !== [...row.querySelectorAll("button")].filter((b) => !b.hasAttribute("data-rm-ws-new-room"))[0]) return;
     pendingKey = row ? rowKey(row) : null;
     if (!pendingKey) return;
     const key = pendingKey;
@@ -4338,7 +4887,7 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
       const first = menu.firstElementChild;
       menu.insertBefore(mk("New session", newSessSvg, () => {
         const row2 = document.querySelector(`[data-row-key="workspace:${CSS.escape(key)}"]`);
-        row2?.querySelector('button[aria-label^="New session in"]')?.click();
+        if (row2) newSessionButton(row2)?.click();
       }), first);
       menu.insertBefore(mk("New room", ROOM_SVG, () => open(key)), first);
     };
@@ -4371,6 +4920,8 @@ function apply(ctx) {
     native = ctx.workspaces || null;
   }
   store.native = native || null;
+  store.uiWorkspace = ctx.uiWorkspace;
+  store.sidebarRight = ctx.sidebarRight;
   store.nativeList = native && native.list ? {
     subscribe: (listener) => native.list.subscribe(listener),
     getSnapshot: () => native.list.getSnapshot()
@@ -4390,6 +4941,7 @@ function apply(ctx) {
   ctx.slots.inject("shell.overlay", () => ctx.slots.register({ name: "shell.overlay", id: "dsh-room-dialogs", inject: () => ({ store }) }, Overlay));
   ctx.slots.inject("sidebar.session.row.leading", () => ctx.slots.register({ name: "sidebar.session.row.leading", id: "dsh-room-session-mark", inject: () => ({ store }) }, RoomSessionMark));
   ctx.effect(() => installWorkspaceDecorator(store, native, (workspace) => store.actions.openDialog({ kind: "create", workspace })), "dsh-room: workspace New room");
+  ctx.effect(() => installRoomGroups(store, native, ctx.layout, ctx.get ? ctx.get("sessions", false) : ctx.sessions), "dsh-room: workspace room groups");
 }
 
 		return module.exports;

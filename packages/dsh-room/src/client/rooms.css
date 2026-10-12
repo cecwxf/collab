@@ -89,7 +89,7 @@
 
 /* ── main: room workspace ─────────────────────────────────────────────────── */
 .rm-main { display: flex; flex: 1; min-height: 0; height: 100%; width: 100%; background: var(--rm-bg); }
-.rm-workspace { display: flex; flex: 1; min-width: 0; min-height: 0; }
+.rm-workspace { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }
 .rm-chat { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .rm-chat-header {
   flex: none; display: flex; align-items: center; gap: 10px; height: 48px;
@@ -114,7 +114,7 @@
 .rm-msg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 1px; }
 .rm-msg-author { font-size: 12px; font-weight: 600; color: var(--rm-muted); }
 .rm-msg-time { font-size: 11px; color: var(--rm-quiet); }
-.rm-msg-body { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.rm-msg-body { font-size: 13.5px; line-height: 1.55; word-break: break-word; min-width: 0; }
 .rm-msg-self .rm-msg-body {
   background: var(--dsw-alias-label-primary); color: var(--dsw-alias-label-primary-foreground);
   padding: 8px 12px; border-radius: 12px 12px 4px 12px; width: fit-content; margin-left: auto;
@@ -157,6 +157,23 @@
   border-left: .5px solid var(--rm-border); background: var(--rm-bg); overflow: auto;
 }
 .rm-detail-section { padding: 14px 14px 8px; border-bottom: .5px solid var(--rm-border); }
+.rm-detail-heading { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: .5px solid var(--rm-border); }
+.rm-output-link { cursor: pointer; color: var(--rm-accent); background: var(--rm-hover); border: .5px solid var(--rm-border); border-radius: 6px; padding: 3px 7px; font: inherit; }
+.rm-output-link:hover { text-decoration: underline; }
+.rm-native-rooms { padding-left: 10px; }
+.rm-native-room-heading { display: flex; align-items: center; }
+.rm-native-row { display: flex; align-items: center; gap: 7px; min-width: 0; width: 100%; min-height: 30px; padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--rm-muted); text-align: left; cursor: pointer; }
+.rm-native-row:hover, .rm-native-row[aria-current="true"] { background: var(--rm-hover); color: var(--rm-label); }
+.rm-native-row-label { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rm-native-row-count { font-size: 11px; color: var(--rm-quiet); }
+.rm-native-room-caret { flex: none; border: 0; width: 18px; background: transparent; color: var(--rm-muted); cursor: pointer; }
+.rm-native-agent { padding-left: 34px; font-size: 12px; }
+[data-rm-grouped-session] { display: none !important; }
+.rm-native-rooms[hidden] { display: none; }
+.rm-nav[aria-label="Rooms by workspace"] { width: 100%; border: 0; max-height: 55vh; }
+@media (max-width: 900px) {
+  .rm-detail { position: absolute; top: 0; bottom: 0; right: 0; z-index: 10; width: min(320px, 90%); box-shadow: -8px 0 24px color-mix(in srgb, var(--rm-label) 10%, transparent); }
+}
 .rm-detail-section:last-child { border-bottom: 0; }
 .rm-detail-h {
   display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;

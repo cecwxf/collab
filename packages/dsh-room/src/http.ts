@@ -156,7 +156,7 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
         if (url.searchParams.get("op") === "delete") return sendJson(res, 200, await bridge.removeLocalAgent(roomId, id));
         return sendJson(res, 200, await bridge.updateLocalAgent(roomId, id, b));
       }
-      const lm = /^\/rooms\/([^/]+)\/(local|transport|stop|runs|diffs|merge|discard)$/.exec(path);
+      const lm = /^\/rooms\/([^/]+)\/(local|transport|stop|runs|diffs|merge|discard|session|preview|files)$/.exec(path);
       if (lm) {
         const roomId = decodeURIComponent(lm[1]!);
         const action = lm[2]!;
@@ -164,6 +164,18 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
         if (method === "GET" && action === "diffs") return sendJson(res, 200, await bridge.agentDiffs(roomId));
         if (method === "POST") {
           const b = await readJson(req);
+          if (action === "files") {
+            if (!Array.isArray(b.paths) || b.paths.length > 50 || b.paths.some(p => typeof p !== "string" || p.length > 4096)) throw new HttpError(400, "up to 50 file paths required");
+            return sendJson(res, 200, await bridge.inspectFiles(roomId, b.paths as string[], str(b.agentId)));
+          }
+          if (action === "session") {
+            if (!str(b.agentId)) throw new HttpError(400, "agentId required");
+            return sendJson(res, 200, await bridge.openAgentSession(roomId, str(b.agentId)!));
+          }
+          if (action === "preview") {
+            if (!str(b.path)) throw new HttpError(400, "path required");
+            return sendJson(res, 200, await bridge.previewFile(roomId, str(b.path)!, str(b.agentId)));
+          }
           if (action === "local") {
             const patch: Record<string, unknown> = {};
             if (typeof b.turnLimit === "number") patch.turnLimit = b.turnLimit;
@@ -217,7 +229,7 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
       }
       throw new HttpError(404, `no route ${method} ${API}${path}`);
     } catch (e) {
-      const status = e instanceof HttpError ? e.status : /not in room|not in a collab room|no local agent/.test((e as Error).message) ? 404 : /needs explicit approval|peer grant deny|^denied:/.test((e as Error).message) ? 403 : 500;
+      const status = e instanceof HttpError ? e.status : /not in room|not in a collab room|no local agent|file not found/.test((e as Error).message) ? 404 : /needs explicit approval|peer grant deny|^denied:|path escapes room workspace/.test((e as Error).message) ? 403 : 500;
       if (!res.headersSent) sendJson(res, status, { error: (e as Error).message });
     }
   };

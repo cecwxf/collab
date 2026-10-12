@@ -50,6 +50,7 @@ import type {
 import { loadState, saveState, createWorkspaceMeta, type RoomMeta, type WorkspaceMeta } from "./state.js";
 import { extractMentions } from "./commands.js";
 import { createRequire } from "node:module";
+import { resolveRoomFile } from "./artifacts.js";
 const requirePkg = createRequire(import.meta.url);
 export const PLUGIN_VERSION: string = (() => { try { return requirePkg("../package.json").version as string; } catch { return "0.3.6"; } })();
 
@@ -155,6 +156,7 @@ export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId" | "membe
   memberConfig?: (ReturnType<typeof publicMemberConfig> & {
     workspacePath?: string;
     resolvedModel?: ModelChoice | null;
+    effectiveReasoningEffort?: string;
     peerGrants?: RoomMemberConfig["peerGrants"];
   }) | null;
   peerConfigs?: Record<string, ReturnType<typeof publicMemberConfig> & { displayName?: string; persona?: string; hostedBy?: string }>;
@@ -919,7 +921,7 @@ export class CollabBridge {
       bound: !!sessionId,
       sessionId,
       transport: conn.local.loopback ? "local" : conn.meta.transport ?? (conn.meta.invite.startsWith("collab://lan/") ? "lan" : "relay"),
-      memberConfig: conn.meta.memberConfig ? { ...publicMemberConfig(conn.meta.memberConfig), workspacePath: conn.meta.memberConfig.workspacePath, resolvedModel: this.resolvedModel(conn), peerGrants: conn.meta.memberConfig.peerGrants, permissions: conn.meta.memberConfig.permissions } : null,
+      memberConfig: conn.meta.memberConfig ? { ...publicMemberConfig(conn.meta.memberConfig), workspacePath: conn.meta.memberConfig.workspacePath, resolvedModel: this.resolvedModel(conn), effectiveReasoningEffort: this.selectedModel(conn).reasoningEffort, peerGrants: conn.meta.memberConfig.peerGrants, permissions: conn.meta.memberConfig.permissions } : null,
       peerConfigs: Object.fromEntries(this.peerConfigs.get(conn.meta.roomId) ?? []),
       local: this.localView(conn),
       runs: this.scheduler.list(conn.meta.roomId),
@@ -1720,6 +1722,40 @@ export class CollabBridge {
       if (wt) await commitPending(wt, a.agentId).catch(() => {});
       this.emit({ type: "rooms" });
     }
+  }
+
+  /** Create or resume the agent's native session without starting a model turn. */
+  async openAgentSession(roomId: string, agentId: string) {
+    const conn = this.room(roomId);
+    const agent = this.localAgent(conn, agentId);
+    await this.agentSessionFor(conn, agent, await this.agentCwd(conn, agent));
+    const sessionId = conn.meta.agentSessions?.[agent.agentId];
+    if (!sessionId || !conn.local.agents.includes(agent)) throw new Error("agent session no longer available");
+    this.emit({ type: "rooms" });
+    return { sessionId };
+  }
+
+  async previewFile(roomId: string, path: string, agentId?: string) {
+    const conn = this.room(roomId);
+    const root = conn.meta.memberConfig?.workspacePath || this.config.workspacePath;
+    const agent = agentId ? this.localAgent(conn, agentId) : undefined;
+    const cwd = agent ? await this.agentCwd(conn, agent) : root;
+    const file = await resolveRoomFile(root, cwd, path);
+    const sessionId = agent ? (await this.openAgentSession(roomId, agent.agentId)).sessionId : conn.meta.sessionId;
+    return { path: file, workspacePath: root, sessionId };
+  }
+
+  async inspectFiles(roomId: string, paths: string[], agentId?: string) {
+    const conn = this.room(roomId);
+    const root = conn.meta.memberConfig?.workspacePath || this.config.workspacePath;
+    const agent = agentId ? this.localAgent(conn, agentId) : undefined;
+    // Inspect only an existing worktree; rendering a message must not create sessions or branches.
+    const cwd = agent ? (conn.worktrees.get(agent.agentId) ?? await this.findWorktree(conn, agent))?.path || root : root;
+    const files: Record<string, string> = {};
+    for (const path of paths.slice(0, 50)) {
+      try { files[path] = await resolveRoomFile(root, cwd, path); } catch { /* Not a known local file. */ }
+    }
+    return { files };
   }
 
   /** Working directory of an agent: private worktree (write + git), else the room workspace. */

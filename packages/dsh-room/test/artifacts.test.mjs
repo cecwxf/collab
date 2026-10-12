@@ -1,0 +1,34 @@
+import { test, before } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp,mkdir,writeFile,symlink,rm,realpath } from 'node:fs/promises';
+import { dirname,join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
+import {build} from 'esbuild';
+import {sameWorkspacePath,sessionFileAddress,fileCandidates,inlineFile} from '../src/client/files.js';
+let resolveRoomFile;
+before(async()=>{const here=dirname(fileURLToPath(import.meta.url)),out=join(here,'.artifacts-build/artifacts.js');await build({entryPoints:[join(here,'../src/artifacts.ts')],outfile:out,bundle:true,platform:'node',format:'esm'});({resolveRoomFile}=await import(out));});
+test('preview resolves an unmerged author worktree, falls back after merge, and confines files to the room',async t=>{
+  const dir=await realpath(await mkdtemp(join(tmpdir(),'room-preview-')));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const root=join(dir,'root'),wt=join(root,'.dsh-room/worktrees/coder');await mkdir(wt,{recursive:true});
+  await writeFile(join(root,'report.html'),'main');await writeFile(join(wt,'report.html'),'unmerged');
+  assert.equal(await resolveRoomFile(root,wt,'report.html'),join(wt,'report.html'));
+  await rm(join(wt,'report.html'));assert.equal(await resolveRoomFile(root,wt,'report.html'),join(root,'report.html'));
+  await writeFile(join(dir,'secret.txt'),'outside');await symlink(join(dir,'secret.txt'),join(root,'link.html'));
+  for(const path of ['../secret.txt',join(dir,'secret.txt'),'link.html'])await assert.rejects(resolveRoomFile(root,root,path),/escapes room workspace/);
+  await assert.rejects(resolveRoomFile(root,root,'.'),/not a file/);
+  await assert.rejects(resolveRoomFile(root,root,'https://example.com/file.html'),/file path required/);
+  await assert.rejects(resolveRoomFile(root,root,'missing.html'),/file not found/);
+  await symlink(root,join(dir,'alias'));assert.equal(await resolveRoomFile(join(dir,'alias'),join(dir,'alias'),'report.html'),join(root,'report.html'));
+  const sibling=join(dir,'owned-worktree');await mkdir(sibling);await writeFile(join(sibling,'report.html'),'monorepo output');
+  assert.equal(await resolveRoomFile(root,sibling,'report.html'),join(sibling,'report.html'));
+  await assert.rejects(resolveRoomFile(root,sibling,join(dir,'secret.txt')),/escapes room workspace/);
+});
+test('native preview addresses preserve drive letters and encode names; file links carry line numbers',()=>{
+  assert.equal(sessionFileAddress('room 1','/tmp/产物 #1?.html'),'dsh-resource://file/session/room%201//tmp/%E4%BA%A7%E7%89%A9%20%231%3F.html');
+  assert.equal(sessionFileAddress('s','C:\\work\\a b.md'),'dsh-resource://file/session/s/C:/work/a%20b.md');
+  assert.deepEqual(inlineFile('src/index.ts:42'),{path:'src/index.ts',line:42});
+  assert.deepEqual(inlineFile('report.md#L4-L8'),{path:'report.md',line:4});
+  assert.ok(sameWorkspacePath('/private/var/test/','/var/test'));
+  assert.deepEqual(fileCandidates('File `report.md:4`; ![chart](chart.svg); `https://a.com/a.md`').paths,['report.md','chart.svg']);
+});

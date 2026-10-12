@@ -1264,7 +1264,7 @@ var WsTransport = class {
       return;
     this.teardownSocket();
     const gen = ++this.generation;
-    await new Promise((resolve4, reject) => {
+    await new Promise((resolve5, reject) => {
       const ws = new WebSocket(this.url);
       this.ws = ws;
       let settled = false;
@@ -1285,7 +1285,7 @@ var WsTransport = class {
           reject(err);
         } else {
           this._connected = true;
-          resolve4();
+          resolve5();
         }
       };
       const timer = setTimeout(() => finish(new Error(`WebSocket connect timeout (${timeoutMs}ms) to ${this.url}`)), timeoutMs);
@@ -1715,12 +1715,12 @@ var CollabClient = class _CollabClient {
     }
   }
   waitFor(pred, timeoutMs) {
-    const p = new Promise((resolve4, reject) => {
+    const p = new Promise((resolve5, reject) => {
       const timer = setTimeout(() => {
         this.waiters = this.waiters.filter((w) => w.timer !== timer);
         reject(new Error("timeout waiting for frame"));
       }, timeoutMs);
-      this.waiters.push({ pred, resolve: resolve4, reject, timer });
+      this.waiters.push({ pred, resolve: resolve5, reject, timer });
     });
     p.catch(() => {
     });
@@ -2276,10 +2276,10 @@ function browseLanRelays(opts) {
     }
   });
   dns.query({ questions: [{ name: MDNS_SERVICE, type: "PTR" }] });
-  return new Promise((resolve4) => {
+  return new Promise((resolve5) => {
     setTimeout(() => {
       dns.destroy();
-      resolve4([...found.values()]);
+      resolve5([...found.values()]);
     }, timeoutMs);
   });
 }
@@ -2610,11 +2610,11 @@ var LanRelayServer = class {
         this.room(roomId).attach(ws);
       });
     });
-    await new Promise((resolve4, reject) => {
+    await new Promise((resolve5, reject) => {
       this.http.once("error", reject);
       this.http.listen(port, host, () => {
         this.http.off("error", reject);
-        resolve4();
+        resolve5();
       });
     });
     const addr = this.http.address();
@@ -2629,9 +2629,9 @@ var LanRelayServer = class {
     for (const ws of this.wss?.clients ?? [])
       ws.terminate();
     if (this.wss)
-      await new Promise((resolve4) => this.wss.close(() => resolve4()));
+      await new Promise((resolve5) => this.wss.close(() => resolve5()));
     if (this.http)
-      await new Promise((resolve4) => this.http.close(() => resolve4()));
+      await new Promise((resolve5) => this.http.close(() => resolve5()));
   }
 };
 
@@ -2659,7 +2659,7 @@ var ApprovalQueue = class {
   request(opts) {
     if (opts.signal?.aborted) return Promise.resolve("deny");
     const requestId = randomUUID();
-    return new Promise((resolve4) => {
+    return new Promise((resolve5) => {
       const entry = {
         requestId,
         roomId: opts.roomId,
@@ -2674,7 +2674,7 @@ var ApprovalQueue = class {
           opts.signal?.removeEventListener("abort", abort);
           this.pending.delete(requestId);
           this.emit();
-          resolve4(d);
+          resolve5(d);
         }
       };
       const abort = () => entry.resolve("deny");
@@ -2924,6 +2924,38 @@ ${HELP}` };
 
 // src/plugin.ts
 import { createRequire } from "node:module";
+
+// src/artifacts.ts
+import { realpath as realpath2, stat as stat3 } from "node:fs/promises";
+import { isAbsolute as isAbsolute3, relative as relative3, resolve as resolve4, sep as sep2 } from "node:path";
+async function resolveRoomFile(root, preferred, path) {
+  if (!path || path.includes("\0") || /^[a-z]+:\/\//i.test(path)) throw new Error("workspace file path required");
+  const realRoot = await realpath2(root);
+  const allowed = [realRoot];
+  if (preferred !== root) {
+    try {
+      allowed.push(await realpath2(preferred));
+    } catch {
+    }
+  }
+  const outside = (p) => isAbsolute3(p) || p === ".." || p.startsWith(`..${sep2}`);
+  for (const base of [.../* @__PURE__ */ new Set([preferred, root])]) {
+    const candidate = resolve4(base, path);
+    let file;
+    try {
+      file = await realpath2(candidate);
+    } catch (e) {
+      if (e.code === "ENOENT") continue;
+      throw e;
+    }
+    if (allowed.every((base2) => outside(relative3(base2, file)))) throw new Error("path escapes room workspace or agent worktree");
+    if (!(await stat3(file)).isFile()) throw new Error("workspace path is not a file");
+    return file;
+  }
+  throw new Error("file not found in the room workspace or agent worktree");
+}
+
+// src/plugin.ts
 var requirePkg = createRequire(import.meta.url);
 var PLUGIN_VERSION = (() => {
   try {
@@ -3653,7 +3685,7 @@ var CollabBridge = class {
       bound: !!sessionId,
       sessionId,
       transport: conn.local.loopback ? "local" : conn.meta.transport ?? (conn.meta.invite.startsWith("collab://lan/") ? "lan" : "relay"),
-      memberConfig: conn.meta.memberConfig ? { ...publicMemberConfig(conn.meta.memberConfig), workspacePath: conn.meta.memberConfig.workspacePath, resolvedModel: this.resolvedModel(conn), peerGrants: conn.meta.memberConfig.peerGrants, permissions: conn.meta.memberConfig.permissions } : null,
+      memberConfig: conn.meta.memberConfig ? { ...publicMemberConfig(conn.meta.memberConfig), workspacePath: conn.meta.memberConfig.workspacePath, resolvedModel: this.resolvedModel(conn), effectiveReasoningEffort: this.selectedModel(conn).reasoningEffort, peerGrants: conn.meta.memberConfig.peerGrants, permissions: conn.meta.memberConfig.permissions } : null,
       peerConfigs: Object.fromEntries(this.peerConfigs.get(conn.meta.roomId) ?? []),
       local: this.localView(conn),
       runs: this.scheduler.list(conn.meta.roomId)
@@ -3761,13 +3793,13 @@ var CollabBridge = class {
       return { callId, target, ok: true, result: await this.callLocalMcp(roomId, tool, args, caller) };
     }
     if (!conn.client.getPeers().some((p) => p.agentId === target)) throw new Error(`MCP target ${target} is not online in this room`);
-    return new Promise((resolve4, reject) => {
+    return new Promise((resolve5, reject) => {
       const finish = (result, error) => {
         if (!conn.mcpCalls.delete(callId)) return;
         clearTimeout(timer);
         options.signal?.removeEventListener("abort", abort);
         if (error) reject(error);
-        else resolve4({ callId, target, ok: result.ok, ...result.ok ? { result: result.result } : { error: result.error ?? "remote MCP failed" } });
+        else resolve5({ callId, target, ok: result.ok, ...result.ok ? { result: result.result } : { error: result.error ?? "remote MCP failed" } });
       };
       const abort = () => finish(void 0, new Error("MCP call aborted"));
       const timer = setTimeout(() => finish(void 0, new Error(`MCP ${tool} timed out after ${timeoutMs}ms`)), timeoutMs);
@@ -4407,6 +4439,39 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
       this.emit({ type: "rooms" });
     }
   }
+  /** Create or resume the agent's native session without starting a model turn. */
+  async openAgentSession(roomId, agentId) {
+    const conn = this.room(roomId);
+    const agent = this.localAgent(conn, agentId);
+    await this.agentSessionFor(conn, agent, await this.agentCwd(conn, agent));
+    const sessionId = conn.meta.agentSessions?.[agent.agentId];
+    if (!sessionId || !conn.local.agents.includes(agent)) throw new Error("agent session no longer available");
+    this.emit({ type: "rooms" });
+    return { sessionId };
+  }
+  async previewFile(roomId, path, agentId) {
+    const conn = this.room(roomId);
+    const root = conn.meta.memberConfig?.workspacePath || this.config.workspacePath;
+    const agent = agentId ? this.localAgent(conn, agentId) : void 0;
+    const cwd = agent ? await this.agentCwd(conn, agent) : root;
+    const file = await resolveRoomFile(root, cwd, path);
+    const sessionId = agent ? (await this.openAgentSession(roomId, agent.agentId)).sessionId : conn.meta.sessionId;
+    return { path: file, workspacePath: root, sessionId };
+  }
+  async inspectFiles(roomId, paths, agentId) {
+    const conn = this.room(roomId);
+    const root = conn.meta.memberConfig?.workspacePath || this.config.workspacePath;
+    const agent = agentId ? this.localAgent(conn, agentId) : void 0;
+    const cwd = agent ? (conn.worktrees.get(agent.agentId) ?? await this.findWorktree(conn, agent))?.path || root : root;
+    const files = {};
+    for (const path of paths.slice(0, 50)) {
+      try {
+        files[path] = await resolveRoomFile(root, cwd, path);
+      } catch {
+      }
+    }
+    return { files };
+  }
   /** Working directory of an agent: private worktree (write + git), else the room workspace. */
   async agentCwd(conn, a) {
     const root = conn.meta.memberConfig?.workspacePath?.trim() || this.config.workspacePath;
@@ -4703,8 +4768,8 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
     if (!top) return null;
     const { worktreeBranch: worktreeBranch2, worktreeDir: worktreeDir2 } = await Promise.resolve().then(() => (init_isolation(), isolation_exports));
     const wt = { repo: top, path: worktreeDir2(top, conn.meta.roomId, a.agentId), branch: worktreeBranch2(conn.meta.name, conn.meta.roomId, a.agentId) };
-    const { stat: stat3 } = await import("node:fs/promises");
-    if (!await stat3(join3(wt.path, ".git")).then(() => true, () => false)) return null;
+    const { stat: stat4 } = await import("node:fs/promises");
+    if (!await stat4(join3(wt.path, ".git")).then(() => true, () => false)) return null;
     conn.worktrees.set(a.agentId, wt);
     return wt;
   }
@@ -4889,8 +4954,8 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
     ];
   }
 };
-var sleep2 = (ms, signal) => new Promise((resolve4, reject) => {
-  const t = setTimeout(resolve4, ms);
+var sleep2 = (ms, signal) => new Promise((resolve5, reject) => {
+  const t = setTimeout(resolve5, ms);
   signal?.addEventListener("abort", () => {
     clearTimeout(t);
     reject(new Error("stopped"));
@@ -4938,7 +5003,7 @@ Written by ${a.agentId} (${a.name}) at ${(/* @__PURE__ */ new Date()).toISOStrin
 
 // src/config.ts
 import { homedir } from "node:os";
-import { join as join4, isAbsolute as isAbsolute3 } from "node:path";
+import { join as join4, isAbsolute as isAbsolute4 } from "node:path";
 var AUTO = /* @__PURE__ */ new Set(["off", "mention", "mention-or-task"]);
 function expand(p) {
   return p.startsWith("~/") ? join4(homedir(), p.slice(2)) : p;
@@ -4951,7 +5016,7 @@ function normalizeConfig(raw, dataRoot = join4(homedir(), ".collab")) {
   const relayUrl = str2("relayUrl") ?? DEFAULT_RELAY_URL;
   if (!/^wss?:\/\//.test(relayUrl)) throw new Error(`dsh-room: relayUrl must be ws:// or wss://, got ${relayUrl}`);
   const workspacePath = expand(str2("workspacePath") ?? join4(dataRoot, "workspace"));
-  if (!isAbsolute3(workspacePath)) throw new Error("dsh-room: workspacePath must be absolute");
+  if (!isAbsolute4(workspacePath)) throw new Error("dsh-room: workspacePath must be absolute");
   return {
     relayUrl,
     invite: str2("invite"),
@@ -5277,7 +5342,7 @@ function createApiHandler(bridge, connection) {
         if (url.searchParams.get("op") === "delete") return sendJson2(res, 200, await bridge.removeLocalAgent(roomId, id));
         return sendJson2(res, 200, await bridge.updateLocalAgent(roomId, id, b));
       }
-      const lm = /^\/rooms\/([^/]+)\/(local|transport|stop|runs|diffs|merge|discard)$/.exec(path);
+      const lm = /^\/rooms\/([^/]+)\/(local|transport|stop|runs|diffs|merge|discard|session|preview|files)$/.exec(path);
       if (lm) {
         const roomId = decodeURIComponent(lm[1]);
         const action = lm[2];
@@ -5285,6 +5350,18 @@ function createApiHandler(bridge, connection) {
         if (method === "GET" && action === "diffs") return sendJson2(res, 200, await bridge.agentDiffs(roomId));
         if (method === "POST") {
           const b = await readJson2(req);
+          if (action === "files") {
+            if (!Array.isArray(b.paths) || b.paths.length > 50 || b.paths.some((p) => typeof p !== "string" || p.length > 4096)) throw new HttpError(400, "up to 50 file paths required");
+            return sendJson2(res, 200, await bridge.inspectFiles(roomId, b.paths, str(b.agentId)));
+          }
+          if (action === "session") {
+            if (!str(b.agentId)) throw new HttpError(400, "agentId required");
+            return sendJson2(res, 200, await bridge.openAgentSession(roomId, str(b.agentId)));
+          }
+          if (action === "preview") {
+            if (!str(b.path)) throw new HttpError(400, "path required");
+            return sendJson2(res, 200, await bridge.previewFile(roomId, str(b.path), str(b.agentId)));
+          }
           if (action === "local") {
             const patch = {};
             if (typeof b.turnLimit === "number") patch.turnLimit = b.turnLimit;
@@ -5341,7 +5418,7 @@ function createApiHandler(bridge, connection) {
       }
       throw new HttpError(404, `no route ${method} ${API}${path}`);
     } catch (e) {
-      const status = e instanceof HttpError ? e.status : /not in room|not in a collab room|no local agent/.test(e.message) ? 404 : /needs explicit approval|peer grant deny|^denied:/.test(e.message) ? 403 : 500;
+      const status = e instanceof HttpError ? e.status : /not in room|not in a collab room|no local agent|file not found/.test(e.message) ? 404 : /needs explicit approval|peer grant deny|^denied:|path escapes room workspace/.test(e.message) ? 403 : 500;
       if (!res.headersSent) sendJson2(res, status, { error: e.message });
     }
   };

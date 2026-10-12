@@ -25,7 +25,7 @@ async function pair(t) {
   await writeFile(join(dir,'exporter','hello.txt'),'remote-only-随机内容');
   const room=await b.createRoom({mode:'lan',lanHostPort:`127.0.0.1:${port}`});
   await a.joinInvite(room.invite);
-  await until(()=>a.room(room.roomId).status==='online'&&b.room(room.roomId).status==='online');
+  await until(()=>a.room(room.roomId).client?.isJoined()&&b.room(room.roomId).client?.isJoined()&&a.room(room.roomId).client.getPeers().some(p=>p.agentId===b.identity.agentId));
   return {a,b,id:room.roomId,target:b.identity.agentId,root:join(dir,'exporter'),invite:room.invite,port};
 }
 
