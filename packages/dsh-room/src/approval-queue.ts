@@ -44,7 +44,9 @@ export class ApprovalQueue {
     detail?: string;
     from: string;
     timeoutMs?: number;
+    signal?: AbortSignal;
   }): Promise<"allow" | "deny"> {
+    if (opts.signal?.aborted) return Promise.resolve("deny");
     const requestId = randomUUID();
     return new Promise<"allow" | "deny">((resolve) => {
       const entry: PendingApproval = {
@@ -56,22 +58,22 @@ export class ApprovalQueue {
         from: opts.from,
         createdAt: Date.now(),
         resolve: (d) => {
+          if (!this.pending.has(requestId)) return;
           clearTimeout(timer);
+          opts.signal?.removeEventListener("abort", abort);
           this.pending.delete(requestId);
           this.emit();
           resolve(d);
         },
       };
-      this.pending.set(requestId, entry);
-      this.emit();
+      const abort = () => entry.resolve("deny");
       const timer = setTimeout(() => {
-        if (this.pending.has(requestId)) {
-          this.pending.delete(requestId);
-          this.emit();
-          resolve("deny");
-        }
+        entry.resolve("deny");
       }, opts.timeoutMs ?? 120_000);
       (timer as { unref?: () => void }).unref?.();
+      this.pending.set(requestId, entry);
+      opts.signal?.addEventListener("abort", abort, { once: true });
+      this.emit();
     });
   }
 

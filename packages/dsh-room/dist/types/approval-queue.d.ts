@@ -25,6 +25,7 @@ export declare class ApprovalQueue {
         detail?: string;
         from: string;
         timeoutMs?: number;
+        signal?: AbortSignal;
     }): Promise<"allow" | "deny">;
     decide(requestId: string, decision: "allow" | "deny"): boolean;
 }

@@ -1,5 +1,6 @@
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 import type { RoomMemberConfig } from "./member-config.js";
 import type { RoomLocalSettings } from "./local-agents.js";
 
@@ -104,11 +105,22 @@ export async function loadState(path: string): Promise<RoomState | null> {
   }
 }
 
+const pendingWrites = new Map<string, Promise<void>>();
+
 export async function saveState(path: string, state: RoomState): Promise<void> {
+  path = resolve(path);
+  const snapshot = structuredClone(state);
+  const pending = (pendingWrites.get(path) ?? Promise.resolve()).catch(() => {}).then(() => writeState(path, snapshot));
+  pendingWrites.set(path, pending);
+  try { await pending; }
+  finally { if (pendingWrites.get(path) === pending) pendingWrites.delete(path); }
+}
+
+async function writeState(path: string, state: RoomState): Promise<void> {
   const dir = dirname(path);
   await mkdir(dir, { recursive: true, mode: 0o700 });
   await chmod(dir, 0o700).catch(() => {});
-  const tmp = `${path}.${process.pid}.tmp`;
+  const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`;
   const body: RoomState = {
     version: 3,
     activeWorkspaceId: state.activeWorkspaceId,
@@ -117,9 +129,13 @@ export async function saveState(path: string, state: RoomState): Promise<void> {
     rooms: state.rooms,
     updatedAt: new Date().toISOString(),
   };
-  await writeFile(tmp, JSON.stringify(body, null, 2), { mode: 0o600 });
-  await chmod(tmp, 0o600);
-  await rename(tmp, path);
+  try {
+    await writeFile(tmp, JSON.stringify(body, null, 2), { mode: 0o600, flag: "wx" });
+    await chmod(tmp, 0o600);
+    await rename(tmp, path);
+  } finally {
+    await rm(tmp, { force: true });
+  }
 }
 
 export async function clearState(path: string): Promise<void> {

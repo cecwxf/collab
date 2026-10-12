@@ -48,6 +48,28 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
 const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : typeof v === "string" ? v.split(/[\s,]+/).filter(Boolean) : undefined);
 
+function peerGrants(value: unknown) {
+  const object = (v: unknown): Record<string, unknown> => {
+    if (!v || typeof v !== "object" || Array.isArray(v)) throw new HttpError(400, "peerGrants must contain objects");
+    return v as Record<string, unknown>;
+  };
+  const grants = (v: unknown) => {
+    const input = object(v), out: Record<string, string> = {};
+    for (const cap of ["read", "write", "exec", "delete"]) {
+      if (!(cap in input)) continue;
+      const grant = input[cap];
+      if (grant !== "auto" && grant !== "ask" && grant !== "deny") throw new HttpError(400, `invalid peer grant for ${cap}`);
+      out[cap] = grant;
+    }
+    return out;
+  };
+  const input = object(value);
+  return {
+    default: "default" in input ? grants(input.default) : {},
+    byAgent: "byAgent" in input ? Object.fromEntries(Object.entries(object(input.byAgent)).map(([id, v]) => [id, grants(v)])) : {},
+  };
+}
+
 /** Pure router so tests can drive it without a dsh web server. */
 export function createApiHandler(bridge: CollabBridge, connection: () => ConnectionLike | undefined) {
   return async (req: IncomingMessage, res: ServerResponse) => {
@@ -174,6 +196,7 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
             if (k in b) patch[k] = b[k];
           }
           if (b.permissions && typeof b.permissions === "object") patch.permissions = b.permissions;
+          if ("peerGrants" in b) patch.peerGrants = peerGrants(b.peerGrants);
           return sendJson(res, 200, await bridge.updateMemberConfig(roomId, patch as any));
         }
         if (method === "GET" && action === "mcp") return sendJson(res, 200, { tools: (await import("./mcp-workspace.js")).MCP_TOOL_DEFS });
@@ -189,7 +212,7 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
       }
       throw new HttpError(404, `no route ${method} ${API}${path}`);
     } catch (e) {
-      const status = e instanceof HttpError ? e.status : /not in room|not in a collab room|no local agent/.test((e as Error).message) ? 404 : /needs explicit approval/.test((e as Error).message) ? 403 : 500;
+      const status = e instanceof HttpError ? e.status : /not in room|not in a collab room|no local agent/.test((e as Error).message) ? 404 : /needs explicit approval|peer grant deny|^denied:/.test((e as Error).message) ? 403 : 500;
       if (!res.headersSent) sendJson(res, status, { error: (e as Error).message });
     }
   };

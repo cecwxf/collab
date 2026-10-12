@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile, appendFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, appendFile, rename, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   DIRECTORY_HEARTBEAT_MS,
@@ -58,13 +58,22 @@ const AGENT_SERVICES = ["agents", "agentDefaultModel", "agentPresets", "permissi
 const text = (s: string): ContentBlock[] => [{ type: "text", text: s }];
 const jsonRender = (_args: unknown, value: unknown) => text(JSON.stringify(value));
 
-function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+function withTimeout<T>(p: Promise<T>, ms: number, label: string, signal?: AbortSignal): Promise<T> {
   let t: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
   const timeout = new Promise<never>((_, rej) => {
     t = setTimeout(() => rej(new Error(`${label} timed out after ${ms}ms`)), ms);
     (t as { unref?: () => void }).unref?.();
   });
-  return Promise.race([p, timeout]).finally(() => { if (t) clearTimeout(t); });
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => reject(signal?.reason ?? new Error("stopped by user"));
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted) onAbort();
+  });
+  return Promise.race([p, timeout, aborted]).finally(() => {
+    if (t) clearTimeout(t);
+    if (onAbort) signal?.removeEventListener("abort", onAbort);
+  });
 }
 
 async function loadIdentity(path: string, agentName?: string): Promise<Identity> {
@@ -214,6 +223,7 @@ class RoomConn {
   locks?: FileLocks;
   git?: boolean | null;
   historyTimer?: ReturnType<typeof setTimeout>;
+  historySave?: Promise<void>;
   announceTimer?: ReturnType<typeof setTimeout>;
   constructor(public meta: RoomMeta) {}
   private normalized?: RoomLocalSettings;
@@ -351,12 +361,18 @@ export class CollabBridge {
       }
       this.activeWorkspaceId = st?.activeWorkspaceId ?? [...this.workspaces.keys()][0] ?? null;
       const metas = st?.rooms ?? [];
-      if (this.config.invite && !metas.some((m) => this.config.invite!.includes(`/join/${encodeURIComponent(m.roomId)}#`) || this.config.invite!.includes(`/join/${m.roomId}#`))) {
+      if (this.config.invite && !metas.some((m) => m.roomId === CollabClient.parseInvite(this.config.invite!).roomId)) {
         const { roomId } = CollabClient.parseInvite(this.config.invite);
         const wsId = this.activeWorkspaceId!;
         metas.push({ roomId, invite: this.config.invite, name: roomId, description: "", tags: [], public: false, owner: false, joinedAt: Date.now(), workspaceId: wsId });
       }
       this.activeRoomId = st?.activeRoomId ?? metas[0]?.roomId ?? null;
+      // Restore metadata before saving or starting any asynchronous joins.
+      for (const meta of metas) {
+        const conn = new RoomConn(meta);
+        conn.onAdd = () => this.scheduleHistorySave(conn);
+        this.rooms.set(meta.roomId, conn);
+      }
       await this.persist();
       // CRITICAL: never block API handlers (incl. Local-only create) on room rejoins.
       // A single hung relay/loopback join used to freeze every /api/collab request.
@@ -766,6 +782,7 @@ export class CollabBridge {
       this.emit({ type: "message", roomId: conn.meta.roomId, message: m });
       this.routeLocal(conn, full);
     }
+    if (conn.local.loopback || conn.local.agents.length) await this.saveLocalHistory(conn);
     return { roomId: conn.meta.roomId, ...r };
   }
   send(roomId: string | undefined, textIn: string, mentions?: string[], replyTo?: string) {
@@ -1399,6 +1416,7 @@ export class CollabBridge {
     await this.disconnectAgents(conn);
     await conn.client?.dispose().catch(() => {});
     conn.client = null;
+    conn.lastSeenPeers.clear();
     conn.local.loopback = wantLoopback;
     conn.status = "connecting";
     this.emit({ type: "rooms" });
@@ -1413,17 +1431,28 @@ export class CollabBridge {
     return join(dirname(this.config.statePath), "local-history", `${roomId.replace(/[^A-Za-z0-9_-]/g, "_")}.json`);
   }
   private scheduleHistorySave(conn: RoomConn) {
-    if (!conn.local.loopback || conn.historyTimer) return;
+    if ((!conn.local.loopback && !conn.local.agents.length) || conn.historyTimer) return;
     conn.historyTimer = setTimeout(() => {
       conn.historyTimer = undefined;
-      void this.saveLocalHistory(conn);
+      void this.saveLocalHistory(conn).catch((e) => this.log("error", `save history ${conn.meta.roomId}: ${(e as Error).message}`));
     }, 500);
     (conn.historyTimer as { unref?: () => void }).unref?.();
   }
-  private async saveLocalHistory(conn: RoomConn) {
+  private saveLocalHistory(conn: RoomConn): Promise<void> {
+    clearTimeout(conn.historyTimer);
+    conn.historyTimer = undefined;
     const f = this.historyPath(conn.meta.roomId);
-    await mkdir(dirname(f), { recursive: true, mode: 0o700 }).catch(() => {});
-    await writeFile(f, JSON.stringify(conn.messages.slice(-MESSAGES_MAX)), { mode: 0o600 }).catch(() => {});
+    const body = JSON.stringify(conn.messages.slice(-MESSAGES_MAX));
+    const save = (conn.historySave ?? Promise.resolve()).catch(() => {}).then(async () => {
+      await mkdir(dirname(f), { recursive: true, mode: 0o700 });
+      const tmp = `${f}.${randomUUID()}.tmp`;
+      try {
+        await writeFile(tmp, body, { mode: 0o600, flag: "wx" });
+        await rename(tmp, f);
+      } finally { await rm(tmp, { force: true }); }
+    });
+    conn.historySave = save;
+    return save;
   }
   private async loadLocalHistory(conn: RoomConn) {
     try {
@@ -1505,8 +1534,8 @@ export class CollabBridge {
       tasks: opts.tasks,
     };
     if (a.approvalRequired) {
-      req.gate = async () =>
-        (await this.approvals.request({ roomId: conn.meta.roomId, action: "shell.exec", summary: `Run local agent ${a.name} (${a.agentId})`, detail: summary, from: a.agentId, timeoutMs: 10 * 60_000 })) === "allow";
+      req.gate = async (signal) =>
+        (await this.approvals.request({ roomId: conn.meta.roomId, action: "shell.exec", summary: `Run local agent ${a.name} (${a.agentId})`, detail: summary, from: a.agentId, timeoutMs: 10 * 60_000, signal })) === "allow";
     }
     this.scheduler.enqueue(req);
   }
@@ -1538,6 +1567,7 @@ export class CollabBridge {
     conn.runThread.set(a.agentId, run.threadId);
     try {
       const cwd = await this.agentCwd(conn, a);
+      signal.throwIfAborted();
       const prompt = this.buildLocalPrompt(conn, a, mode, req.trigger as CollabPayload | undefined, run.threadId, cwd, req.tasks as never);
       const ctx: LocalRunContext = { bridge: this, roomId: conn.meta.roomId, agent: a, prompt, mode, trigger: req.trigger as CollabPayload | undefined, threadId: run.threadId, cwd, signal };
       // Guard: a worktree agent should not touch the main workspace — snapshot it to report strays afterwards.
@@ -1588,53 +1618,56 @@ export class CollabBridge {
   }
 
   private async runInSession(conn: RoomConn, a: LocalAgentConfig, ctx: LocalRunContext, retried = false): Promise<void> {
+    ctx.signal.throwIfAborted();
     const handle = await this.agentSessionFor(conn, a, ctx.cwd);
+    ctx.signal.throwIfAborted();
     const agent = handle.agent as AgentLike & { whenIdle?(): Promise<void>; cancel?(c: unknown, o?: unknown): void; session?: { seq?: number } };
-    // A freshly created/resumed session may still be settling; queueing before it is idle can drop the turn.
-    if (agent.whenIdle) await Promise.race([agent.whenIdle(), new Promise((r) => setTimeout(r, 30_000))]);
-    const seq0 = agent.session?.seq;
-    agent.followup(this.notice(conn, ctx.prompt, ctx.trigger?.sender ?? "room", ctx.trigger?.messageId ?? randomUUID(), `${ctx.mode} → ${a.name}`));
-    if (!agent.whenIdle) return;
-    const aborted = new Promise<void>((resolve) => ctx.signal.addEventListener("abort", () => resolve(), { once: true }));
-    const timeout = new Promise<void>((resolve) => {
-      const t = setTimeout(resolve, 20 * 60_000);
-      (t as { unref?: () => void }).unref?.();
-    });
-    // whenIdle can resolve before the queued followup is picked up: wait until the session advanced.
-    const settled = (async () => {
-      for (let i = 0; i < 40; i++) {
-        await agent.whenIdle!();
-        if (seq0 === undefined || agent.session?.seq !== seq0) return;
-        await new Promise((r) => setTimeout(r, 250));
+    const cancel = () => { try { agent.cancel?.({ kind: "user" }); } catch { /* */ } };
+    ctx.signal.addEventListener("abort", cancel, { once: true });
+    try {
+      // A freshly created/resumed session may still be settling; queueing before it is idle can drop the turn.
+      if (agent.whenIdle) await withTimeout(agent.whenIdle(), 30_000, `session idle ${a.agentId}`, ctx.signal);
+      ctx.signal.throwIfAborted();
+      const seq0 = agent.session?.seq;
+      agent.followup(this.notice(conn, ctx.prompt, ctx.trigger?.sender ?? "room", ctx.trigger?.messageId ?? randomUUID(), `${ctx.mode} → ${a.name}`));
+      if (!agent.whenIdle) return;
+      // whenIdle can resolve before the queued followup is picked up: wait until the session advanced.
+      const settled = (async () => {
+        for (let i = 0; i < 40; i++) {
+          ctx.signal.throwIfAborted();
+          await agent.whenIdle!();
+          ctx.signal.throwIfAborted();
+          if (seq0 === undefined || agent.session?.seq !== seq0) return;
+          await sleep(250, ctx.signal);
+        }
+      })();
+      await withTimeout(settled, 20 * 60_000, `agent turn ${a.agentId}`, ctx.signal);
+      this.log("info", `run ${a.agentId}: seq ${seq0} -> ${agent.session?.seq}`);
+      if (process.env.DSH_ROOM_DEBUG_LOG && seq0 !== undefined) {
+        const sess = agent.session as { seq?: number; eventAt?(n: number): unknown };
+        for (let i = seq0; i < (sess.seq ?? seq0); i++) this.log("info", `  ev ${i}: ${JSON.stringify(sess.eventAt?.(i)).slice(0, 700)}`);
       }
-    })();
-    await Promise.race([settled, aborted, timeout]);
-    this.log("info", `run ${a.agentId}: seq ${seq0} -> ${agent.session?.seq}`);
-    if (process.env.DSH_ROOM_DEBUG_LOG && seq0 !== undefined) {
-      const sess = agent.session as { seq?: number; eventAt?(n: number): unknown };
-      for (let i = seq0; i < (sess.seq ?? seq0); i++) this.log("info", `  ev ${i}: ${JSON.stringify(sess.eventAt?.(i)).slice(0, 700)}`);
-    }
-    if (!ctx.signal.aborted && seq0 !== undefined && agent.session?.seq === seq0) throw new Error("agent session did not start a turn");
-    // Surface a turn that ended in a provider error (otherwise the run would look "done" with no reply).
-    const failure = !ctx.signal.aborted && seq0 !== undefined ? this.turnError(agent.session as never, seq0) : undefined;
-    if (failure) {
-      const key = `${conn.meta.roomId}:${a.agentId}`;
-      if (!retried && failure.code === "UNSUPPORTED_REASONING_EFFORT" && a.reasoningEffort) {
-        this.log("warn", `${a.agentId}: ${failure.message}; recreating its session with the model's default effort`);
-        this.noEffort.add(key);
-        conn.meta.agentNoEffort = [...new Set([...(conn.meta.agentNoEffort ?? []), a.agentId])];
-        this.agentHandles.delete(key);
-        if (conn.meta.agentSessions) delete conn.meta.agentSessions[a.agentId];
-        return this.runInSession(conn, a, ctx, true);
+      if (!ctx.signal.aborted && seq0 !== undefined && agent.session?.seq === seq0) throw new Error("agent session did not start a turn");
+      // Surface a turn that ended in a provider error (otherwise the run would look "done" with no reply).
+      const failure = !ctx.signal.aborted && seq0 !== undefined ? this.turnError(agent.session as never, seq0) : undefined;
+      if (failure) {
+        const key = `${conn.meta.roomId}:${a.agentId}`;
+        if (!retried && failure.code === "UNSUPPORTED_REASONING_EFFORT" && a.reasoningEffort) {
+          this.log("warn", `${a.agentId}: ${failure.message}; recreating its session with the model's default effort`);
+          this.noEffort.add(key);
+          conn.meta.agentNoEffort = [...new Set([...(conn.meta.agentNoEffort ?? []), a.agentId])];
+          this.agentHandles.delete(key);
+          if (conn.meta.agentSessions) delete conn.meta.agentSessions[a.agentId];
+          return this.runInSession(conn, a, ctx, true);
+        }
+        throw new Error(failure.message);
       }
-      throw new Error(failure.message);
-    }
-    if (ctx.signal.aborted) {
-      try {
-        agent.cancel?.({ kind: "user" });
-      } catch {
-        /* */
-      }
+    } catch (e) {
+      cancel();
+      if (agent.whenIdle) await withTimeout(agent.whenIdle(), 30_000, `agent stop ${a.agentId}`).catch(() => {});
+      throw e;
+    } finally {
+      ctx.signal.removeEventListener("abort", cancel);
     }
   }
 
@@ -1835,6 +1868,7 @@ export class CollabBridge {
       this.emit({ type: "message", roomId: conn.meta.roomId, message: m });
       this.routeLocal(conn, full);
     }
+    if (conn.local.loopback || conn.local.agents.length) await this.saveLocalHistory(conn);
     return { roomId: conn.meta.roomId, ...r };
   }
 
@@ -1874,7 +1908,7 @@ export class CollabBridge {
     if (!approved) throw new Error("merge needs explicit approval");
     const conn = this.room(roomId);
     const a = this.localAgent(conn, agentId);
-    if (this.scheduler.list(conn.meta.roomId).some((r) => r.agentId === a.agentId && r.state === "running")) throw new Error(`${a.name} is still running — stop it or wait`);
+    if (this.scheduler.isExecuting(conn.meta.roomId, a.agentId)) throw new Error(`${a.name} is still running — wait for it to finish stopping`);
     const wt = conn.worktrees.get(a.agentId) ?? (await this.findWorktree(conn, a));
     if (!wt) throw new Error(`${a.name} has no worktree yet`);
     const r = await mergeWorktree(wt, a.agentId);
@@ -1892,7 +1926,7 @@ export class CollabBridge {
     if (!approved) throw new Error("discard needs explicit approval");
     const conn = this.room(roomId);
     const a = this.localAgent(conn, agentId);
-    if (this.scheduler.list(conn.meta.roomId).some((r) => r.agentId === a.agentId && r.state === "running")) throw new Error(`${a.name} is still running — stop it or wait`);
+    if (this.scheduler.isExecuting(conn.meta.roomId, a.agentId)) throw new Error(`${a.name} is still running — wait for it to finish stopping`);
     const wt = conn.worktrees.get(a.agentId) ?? (await this.findWorktree(conn, a));
     if (!wt) return { ok: true, discarded: false };
     await discardWorktree(wt);
@@ -1954,8 +1988,10 @@ export class CollabBridge {
     for (const conn of this.rooms.values()) {
       if (conn.heartbeat) clearInterval(conn.heartbeat);
       if (conn.presenceTimer) clearInterval(conn.presenceTimer);
+      clearTimeout(conn.announceTimer);
+      clearTimeout(conn.historyTimer);
       this.scheduler.stop(conn.meta.roomId);
-      if (conn.local.loopback) await this.saveLocalHistory(conn);
+      if (conn.local.loopback || conn.local.agents.length) await this.saveLocalHistory(conn);
       await this.disconnectAgents(conn);
       await conn.client?.dispose().catch(() => {});
     }

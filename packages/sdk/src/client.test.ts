@@ -1,9 +1,46 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { generateIdentity } from "@collab/protocol";
+import { generateIdentity, encodePayload, encrypt } from "@collab/protocol";
 import { CollabClient, RoomHub } from "./client.js";
 
 describe("CollabClient mock relay", () => {
+  it("rejoining replays messages missed offline once through onPayload", async () => {
+    const hub = new RoomHub();
+    const room = CollabClient.createRoom();
+    const ta = CollabClient.mockTransport(hub);
+    const a = new CollabClient({ identity: await generateIdentity("a"), roomId: room.roomId, roomKey: room.roomKey, transport: ta });
+    const b = new CollabClient({ identity: await generateIdentity("b"), roomId: room.roomId, roomKey: room.roomKey, transport: CollabClient.mockTransport(hub) });
+    const received: string[] = [];
+    a.onPayload((p) => { if (p.kind === "chat") received.push(p.text); });
+    try {
+      await a.join(); await b.join();
+      await b.sendChat("before disconnect");
+      await sleep(10);
+      ta.close();
+      await b.sendChat("missed task mention", ["a"]);
+      await a.join();
+      await a.join();
+      assert.deepEqual(received, ["before disconnect", "missed task mention"]);
+    } finally { await a.dispose(); await b.dispose(); }
+  });
+
+  it("rejects encrypted payloads whose sender differs from the authenticated frame sender", async () => {
+    const hub = new RoomHub();
+    const room = CollabClient.createRoom();
+    const transport = CollabClient.mockTransport(hub);
+    const a = new CollabClient({ identity: await generateIdentity("a"), roomId: room.roomId, roomKey: room.roomKey, transport });
+    const received: string[] = [];
+    a.onPayload((p) => received.push(p.sender));
+    try {
+      await a.join();
+      const full = { v: 1 as const, kind: "chat" as const, messageId: "spoof", ts: 1, sender: "host", text: "spoofed" };
+      const sealed = await encrypt(room.roomKey, encodePayload(full), new TextEncoder().encode(`${room.roomId}:peer`));
+      transport.deliver({ v: 1, type: "fwd", roomId: room.roomId, from: "peer", seq: 1, ...sealed });
+      await sleep(10);
+      assert.deepEqual(received, []);
+      assert.deepEqual(await a.history(), []);
+    } finally { await a.dispose(); }
+  });
   it("two agents join and chat with E2EE", async () => {
     const hub = new RoomHub();
     const room = CollabClient.createRoom();

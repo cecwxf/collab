@@ -72,6 +72,8 @@ export class CollabClient {
   private statusHandlers: StatusHandler[] = [];
   private waiters: Waiter[] = [];
   private joined = false;
+  private hasJoined = false;
+  private reconnecting?: Promise<void>;
   private disposed = false;
   private capabilities: string[];
   private reconnect: boolean;
@@ -95,9 +97,9 @@ export class CollabClient {
     this.transport.onClose(() => {
       this.joined = false;
       this.setConnStatus("disconnected", "ws_closed");
-      if (this.reconnect && !this.disposed) {
+      if (this.reconnect && !this.disposed && !this.reconnecting) {
         this.setConnStatus("connecting", "reconnect");
-        void this.reconnectLoop();
+        this.reconnecting = this.reconnectLoop().finally(() => { this.reconnecting = undefined; });
       }
     });
   }
@@ -195,7 +197,12 @@ export class CollabClient {
   }
 
   async join(timeoutMs = 10_000): Promise<void> {
+    if (this.disposed) throw new Error("disposed");
+    if (this.joined) return;
+    const catchUp = this.hasJoined || !!this.cursor;
+    const since = this.cursor?.get() ?? this.seq;
     await this.connect();
+    if (this.disposed) throw new Error("disposed");
 
     // Register waiters BEFORE send to avoid sync mock-relay race
     const challengeP = this.waitFor(
@@ -254,15 +261,16 @@ export class CollabClient {
       throw new Error("expected joined");
     }
     this.joined = true;
+    this.hasJoined = true;
     this.peers = joined.peers;
     this.seq = joined.seq;
     this.setConnStatus("connected");
     for (const h of this.peerHandlers) h(this.peers);
 
     // catch up
-    const since = this.cursor?.get() ?? 0;
-    if (since > 0 && since < this.seq) {
-      await this.poll(since);
+    if (catchUp && since < joined.seq) {
+      const missed = await this.pollFrames(since);
+      for (const frame of missed.frames) await this.handleFwd(frame);
     }
 
     this.startPing();
@@ -378,6 +386,18 @@ export class CollabClient {
 
   async poll(sinceSeq?: number): Promise<CollabPayload[]> {
     const since = sinceSeq ?? this.cursor?.get() ?? 0;
+    const res = await this.pollFrames(since);
+    const out: CollabPayload[] = [];
+    for (const fwd of res.frames) {
+      const p = await this.decryptFwd(fwd);
+      if (p) out.push(p);
+    }
+    this.seq = Math.max(this.seq, res.seq);
+    this.cursor?.set(this.seq);
+    return out;
+  }
+
+  private async pollFrames(since: number): Promise<Extract<WireFrame, { method: "poll_result" }>> {
     const resP = this.waitFor(
       (f) => f.type === "ctrl" && f.method === "poll_result",
       5_000,
@@ -391,15 +411,8 @@ export class CollabClient {
       sinceSeq: since,
     });
     const res = await resP;
-    if (res.type !== "ctrl" || res.method !== "poll_result") return [];
-    const out: CollabPayload[] = [];
-    for (const fwd of res.frames) {
-      const p = await this.decryptFwd(fwd);
-      if (p) out.push(p);
-    }
-    this.seq = Math.max(this.seq, res.seq);
-    this.cursor?.set(this.seq);
-    return out;
+    if (res.type !== "ctrl" || res.method !== "poll_result") throw new Error("expected poll_result");
+    return res;
   }
 
   async history(sinceSeq = 0): Promise<CollabPayload[]> {
@@ -452,9 +465,11 @@ export class CollabClient {
 
   private async decryptFwd(frame: FwdFrame): Promise<CollabPayload | null> {
     try {
+      if (frame.roomId !== this.roomId) return null;
       const aad = new TextEncoder().encode(`${frame.roomId}:${frame.from}`);
       const plain = await decrypt(this.roomKey, frame.nonce, frame.ciphertext, aad);
-      return decodePayload(plain);
+      const payload = decodePayload(plain);
+      return payload.sender === frame.from ? payload : null;
     } catch {
       return null;
     }

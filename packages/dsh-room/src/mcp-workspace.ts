@@ -3,8 +3,8 @@
  * Path sandbox: all ops resolve under root; symlink escape rejected.
  * Writes / shell / network require approval unless auto* is set.
  */
-import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { lstat, mkdir, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 import type { RoomMemberConfig, McpToolName } from "./member-config.js";
 import { resolvePeerGrant } from "./member-config.js";
@@ -48,17 +48,29 @@ export class WorkspaceMcp {
     const root = resolve(this.cfg.workspacePath);
     const target = resolve(root, rel || ".");
     const relToRoot = relative(root, target);
-    if (relToRoot.startsWith("..") || relToRoot.includes(`..${sep}`)) throw new Error("path escapes workspace");
-    // Reject if realpath escapes (best-effort)
-    try {
-      const { realpath } = await import("node:fs/promises");
-      const real = await realpath(target).catch(() => target);
-      const realRoot = await realpath(root).catch(() => root);
-      if (!real.startsWith(realRoot + sep) && real !== realRoot) throw new Error("path escapes workspace (symlink)");
-    } catch (e) {
-      if ((e as Error).message.includes("escapes")) throw e;
+    const outside = (p: string) => isAbsolute(p) || p === ".." || p.startsWith(`..${sep}`);
+    if (outside(relToRoot)) throw new Error("path escapes workspace");
+    const realRoot = await realpath(root);
+    let ancestor = resolve(realRoot, relToRoot);
+    const suffix: string[] = [];
+    // New files have no realpath: resolve the closest existing ancestor instead.
+    // This also handles macOS /var aliases and symlinked workspace roots.
+    while (true) {
+      let real: string;
+      try {
+        real = await realpath(ancestor);
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+        if ((await lstat(ancestor).catch(() => null))?.isSymbolicLink()) throw new Error("path escapes workspace (dangling symlink)");
+        const parent = dirname(ancestor);
+        if (parent === ancestor) throw e;
+        suffix.unshift(relative(parent, ancestor));
+        ancestor = parent;
+        continue;
+      }
+      if (outside(relative(realRoot, real))) throw new Error("path escapes workspace (symlink)");
+      return resolve(real, ...suffix);
     }
-    return target;
   }
 
   private async maybeApprove(tool: string, summary: string, detail: string, from: string) {
@@ -72,7 +84,7 @@ export class WorkspaceMcp {
     if (cap) {
       const grant = resolvePeerGrant(this.cfg, from, cap);
       if (grant === "deny") throw new Error(`peer grant deny: ${cap} for ${from}`);
-      if (grant === "auto") return;
+      if (grant === "auto" && (cap !== "read" || this.cfg.permissions.autoRead)) return;
       // ask → fall through to approval queue
     }
     if (!action && cap === "read") {
@@ -115,6 +127,7 @@ export class WorkspaceMcp {
 
     switch (tool as McpToolName) {
       case "workspace_list": {
+        await this.maybeApprove(tool, `list ${args.path ?? "."}`, "", from);
         const dir = await this.resolveSafe(String(args.path ?? "."));
         const entries = await readdir(dir, { withFileTypes: true });
         return {
@@ -123,18 +136,20 @@ export class WorkspaceMcp {
         };
       }
       case "workspace_read": {
-        if (!this.cfg.permissions.autoRead) await this.maybeApprove("workspace_read", `read ${args.path}`, "", from);
+        await this.maybeApprove(tool, `read ${args.path}`, "", from);
         const file = await this.resolveSafe(String(args.path ?? ""));
         const buf = await readFile(file);
         if (buf.length > 256 * 1024) throw new Error("file too large (>256KiB)");
         return { path: String(args.path), content: buf.toString("utf8") };
       }
       case "workspace_stat": {
+        await this.maybeApprove(tool, `stat ${args.path}`, "", from);
         const file = await this.resolveSafe(String(args.path ?? ""));
         const st = await stat(file);
         return { path: String(args.path), size: st.size, mtimeMs: st.mtimeMs, isDirectory: st.isDirectory(), isFile: st.isFile() };
       }
       case "workspace_search": {
+        await this.maybeApprove(tool, `search ${args.path ?? "."}`, String(args.query ?? ""), from);
         const q = String(args.query ?? "");
         if (!q) throw new Error("query required");
         const start = await this.resolveSafe(String(args.path ?? "."));

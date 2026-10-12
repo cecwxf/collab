@@ -9,17 +9,18 @@ import { build } from "esbuild";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const outdir = join(here, ".lma-build");
-let O, I, L, P;
+let O, I, L, P, S;
 
 before(async () => {
   await build({
-    entryPoints: [join(here, "../src/orchestrator.ts"), join(here, "../src/isolation.ts"), join(here, "../src/local-agents.ts")],
+    entryPoints: [join(here, "../src/orchestrator.ts"), join(here, "../src/isolation.ts"), join(here, "../src/local-agents.ts"), join(here, "../src/state.ts")],
     outdir, bundle: true, platform: "node", format: "esm", packages: "bundle", external: ["node:*"],
   });
   O = await import(join(outdir, "orchestrator.js"));
   I = await import(join(outdir, "isolation.js"));
   L = await import(join(outdir, "local-agents.js"));
   P = await import("../dist/index.js");
+  S = await import(join(outdir, "state.js"));
 });
 
 const agent = (name, extra = {}) => ({ id: name.toLowerCase(), agentId: `${name.toLowerCase()}.h0st`, name, scope: "read", approvalRequired: false, createdAt: 0, ...extra });
@@ -85,6 +86,47 @@ describe("turn limit", () => {
 });
 
 describe("concurrency scheduler", () => {
+  test("requesting zero finished runs returns only active runs", async () => {
+    const s = new O.RunScheduler(async () => {}, () => 1);
+    s.enqueue({ roomId: "r", agentId: "a", threadId: "t", reason: "x", summary: "run" });
+    await s.whenIdle();
+    assert.deepEqual(s.list("r", 0), []);
+  });
+  test("stop retains the execution slot until cleanup finishes; the same agent never overlaps", async () => {
+    let release;
+    let live = 0, peak = 0, started = 0;
+    const s = new O.RunScheduler(async () => {
+      live++; started++; peak = Math.max(peak, live);
+      if (started === 1) await new Promise((r) => { release = r; });
+      live--;
+    }, () => 1);
+    s.enqueue({ roomId: "r", agentId: "a", threadId: "t", reason: "x", summary: "first" });
+    await sleep(0);
+    s.stop("r", "a");
+    s.enqueue({ roomId: "r", agentId: "a", threadId: "t", reason: "x", summary: "second" });
+    let idle = false;
+    const idleP = s.whenIdle().then(() => { idle = true; });
+    await sleep(0);
+    const startedBeforeCleanup = started;
+    const idleBeforeCleanup = idle;
+    release();
+    await idleP;
+    assert.equal(startedBeforeCleanup, 1);
+    assert.equal(idleBeforeCleanup, false);
+    assert.equal(peak, 1);
+    assert.equal(started, 2);
+  });
+  test("rejected approval settles whenIdle waiters", async () => {
+    let reject;
+    const s = new O.RunScheduler(async () => assert.fail("must not execute"), () => 1);
+    s.enqueue({ roomId: "r", agentId: "a", threadId: "t", reason: "x", summary: "gate", gate: () => new Promise((_, r) => { reject = r; }) });
+    const idleP = s.whenIdle();
+    await sleep(0);
+    reject(new Error("approval service failed"));
+    const settled = await Promise.race([idleP.then(() => true), sleep(100).then(() => false)]);
+    assert.equal(settled, true);
+    assert.equal(s.list("r")[0].state, "failed");
+  });
   test("caps parallel runs per room, keeps a FIFO queue, one run per agent at a time", async () => {
     let live = 0, peak = 0;
     const order = [];
@@ -179,7 +221,144 @@ async function bridgeIn(dir, ws) {
 const texts = (b, roomId) => b.room(roomId).messages.map((m) => `${m.from}|${m.kind}|${m.text}`);
 
 describe("local multi-agent room (loopback, mock runner)", () => {
-  test("3 local agents as separate members: @all parallel, moderator task flow + summary, worktree merge, stop", async () => {
+  test("merge/discard refuse a stopped agent while its execution is still cleaning up", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "lma-merge-stop-"));
+    const ws = join(dir, "ws");
+    await mkdir(ws);
+    const g = gitRepo(ws);
+    await writeFile(join(ws, "a.txt"), "base\n");
+    g("add", "-A"); g("commit", "-qm", "init");
+    const b = await bridgeIn(dir, ws);
+    let release;
+    b.localRunner = async () => new Promise((r) => { release = r; });
+    try {
+      const room = await b.createRoom({ localOnly: true, agents: ["coder"] });
+      await waitConnected(b, room.roomId);
+      const coder = b.room(room.roomId).local.agents[0];
+      await b.send(room.roomId, "@coder go");
+      for (let i = 0; !release && i < 200; i++) await sleep(5);
+      assert.ok(release);
+      b.stopLocal(room.roomId);
+      await assert.rejects(b.mergeAgent(room.roomId, coder.agentId, true), /still running/);
+      await assert.rejects(b.discardAgent(room.roomId, coder.agentId, true), /still running/);
+    } finally { release?.(); await b.scheduler.whenIdle(); await b.dispose(); }
+  });
+  test("concurrent state snapshots finish in invocation order", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "lma-save-order-"));
+    const path = join(dir, "state.json");
+    const base = { version: 3, rooms: [], activeRoomId: null, activeWorkspaceId: null };
+    await Promise.all([
+      S.saveState(path, { ...base, workspaces: [{ id: "w", name: "old", path: "a".repeat(2_000_000), createdAt: 0 }] }),
+      S.saveState(path, { ...base, workspaces: [{ id: "w", name: "new", path: "/new", createdAt: 0 }] }),
+    ]);
+    assert.equal(JSON.parse(await readFile(path, "utf8")).workspaces[0].name, "new");
+  });
+  test("stop while a dsh session is being created never starts a followup turn", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "lma-session-stop-"));
+    const b = await bridgeIn(dir, join(dir, "ws"));
+    let release, started = 0;
+    b.agentServices = () => ({});
+    b.agentSessionFor = () => new Promise((r) => { release = () => r({ agent: { session: { seq: 0 }, followup() { started++; this.session.seq++; }, whenIdle: async () => {} } }); });
+    try {
+      const room = await b.createRoom({ localOnly: true, agents: ["reviewer"] });
+      await waitConnected(b, room.roomId);
+      await b.send(room.roomId, "@reviewer go");
+      for (let i = 0; !release && i < 100; i++) await sleep(5);
+      assert.ok(release, "session creation reached");
+      b.stopLocal(room.roomId);
+      release();
+      await b.scheduler.whenIdle();
+      assert.equal(started, 0);
+    } finally { release?.(); await b.dispose(); }
+  });
+  test("loopback to localhost relay and back preserves members/history and refuses to cut off remote peers", async () => {
+    const { LanRelayServer } = await import("@collab/lan-relay");
+    const { CollabClient, WsTransport } = await import("@collab/sdk");
+    const { generateIdentity } = await import("@collab/protocol");
+    const server = new LanRelayServer({ port: 0, mdns: false, host: "127.0.0.1" });
+    const { port } = await server.listen();
+    const dir = await mkdtemp(join(tmpdir(), "lma-transport-"));
+    const b = await bridgeIn(dir, join(dir, "ws"));
+    b.localRunner = async () => {};
+    let peer;
+    try {
+      const room = await b.createRoom({ localOnly: true, lanHostPort: `127.0.0.1:${port}`, agents: ["architect", "reviewer"] });
+      await waitConnected(b, room.roomId);
+      await b.send(room.roomId, "loopback history");
+      await b.setTransport(room.roomId, "relay");
+      await waitConnected(b, room.roomId);
+      const parsed = CollabClient.parseInvite(room.invite);
+      peer = new CollabClient({ identity: await generateIdentity("remote"), roomId: room.roomId, roomKey: parsed.roomKeyB64, transport: new WsTransport(`ws://127.0.0.1:${port}/ws/${room.roomId}`) });
+      const configs = new Set();
+      peer.onPayload((p) => { if (p.kind === "member.config") configs.add(p.sender); });
+      await peer.join();
+      await sleep(1000);
+      assert.equal(configs.size, 3, "new peer receives host and every local agent config");
+      await peer.sendChat("relay history");
+      await sleep(20);
+      await assert.rejects(b.setTransport(room.roomId, "local"), /remote members are connected/);
+      await peer.dispose();
+      await sleep(30);
+      await b.setTransport(room.roomId, "local");
+      await waitConnected(b, room.roomId);
+      assert.ok(texts(b, room.roomId).some((m) => m.endsWith("|loopback history")));
+      assert.ok(texts(b, room.roomId).some((m) => m.endsWith("|relay history")));
+      assert.equal(b.view(b.room(room.roomId)).members.length, 3);
+    } finally { await peer?.dispose(); await b.dispose(); await server.close(); }
+  });
+  test("acknowledged local messages are durable before a host shutdown", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "lma-history-"));
+    const b = await bridgeIn(dir, join(dir, "ws"));
+    try {
+      const room = await b.createRoom({ localOnly: true });
+      await waitConnected(b, room.roomId);
+      await b.send(room.roomId, "last message before restart");
+      const stored = JSON.parse(await readFile(join(dir, "local-history", `${room.roomId}.json`), "utf8").catch(() => "[]"));
+      assert.ok(stored.some((m) => m.text === "last message before restart"));
+    } finally { await b.dispose(); }
+  });
+  test("stopping an approval run removes its pending approval", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "lma-stop-approval-"));
+    const b = await bridgeIn(dir, join(dir, "ws"));
+    try {
+      const room = await b.createRoom({ localOnly: true, agents: [{ name: "Guarded", approvalRequired: true }] });
+      await waitConnected(b, room.roomId);
+      await b.send(room.roomId, "@guarded go");
+      assert.equal(b.approvals.list().length, 1);
+      b.stopLocal(room.roomId);
+      await b.scheduler.whenIdle();
+      assert.equal(b.approvals.list().length, 0);
+    } finally { await b.dispose(); }
+  });
+  test("concurrent state writes do not share a temporary file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "lma-save-"));
+    const path = join(dir, "state.json");
+    const state = { version: 3, rooms: [], workspaces: [], activeRoomId: null, activeWorkspaceId: null };
+    const results = await Promise.allSettled(Array.from({ length: 20 }, () => S.saveState(path, state)));
+    assert.deepEqual(results.filter((r) => r.status === "rejected"), []);
+    assert.equal(JSON.parse(await readFile(path, "utf8")).version, 3);
+  });
+  test("restart persists room membership before background reconnect; concurrent saves are atomic", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "lma-restart-"));
+    const ws = join(dir, "ws");
+    await mkdir(ws);
+    const b = await bridgeIn(dir, ws);
+    const room = await b.createRoom({ name: "Persisted", localOnly: true, agents: ["reviewer"] });
+    await waitConnected(b, room.roomId);
+    await b.dispose();
+    const restarted = await bridgeIn(dir, ws);
+    try {
+      const saved = JSON.parse(await readFile(join(dir, "state.json"), "utf8"));
+      assert.equal(saved.rooms.length, 1, "startup must not erase rooms before reconnect");
+      assert.equal(saved.rooms[0].roomId, room.roomId);
+      await waitConnected(restarted, room.roomId);
+      await Promise.all(Array.from({ length: 20 }, () => restarted.persist()));
+      assert.equal(JSON.parse(await readFile(join(dir, "state.json"), "utf8")).rooms[0].roomId, room.roomId);
+    } finally {
+      await restarted.dispose();
+    }
+  });
+  test("3 local agents as separate members: @all parallel, moderator task flow + summary, worktree merge, stop", async (tc) => {
     const dir = await mkdtemp(join(tmpdir(), "lma-bridge-"));
     const ws = join(dir, "ws");
     await mkdir(ws);
@@ -187,6 +366,7 @@ describe("local multi-agent room (loopback, mock runner)", () => {
     await writeFile(join(ws, "README.md"), "demo\n");
     g("add", "-A"); g("commit", "-qm", "init");
     const b = await bridgeIn(dir, ws);
+    tc.after(() => b.dispose());
     b.localRunner = P.mockLocalRunner;
     const room = await b.createRoom({ name: "Team", localOnly: true, workspacePath: ws, agents: ["moderator", "coder", "reviewer"] });
     await waitConnected(b, room.roomId);
@@ -223,7 +403,7 @@ describe("local multi-agent room (loopback, mock runner)", () => {
     const diffs = await b.agentDiffs(room.roomId);
     const cd = diffs.agents.find((a) => a.agentId === coder.agentId);
     assert.equal(cd.isolation, "worktree");
-    assert.match(cd.branch, /^room\/team-[a-z0-9]{4}\/coder-/);
+    assert.match(cd.branch, /^room\/team-[a-z0-9_-]{4}\/coder-/);
     assert.deepEqual(cd.files.map((f) => f.path), ["room-notes/coder.md"]);
     await assert.rejects(b.mergeAgent(room.roomId, coder.agentId, false), /explicit approval/);
     const mr = await b.mergeAgent(room.roomId, coder.agentId, true);

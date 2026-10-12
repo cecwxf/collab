@@ -1,6 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import * as plugin from "../dist/index.js";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 function fakeCtx(services = {}) {
   const tools = new Map(); const effects = []; const logs = [];
@@ -34,7 +37,8 @@ describe("dsh-room plugin module (dsh 0.2 shape)", () => {
 
   it("registers 12 tools with JSON-schema params + output contract, and unregisters on dispose", async () => {
     const ctx = fakeCtx();
-    plugin.apply(ctx, plugin.normalizeConfig({}));
+    const dir = await mkdtemp(join(tmpdir(), "collab-plugin-"));
+    plugin.apply(ctx, plugin.normalizeConfig({ statePath: join(dir, "state.json"), identityPath: join(dir, "identity.json"), workspacePath: join(dir, "workspace") }));
     const names = [...ctx._tools.keys()].sort();
     assert.deepEqual(names, ["collab_broadcast_status", "collab_claim_task", "collab_create_room", "collab_create_task", "collab_history", "collab_join", "collab_lock_files", "collab_peers", "collab_rooms", "collab_search_rooms", "collab_send", "collab_update_task"]);
     for (const t of ctx._tools.values()) {

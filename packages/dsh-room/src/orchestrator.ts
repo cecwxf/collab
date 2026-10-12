@@ -121,7 +121,7 @@ export interface RunRequest {
   /** Human-readable trigger summary for the queue UI. */
   summary: string;
   /** Optional pre-queue gate (e.g. user approval); false → run is stopped without starting. */
-  gate?: () => Promise<boolean>;
+  gate?: (signal: AbortSignal) => Promise<boolean>;
   [k: string]: unknown;
 }
 
@@ -148,6 +148,7 @@ export class RunScheduler {
   private runs: RunInfo[] = [];
   private reqs = new Map<string, RunRequest>();
   private aborts = new Map<string, AbortController>();
+  private gates = new Map<string, AbortController>();
   private idleWaiters: (() => void)[] = [];
   constructor(
     private exec: Exec,
@@ -171,7 +172,10 @@ export class RunScheduler {
     this.reqs.set(run.id, req);
     this.changed();
     if (req.gate) {
-      req.gate().then(
+      const gate = req.gate;
+      const ac = new AbortController();
+      this.gates.set(run.id, ac);
+      Promise.resolve().then(() => ac.signal.aborted ? false : gate(ac.signal)).then(
         (ok) => {
           if (run.state !== "approval") return;
           if (ok) run.state = "queued";
@@ -180,8 +184,9 @@ export class RunScheduler {
         },
         (e) => {
           if (run.state === "approval") this.finish(run, "failed", (e as Error).message);
+          this.pump();
         },
-      );
+      ).finally(() => { this.gates.delete(run.id); this.pump(); });
     } else this.pump();
     return run;
   }
@@ -190,12 +195,16 @@ export class RunScheduler {
   list(roomId?: string, finished = 8): RunInfo[] {
     const mine = this.runs.filter((r) => !roomId || r.roomId === roomId);
     const active = mine.filter((r) => r.state === "approval" || r.state === "queued" || r.state === "running");
-    const done = mine.filter((r) => !active.includes(r)).slice(-finished);
+    const done = finished > 0 ? mine.filter((r) => !active.includes(r)).slice(-finished) : [];
     return [...active, ...done].map((r) => ({ ...r }));
   }
 
   running(roomId: string) {
-    return this.runs.filter((r) => r.roomId === roomId && r.state === "running").length;
+    return this.runs.filter((r) => r.roomId === roomId && this.aborts.has(r.id)).length;
+  }
+
+  isExecuting(roomId: string, agentId: string): boolean {
+    return this.runs.some((r) => r.roomId === roomId && r.agentId === agentId && this.aborts.has(r.id));
   }
 
   /** Stop every queued/running run in a room (optionally one agent). Returns how many were stopped. */
@@ -204,6 +213,7 @@ export class RunScheduler {
     for (const r of this.runs) {
       if (r.roomId !== roomId || (agentId && r.agentId !== agentId)) continue;
       if (r.state === "approval" || r.state === "queued") {
+        this.gates.get(r.id)?.abort();
         this.finish(r, "stopped", "stopped by user");
         n++;
       } else if (r.state === "running") {
@@ -218,7 +228,7 @@ export class RunScheduler {
 
   /** Resolves when no run is approval/queued/running (tests, e2e). */
   whenIdle(): Promise<void> {
-    if (!this.runs.some((r) => r.state === "approval" || r.state === "queued" || r.state === "running")) return Promise.resolve();
+    if (!this.busy()) return Promise.resolve();
     return new Promise((r) => this.idleWaiters.push(r));
   }
 
@@ -226,11 +236,11 @@ export class RunScheduler {
     for (const run of this.runs) {
       if (run.state !== "queued") continue;
       if (this.running(run.roomId) >= Math.max(1, this.limitFor(run.roomId))) continue;
-      if (this.runs.some((r) => r.state === "running" && r.roomId === run.roomId && r.agentId === run.agentId)) continue;
+      if (this.isExecuting(run.roomId, run.agentId)) continue;
       this.start(run);
     }
     this.changed();
-    if (!this.runs.some((r) => r.state === "approval" || r.state === "queued" || r.state === "running")) {
+    if (!this.busy()) {
       const w = this.idleWaiters;
       this.idleWaiters = [];
       for (const fn of w) fn();
@@ -244,7 +254,7 @@ export class RunScheduler {
     run.startedAt = Date.now();
     const req = this.reqs.get(run.id)!;
     Promise.resolve()
-      .then(() => this.exec(run, req, ac.signal))
+      .then(() => { if (!ac.signal.aborted) return this.exec(run, req, ac.signal); })
       .then(
         () => run.state === "running" && this.finish(run, "done"),
         (e) => run.state === "running" && this.finish(run, ac.signal.aborted ? "stopped" : "failed", (e as Error)?.message ?? String(e)),
@@ -261,8 +271,17 @@ export class RunScheduler {
     if (error) run.error = error;
     this.reqs.delete(run.id);
     // keep memory bounded
-    if (this.runs.length > 400) this.runs = this.runs.filter((r) => r.state === "approval" || r.state === "queued" || r.state === "running" || Date.now() - (r.endedAt ?? 0) < 3_600_000).slice(-300);
+    if (this.runs.length > 400) {
+      const active = this.runs.filter((r) => r.state === "approval" || r.state === "queued" || this.aborts.has(r.id) || this.gates.has(r.id));
+      const finished = this.runs.filter((r) => !active.includes(r)).slice(-300);
+      const keep = new Set([...active, ...finished]);
+      this.runs = this.runs.filter((r) => keep.has(r));
+    }
     this.changed();
+  }
+
+  private busy() {
+    return this.aborts.size > 0 || this.gates.size > 0 || this.runs.some((r) => r.state === "approval" || r.state === "queued");
   }
 
   private changed() {

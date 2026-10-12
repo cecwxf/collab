@@ -52,7 +52,7 @@ export interface RunRequest {
     /** Human-readable trigger summary for the queue UI. */
     summary: string;
     /** Optional pre-queue gate (e.g. user approval); false → run is stopped without starting. */
-    gate?: () => Promise<boolean>;
+    gate?: (signal: AbortSignal) => Promise<boolean>;
     [k: string]: unknown;
 }
 export interface RunInfo {
@@ -77,12 +77,14 @@ export declare class RunScheduler {
     private runs;
     private reqs;
     private aborts;
+    private gates;
     private idleWaiters;
     constructor(exec: Exec, limitFor: (roomId: string) => number, onChange?: () => void);
     enqueue(req: RunRequest): RunInfo;
     /** Active (approval/queued/running) runs plus the most recent finished ones. */
     list(roomId?: string, finished?: number): RunInfo[];
     running(roomId: string): number;
+    isExecuting(roomId: string, agentId: string): boolean;
     /** Stop every queued/running run in a room (optionally one agent). Returns how many were stopped. */
     stop(roomId: string, agentId?: string): number;
     /** Resolves when no run is approval/queued/running (tests, e2e). */
@@ -90,6 +92,7 @@ export declare class RunScheduler {
     private pump;
     private start;
     private finish;
+    private busy;
     private changed;
 }
 export {};

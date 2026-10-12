@@ -137,6 +137,7 @@ declare class RoomConn {
     locks?: FileLocks;
     git?: boolean | null;
     historyTimer?: ReturnType<typeof setTimeout>;
+    historySave?: Promise<void>;
     announceTimer?: ReturnType<typeof setTimeout>;
     constructor(meta: RoomMeta);
     private normalized?;

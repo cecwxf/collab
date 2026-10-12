@@ -416,8 +416,8 @@ __export(mcp_workspace_exports, {
   MCP_TOOL_DEFS: () => MCP_TOOL_DEFS,
   WorkspaceMcp: () => WorkspaceMcp
 });
-import { mkdir as mkdir3, readFile as readFile3, readdir, rm, stat as stat2, writeFile as writeFile2 } from "node:fs/promises";
-import { dirname as dirname2, join as join2, relative as relative2, resolve as resolve2, sep } from "node:path";
+import { lstat, mkdir as mkdir3, readFile as readFile3, readdir, realpath, rm, stat as stat2, writeFile as writeFile2 } from "node:fs/promises";
+import { dirname as dirname2, isAbsolute as isAbsolute2, join as join2, relative as relative2, resolve as resolve2, sep } from "node:path";
 import { spawn } from "node:child_process";
 function actionFor(tool) {
   if (tool === "workspace_write" || tool === "workspace_mkdir") return "fs.write";
@@ -482,16 +482,27 @@ var init_mcp_workspace = __esm({
         const root = resolve2(this.cfg.workspacePath);
         const target = resolve2(root, rel || ".");
         const relToRoot = relative2(root, target);
-        if (relToRoot.startsWith("..") || relToRoot.includes(`..${sep}`)) throw new Error("path escapes workspace");
-        try {
-          const { realpath } = await import("node:fs/promises");
-          const real = await realpath(target).catch(() => target);
-          const realRoot = await realpath(root).catch(() => root);
-          if (!real.startsWith(realRoot + sep) && real !== realRoot) throw new Error("path escapes workspace (symlink)");
-        } catch (e) {
-          if (e.message.includes("escapes")) throw e;
+        const outside = (p) => isAbsolute2(p) || p === ".." || p.startsWith(`..${sep}`);
+        if (outside(relToRoot)) throw new Error("path escapes workspace");
+        const realRoot = await realpath(root);
+        let ancestor = resolve2(realRoot, relToRoot);
+        const suffix = [];
+        while (true) {
+          let real;
+          try {
+            real = await realpath(ancestor);
+          } catch (e) {
+            if (e.code !== "ENOENT") throw e;
+            if ((await lstat(ancestor).catch(() => null))?.isSymbolicLink()) throw new Error("path escapes workspace (dangling symlink)");
+            const parent = dirname2(ancestor);
+            if (parent === ancestor) throw e;
+            suffix.unshift(relative2(parent, ancestor));
+            ancestor = parent;
+            continue;
+          }
+          if (outside(relative2(realRoot, real))) throw new Error("path escapes workspace (symlink)");
+          return resolve2(real, ...suffix);
         }
-        return target;
       }
       async maybeApprove(tool, summary, detail, from) {
         const action = actionFor(tool);
@@ -503,7 +514,7 @@ var init_mcp_workspace = __esm({
         if (cap) {
           const grant = resolvePeerGrant(this.cfg, from, cap);
           if (grant === "deny") throw new Error(`peer grant deny: ${cap} for ${from}`);
-          if (grant === "auto") return;
+          if (grant === "auto" && (cap !== "read" || this.cfg.permissions.autoRead)) return;
         }
         if (!action && cap === "read") {
           const decision2 = await this.approvals.request({
@@ -541,6 +552,7 @@ var init_mcp_workspace = __esm({
         await mkdir3(this.cfg.workspacePath, { recursive: true });
         switch (tool) {
           case "workspace_list": {
+            await this.maybeApprove(tool, `list ${args.path ?? "."}`, "", from);
             const dir = await this.resolveSafe(String(args.path ?? "."));
             const entries = await readdir(dir, { withFileTypes: true });
             return {
@@ -549,18 +561,20 @@ var init_mcp_workspace = __esm({
             };
           }
           case "workspace_read": {
-            if (!this.cfg.permissions.autoRead) await this.maybeApprove("workspace_read", `read ${args.path}`, "", from);
+            await this.maybeApprove(tool, `read ${args.path}`, "", from);
             const file = await this.resolveSafe(String(args.path ?? ""));
             const buf = await readFile3(file);
             if (buf.length > 256 * 1024) throw new Error("file too large (>256KiB)");
             return { path: String(args.path), content: buf.toString("utf8") };
           }
           case "workspace_stat": {
+            await this.maybeApprove(tool, `stat ${args.path}`, "", from);
             const file = await this.resolveSafe(String(args.path ?? ""));
             const st = await stat2(file);
             return { path: String(args.path), size: st.size, mtimeMs: st.mtimeMs, isDirectory: st.isDirectory(), isFile: st.isFile() };
           }
           case "workspace_search": {
+            await this.maybeApprove(tool, `search ${args.path ?? "."}`, String(args.query ?? ""), from);
             const q = String(args.query ?? "");
             if (!q) throw new Error("query required");
             const start = await this.resolveSafe(String(args.path ?? "."));
@@ -631,8 +645,8 @@ var init_mcp_workspace = __esm({
 });
 
 // src/plugin.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
-import { mkdir as mkdir5, readFile as readFile5, writeFile as writeFile4, appendFile as appendFile2 } from "node:fs/promises";
+import { randomUUID as randomUUID3 } from "node:crypto";
+import { mkdir as mkdir5, readFile as readFile5, writeFile as writeFile4, appendFile as appendFile2, rename as rename2, rm as rm3 } from "node:fs/promises";
 import { dirname as dirname4, join as join3 } from "node:path";
 
 // ../protocol/dist/types.js
@@ -1229,7 +1243,7 @@ var WsTransport = class {
       return;
     this.teardownSocket();
     const gen = ++this.generation;
-    await new Promise((resolve3, reject) => {
+    await new Promise((resolve4, reject) => {
       const ws = new WebSocket(this.url);
       this.ws = ws;
       let settled = false;
@@ -1250,7 +1264,7 @@ var WsTransport = class {
           reject(err);
         } else {
           this._connected = true;
-          resolve3();
+          resolve4();
         }
       };
       const timer = setTimeout(() => finish(new Error(`WebSocket connect timeout (${timeoutMs}ms) to ${this.url}`)), timeoutMs);
@@ -1340,6 +1354,8 @@ var CollabClient = class _CollabClient {
   statusHandlers = [];
   waiters = [];
   joined = false;
+  hasJoined = false;
+  reconnecting;
   disposed = false;
   capabilities;
   reconnect;
@@ -1361,9 +1377,11 @@ var CollabClient = class _CollabClient {
     this.transport.onClose(() => {
       this.joined = false;
       this.setConnStatus("disconnected", "ws_closed");
-      if (this.reconnect && !this.disposed) {
+      if (this.reconnect && !this.disposed && !this.reconnecting) {
         this.setConnStatus("connecting", "reconnect");
-        void this.reconnectLoop();
+        this.reconnecting = this.reconnectLoop().finally(() => {
+          this.reconnecting = void 0;
+        });
       }
     });
   }
@@ -1441,7 +1459,15 @@ var CollabClient = class _CollabClient {
     await this.transport.connect();
   }
   async join(timeoutMs = 1e4) {
+    if (this.disposed)
+      throw new Error("disposed");
+    if (this.joined)
+      return;
+    const catchUp = this.hasJoined || !!this.cursor;
+    const since = this.cursor?.get() ?? this.seq;
     await this.connect();
+    if (this.disposed)
+      throw new Error("disposed");
     const challengeP = this.waitFor((f) => f.type === "ctrl" && (f.method === "challenge" || f.method === "error"), timeoutMs);
     this.transport.send({
       v: 1,
@@ -1481,14 +1507,16 @@ var CollabClient = class _CollabClient {
       throw new Error("expected joined");
     }
     this.joined = true;
+    this.hasJoined = true;
     this.peers = joined.peers;
     this.seq = joined.seq;
     this.setConnStatus("connected");
     for (const h of this.peerHandlers)
       h(this.peers);
-    const since = this.cursor?.get() ?? 0;
-    if (since > 0 && since < this.seq) {
-      await this.poll(since);
+    if (catchUp && since < joined.seq) {
+      const missed = await this.pollFrames(since);
+      for (const frame of missed.frames)
+        await this.handleFwd(frame);
     }
     this.startPing();
   }
@@ -1583,6 +1611,18 @@ var CollabClient = class _CollabClient {
   }
   async poll(sinceSeq) {
     const since = sinceSeq ?? this.cursor?.get() ?? 0;
+    const res = await this.pollFrames(since);
+    const out = [];
+    for (const fwd of res.frames) {
+      const p = await this.decryptFwd(fwd);
+      if (p)
+        out.push(p);
+    }
+    this.seq = Math.max(this.seq, res.seq);
+    this.cursor?.set(this.seq);
+    return out;
+  }
+  async pollFrames(since) {
     const resP = this.waitFor((f) => f.type === "ctrl" && f.method === "poll_result", 5e3);
     this.transport.send({
       v: 1,
@@ -1594,16 +1634,8 @@ var CollabClient = class _CollabClient {
     });
     const res = await resP;
     if (res.type !== "ctrl" || res.method !== "poll_result")
-      return [];
-    const out = [];
-    for (const fwd of res.frames) {
-      const p = await this.decryptFwd(fwd);
-      if (p)
-        out.push(p);
-    }
-    this.seq = Math.max(this.seq, res.seq);
-    this.cursor?.set(this.seq);
-    return out;
+      throw new Error("expected poll_result");
+    return res;
   }
   async history(sinceSeq = 0) {
     return this.poll(sinceSeq);
@@ -1651,20 +1683,23 @@ var CollabClient = class _CollabClient {
   }
   async decryptFwd(frame) {
     try {
+      if (frame.roomId !== this.roomId)
+        return null;
       const aad = new TextEncoder().encode(`${frame.roomId}:${frame.from}`);
       const plain = await decrypt(this.roomKey, frame.nonce, frame.ciphertext, aad);
-      return decodePayload(plain);
+      const payload = decodePayload(plain);
+      return payload.sender === frame.from ? payload : null;
     } catch {
       return null;
     }
   }
   waitFor(pred, timeoutMs) {
-    const p = new Promise((resolve3, reject) => {
+    const p = new Promise((resolve4, reject) => {
       const timer = setTimeout(() => {
         this.waiters = this.waiters.filter((w) => w.timer !== timer);
         reject(new Error("timeout waiting for frame"));
       }, timeoutMs);
-      this.waiters.push({ pred, resolve: resolve3, reject, timer });
+      this.waiters.push({ pred, resolve: resolve4, reject, timer });
     });
     p.catch(() => {
     });
@@ -1818,6 +1853,7 @@ var RunScheduler = class {
   runs = [];
   reqs = /* @__PURE__ */ new Map();
   aborts = /* @__PURE__ */ new Map();
+  gates = /* @__PURE__ */ new Map();
   idleWaiters = [];
   enqueue(req) {
     const run = {
@@ -1835,7 +1871,10 @@ var RunScheduler = class {
     this.reqs.set(run.id, req);
     this.changed();
     if (req.gate) {
-      req.gate().then(
+      const gate = req.gate;
+      const ac = new AbortController();
+      this.gates.set(run.id, ac);
+      Promise.resolve().then(() => ac.signal.aborted ? false : gate(ac.signal)).then(
         (ok2) => {
           if (run.state !== "approval") return;
           if (ok2) run.state = "queued";
@@ -1844,8 +1883,12 @@ var RunScheduler = class {
         },
         (e) => {
           if (run.state === "approval") this.finish(run, "failed", e.message);
+          this.pump();
         }
-      );
+      ).finally(() => {
+        this.gates.delete(run.id);
+        this.pump();
+      });
     } else this.pump();
     return run;
   }
@@ -1853,11 +1896,14 @@ var RunScheduler = class {
   list(roomId, finished = 8) {
     const mine = this.runs.filter((r) => !roomId || r.roomId === roomId);
     const active = mine.filter((r) => r.state === "approval" || r.state === "queued" || r.state === "running");
-    const done = mine.filter((r) => !active.includes(r)).slice(-finished);
+    const done = finished > 0 ? mine.filter((r) => !active.includes(r)).slice(-finished) : [];
     return [...active, ...done].map((r) => ({ ...r }));
   }
   running(roomId) {
-    return this.runs.filter((r) => r.roomId === roomId && r.state === "running").length;
+    return this.runs.filter((r) => r.roomId === roomId && this.aborts.has(r.id)).length;
+  }
+  isExecuting(roomId, agentId) {
+    return this.runs.some((r) => r.roomId === roomId && r.agentId === agentId && this.aborts.has(r.id));
   }
   /** Stop every queued/running run in a room (optionally one agent). Returns how many were stopped. */
   stop(roomId, agentId) {
@@ -1865,6 +1911,7 @@ var RunScheduler = class {
     for (const r of this.runs) {
       if (r.roomId !== roomId || agentId && r.agentId !== agentId) continue;
       if (r.state === "approval" || r.state === "queued") {
+        this.gates.get(r.id)?.abort();
         this.finish(r, "stopped", "stopped by user");
         n++;
       } else if (r.state === "running") {
@@ -1878,18 +1925,18 @@ var RunScheduler = class {
   }
   /** Resolves when no run is approval/queued/running (tests, e2e). */
   whenIdle() {
-    if (!this.runs.some((r) => r.state === "approval" || r.state === "queued" || r.state === "running")) return Promise.resolve();
+    if (!this.busy()) return Promise.resolve();
     return new Promise((r) => this.idleWaiters.push(r));
   }
   pump() {
     for (const run of this.runs) {
       if (run.state !== "queued") continue;
       if (this.running(run.roomId) >= Math.max(1, this.limitFor(run.roomId))) continue;
-      if (this.runs.some((r) => r.state === "running" && r.roomId === run.roomId && r.agentId === run.agentId)) continue;
+      if (this.isExecuting(run.roomId, run.agentId)) continue;
       this.start(run);
     }
     this.changed();
-    if (!this.runs.some((r) => r.state === "approval" || r.state === "queued" || r.state === "running")) {
+    if (!this.busy()) {
       const w = this.idleWaiters;
       this.idleWaiters = [];
       for (const fn of w) fn();
@@ -1901,7 +1948,9 @@ var RunScheduler = class {
     run.state = "running";
     run.startedAt = Date.now();
     const req = this.reqs.get(run.id);
-    Promise.resolve().then(() => this.exec(run, req, ac.signal)).then(
+    Promise.resolve().then(() => {
+      if (!ac.signal.aborted) return this.exec(run, req, ac.signal);
+    }).then(
       () => run.state === "running" && this.finish(run, "done"),
       (e) => run.state === "running" && this.finish(run, ac.signal.aborted ? "stopped" : "failed", e?.message ?? String(e))
     ).finally(() => {
@@ -1914,8 +1963,16 @@ var RunScheduler = class {
     run.endedAt = Date.now();
     if (error) run.error = error;
     this.reqs.delete(run.id);
-    if (this.runs.length > 400) this.runs = this.runs.filter((r) => r.state === "approval" || r.state === "queued" || r.state === "running" || Date.now() - (r.endedAt ?? 0) < 36e5).slice(-300);
+    if (this.runs.length > 400) {
+      const active = this.runs.filter((r) => r.state === "approval" || r.state === "queued" || this.aborts.has(r.id) || this.gates.has(r.id));
+      const finished = this.runs.filter((r) => !active.includes(r)).slice(-300);
+      const keep = /* @__PURE__ */ new Set([...active, ...finished]);
+      this.runs = this.runs.filter((r) => keep.has(r));
+    }
     this.changed();
+  }
+  busy() {
+    return this.aborts.size > 0 || this.gates.size > 0 || this.runs.some((r) => r.state === "approval" || r.state === "queued");
   }
   changed() {
     try {
@@ -2158,10 +2215,10 @@ function browseLanRelays(opts) {
     }
   });
   dns.query({ questions: [{ name: MDNS_SERVICE, type: "PTR" }] });
-  return new Promise((resolve3) => {
+  return new Promise((resolve4) => {
     setTimeout(() => {
       dns.destroy();
-      resolve3([...found.values()]);
+      resolve4([...found.values()]);
     }, timeoutMs);
   });
 }
@@ -2484,7 +2541,7 @@ var LanRelayServer = class {
         this.room(roomId).attach(ws);
       });
     });
-    await new Promise((resolve3) => this.http.listen(port, host, resolve3));
+    await new Promise((resolve4) => this.http.listen(port, host, resolve4));
     const addr = this.http.address();
     this.port = typeof addr === "object" && addr ? addr.port : port;
     if (this.opts.mdns !== false) {
@@ -2494,8 +2551,8 @@ var LanRelayServer = class {
   }
   async close() {
     this.stopMdns?.();
-    await new Promise((resolve3) => this.wss?.close(() => resolve3()));
-    await new Promise((resolve3) => this.http?.close(() => resolve3()));
+    await new Promise((resolve4) => this.wss?.close(() => resolve4()));
+    await new Promise((resolve4) => this.http?.close(() => resolve4()));
   }
 };
 
@@ -2521,8 +2578,9 @@ var ApprovalQueue = class {
   }
   /** Ask for approval; resolves with allow|deny. Auto-denies after timeoutMs. */
   request(opts) {
+    if (opts.signal?.aborted) return Promise.resolve("deny");
     const requestId = randomUUID();
-    return new Promise((resolve3) => {
+    return new Promise((resolve4) => {
       const entry = {
         requestId,
         roomId: opts.roomId,
@@ -2532,22 +2590,22 @@ var ApprovalQueue = class {
         from: opts.from,
         createdAt: Date.now(),
         resolve: (d) => {
+          if (!this.pending.has(requestId)) return;
           clearTimeout(timer);
+          opts.signal?.removeEventListener("abort", abort);
           this.pending.delete(requestId);
           this.emit();
-          resolve3(d);
+          resolve4(d);
         }
       };
-      this.pending.set(requestId, entry);
-      this.emit();
+      const abort = () => entry.resolve("deny");
       const timer = setTimeout(() => {
-        if (this.pending.has(requestId)) {
-          this.pending.delete(requestId);
-          this.emit();
-          resolve3("deny");
-        }
+        entry.resolve("deny");
       }, opts.timeoutMs ?? 12e4);
       timer.unref?.();
+      this.pending.set(requestId, entry);
+      opts.signal?.addEventListener("abort", abort, { once: true });
+      this.emit();
     });
   }
   decide(requestId, decision) {
@@ -2564,7 +2622,8 @@ init_member_config();
 
 // src/state.ts
 import { chmod, mkdir as mkdir4, readFile as readFile4, rename, rm as rm2, writeFile as writeFile3 } from "node:fs/promises";
-import { dirname as dirname3 } from "node:path";
+import { dirname as dirname3, resolve as resolve3 } from "node:path";
+import { randomUUID as randomUUID2 } from "node:crypto";
 function newId(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -2608,12 +2667,25 @@ async function loadState(path) {
     return null;
   }
 }
+var pendingWrites = /* @__PURE__ */ new Map();
 async function saveState(path, state) {
+  path = resolve3(path);
+  const snapshot = structuredClone(state);
+  const pending = (pendingWrites.get(path) ?? Promise.resolve()).catch(() => {
+  }).then(() => writeState(path, snapshot));
+  pendingWrites.set(path, pending);
+  try {
+    await pending;
+  } finally {
+    if (pendingWrites.get(path) === pending) pendingWrites.delete(path);
+  }
+}
+async function writeState(path, state) {
   const dir = dirname3(path);
   await mkdir4(dir, { recursive: true, mode: 448 });
   await chmod(dir, 448).catch(() => {
   });
-  const tmp = `${path}.${process.pid}.tmp`;
+  const tmp = `${path}.${process.pid}.${randomUUID2()}.tmp`;
   const body = {
     version: 3,
     activeWorkspaceId: state.activeWorkspaceId,
@@ -2622,9 +2694,13 @@ async function saveState(path, state) {
     rooms: state.rooms,
     updatedAt: (/* @__PURE__ */ new Date()).toISOString()
   };
-  await writeFile3(tmp, JSON.stringify(body, null, 2), { mode: 384 });
-  await chmod(tmp, 384);
-  await rename(tmp, path);
+  try {
+    await writeFile3(tmp, JSON.stringify(body, null, 2), { mode: 384, flag: "wx" });
+    await chmod(tmp, 384);
+    await rename(tmp, path);
+  } finally {
+    await rm2(tmp, { force: true });
+  }
 }
 
 // src/commands.ts
@@ -2782,14 +2858,21 @@ var MESSAGES_MAX = 300;
 var AGENT_SERVICES = ["agents", "agentDefaultModel", "agentPresets", "permissionPresets", "sessionTitle", "workspaceRegistry"];
 var text = (s) => [{ type: "text", text: s }];
 var jsonRender = (_args, value) => text(JSON.stringify(value));
-function withTimeout(p, ms, label) {
+function withTimeout(p, ms, label, signal) {
   let t;
+  let onAbort;
   const timeout = new Promise((_, rej) => {
     t = setTimeout(() => rej(new Error(`${label} timed out after ${ms}ms`)), ms);
     t.unref?.();
   });
-  return Promise.race([p, timeout]).finally(() => {
+  const aborted = new Promise((_, reject) => {
+    onAbort = () => reject(signal?.reason ?? new Error("stopped by user"));
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted) onAbort();
+  });
+  return Promise.race([p, timeout, aborted]).finally(() => {
     if (t) clearTimeout(t);
+    if (onAbort) signal?.removeEventListener("abort", onAbort);
   });
 }
 async function loadIdentity(path, agentName) {
@@ -2859,6 +2942,7 @@ var RoomConn = class {
   locks;
   git;
   historyTimer;
+  historySave;
   announceTimer;
   normalized;
   /** Normalized once; the same object afterwards so `conn.local.x = …` always sticks. */
@@ -2958,12 +3042,17 @@ var CollabBridge = class {
       }
       this.activeWorkspaceId = st?.activeWorkspaceId ?? [...this.workspaces.keys()][0] ?? null;
       const metas = st?.rooms ?? [];
-      if (this.config.invite && !metas.some((m) => this.config.invite.includes(`/join/${encodeURIComponent(m.roomId)}#`) || this.config.invite.includes(`/join/${m.roomId}#`))) {
+      if (this.config.invite && !metas.some((m) => m.roomId === CollabClient.parseInvite(this.config.invite).roomId)) {
         const { roomId } = CollabClient.parseInvite(this.config.invite);
         const wsId = this.activeWorkspaceId;
         metas.push({ roomId, invite: this.config.invite, name: roomId, description: "", tags: [], public: false, owner: false, joinedAt: Date.now(), workspaceId: wsId });
       }
       this.activeRoomId = st?.activeRoomId ?? metas[0]?.roomId ?? null;
+      for (const meta of metas) {
+        const conn = new RoomConn(meta);
+        conn.onAdd = () => this.scheduleHistorySave(conn);
+        this.rooms.set(meta.roomId, conn);
+      }
       await this.persist();
       this.emit({ type: "rooms" });
       void Promise.all(
@@ -3356,6 +3445,7 @@ var CollabBridge = class {
       this.emit({ type: "message", roomId: conn.meta.roomId, message: m });
       this.routeLocal(conn, full);
     }
+    if (conn.local.loopback || conn.local.agents.length) await this.saveLocalHistory(conn);
     return { roomId: conn.meta.roomId, ...r };
   }
   send(roomId, textIn, mentions, replyTo) {
@@ -3664,7 +3754,7 @@ var CollabBridge = class {
     const summary = `collab ${kind} from ${from} in ${conn.meta.name}`.slice(0, SUMMARY_MAX);
     return Object.freeze({
       role: "user",
-      id: randomUUID2(),
+      id: randomUUID3(),
       content: Object.freeze([Object.freeze({ type: "text", text: body })]),
       source: Object.freeze({ kind: "collab", roomId: conn.meta.roomId, from, messageId, form: "notice", summary })
     });
@@ -3729,7 +3819,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
         await mkdir5(wsPath, { recursive: true });
         const workspace = await svc.workspaceRegistry.create(wsPath, wsPath === cfg.workspacePath ? "collab" : void 0);
         const selected = svc.agentDefaultModel.currentSelection();
-        const sessionId = `collab-${roomId}-${randomUUID2().slice(0, 8)}`;
+        const sessionId = `collab-${roomId}-${randomUUID3().slice(0, 8)}`;
         const handle = await svc.agents.create({
           sessionId,
           signal: this.abort.signal,
@@ -3944,6 +4034,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     await conn.client?.dispose().catch(() => {
     });
     conn.client = null;
+    conn.lastSeenPeers.clear();
     conn.local.loopback = wantLoopback;
     conn.status = "connecting";
     this.emit({ type: "rooms" });
@@ -3957,19 +4048,31 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     return join3(dirname4(this.config.statePath), "local-history", `${roomId.replace(/[^A-Za-z0-9_-]/g, "_")}.json`);
   }
   scheduleHistorySave(conn) {
-    if (!conn.local.loopback || conn.historyTimer) return;
+    if (!conn.local.loopback && !conn.local.agents.length || conn.historyTimer) return;
     conn.historyTimer = setTimeout(() => {
       conn.historyTimer = void 0;
-      void this.saveLocalHistory(conn);
+      void this.saveLocalHistory(conn).catch((e) => this.log("error", `save history ${conn.meta.roomId}: ${e.message}`));
     }, 500);
     conn.historyTimer.unref?.();
   }
-  async saveLocalHistory(conn) {
+  saveLocalHistory(conn) {
+    clearTimeout(conn.historyTimer);
+    conn.historyTimer = void 0;
     const f = this.historyPath(conn.meta.roomId);
-    await mkdir5(dirname4(f), { recursive: true, mode: 448 }).catch(() => {
+    const body = JSON.stringify(conn.messages.slice(-MESSAGES_MAX));
+    const save = (conn.historySave ?? Promise.resolve()).catch(() => {
+    }).then(async () => {
+      await mkdir5(dirname4(f), { recursive: true, mode: 448 });
+      const tmp = `${f}.${randomUUID3()}.tmp`;
+      try {
+        await writeFile4(tmp, body, { mode: 384, flag: "wx" });
+        await rename2(tmp, f);
+      } finally {
+        await rm3(tmp, { force: true });
+      }
     });
-    await writeFile4(f, JSON.stringify(conn.messages.slice(-MESSAGES_MAX)), { mode: 384 }).catch(() => {
-    });
+    conn.historySave = save;
+    return save;
   }
   async loadLocalHistory(conn) {
     try {
@@ -4044,7 +4147,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
       tasks: opts.tasks
     };
     if (a.approvalRequired) {
-      req.gate = async () => await this.approvals.request({ roomId: conn.meta.roomId, action: "shell.exec", summary: `Run local agent ${a.name} (${a.agentId})`, detail: summary, from: a.agentId, timeoutMs: 10 * 6e4 }) === "allow";
+      req.gate = async (signal) => await this.approvals.request({ roomId: conn.meta.roomId, action: "shell.exec", summary: `Run local agent ${a.name} (${a.agentId})`, detail: summary, from: a.agentId, timeoutMs: 10 * 6e4, signal }) === "allow";
     }
     this.scheduler.enqueue(req);
   }
@@ -4073,6 +4176,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     conn.runThread.set(a.agentId, run.threadId);
     try {
       const cwd = await this.agentCwd(conn, a);
+      signal.throwIfAborted();
       const prompt = this.buildLocalPrompt(conn, a, mode, req.trigger, run.threadId, cwd, req.tasks);
       const ctx = { bridge: this, roomId: conn.meta.roomId, agent: a, prompt, mode, trigger: req.trigger, threadId: run.threadId, cwd, signal };
       const wtBefore = conn.worktrees.get(a.agentId);
@@ -4123,49 +4227,59 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     return root;
   }
   async runInSession(conn, a, ctx, retried = false) {
+    ctx.signal.throwIfAborted();
     const handle = await this.agentSessionFor(conn, a, ctx.cwd);
+    ctx.signal.throwIfAborted();
     const agent = handle.agent;
-    if (agent.whenIdle) await Promise.race([agent.whenIdle(), new Promise((r) => setTimeout(r, 3e4))]);
-    const seq0 = agent.session?.seq;
-    agent.followup(this.notice(conn, ctx.prompt, ctx.trigger?.sender ?? "room", ctx.trigger?.messageId ?? randomUUID2(), `${ctx.mode} \u2192 ${a.name}`));
-    if (!agent.whenIdle) return;
-    const aborted = new Promise((resolve3) => ctx.signal.addEventListener("abort", () => resolve3(), { once: true }));
-    const timeout = new Promise((resolve3) => {
-      const t = setTimeout(resolve3, 20 * 6e4);
-      t.unref?.();
-    });
-    const settled = (async () => {
-      for (let i = 0; i < 40; i++) {
-        await agent.whenIdle();
-        if (seq0 === void 0 || agent.session?.seq !== seq0) return;
-        await new Promise((r) => setTimeout(r, 250));
-      }
-    })();
-    await Promise.race([settled, aborted, timeout]);
-    this.log("info", `run ${a.agentId}: seq ${seq0} -> ${agent.session?.seq}`);
-    if (process.env.DSH_ROOM_DEBUG_LOG && seq0 !== void 0) {
-      const sess = agent.session;
-      for (let i = seq0; i < (sess.seq ?? seq0); i++) this.log("info", `  ev ${i}: ${JSON.stringify(sess.eventAt?.(i)).slice(0, 700)}`);
-    }
-    if (!ctx.signal.aborted && seq0 !== void 0 && agent.session?.seq === seq0) throw new Error("agent session did not start a turn");
-    const failure = !ctx.signal.aborted && seq0 !== void 0 ? this.turnError(agent.session, seq0) : void 0;
-    if (failure) {
-      const key = `${conn.meta.roomId}:${a.agentId}`;
-      if (!retried && failure.code === "UNSUPPORTED_REASONING_EFFORT" && a.reasoningEffort) {
-        this.log("warn", `${a.agentId}: ${failure.message}; recreating its session with the model's default effort`);
-        this.noEffort.add(key);
-        conn.meta.agentNoEffort = [.../* @__PURE__ */ new Set([...conn.meta.agentNoEffort ?? [], a.agentId])];
-        this.agentHandles.delete(key);
-        if (conn.meta.agentSessions) delete conn.meta.agentSessions[a.agentId];
-        return this.runInSession(conn, a, ctx, true);
-      }
-      throw new Error(failure.message);
-    }
-    if (ctx.signal.aborted) {
+    const cancel = () => {
       try {
         agent.cancel?.({ kind: "user" });
       } catch {
       }
+    };
+    ctx.signal.addEventListener("abort", cancel, { once: true });
+    try {
+      if (agent.whenIdle) await withTimeout(agent.whenIdle(), 3e4, `session idle ${a.agentId}`, ctx.signal);
+      ctx.signal.throwIfAborted();
+      const seq0 = agent.session?.seq;
+      agent.followup(this.notice(conn, ctx.prompt, ctx.trigger?.sender ?? "room", ctx.trigger?.messageId ?? randomUUID3(), `${ctx.mode} \u2192 ${a.name}`));
+      if (!agent.whenIdle) return;
+      const settled = (async () => {
+        for (let i = 0; i < 40; i++) {
+          ctx.signal.throwIfAborted();
+          await agent.whenIdle();
+          ctx.signal.throwIfAborted();
+          if (seq0 === void 0 || agent.session?.seq !== seq0) return;
+          await sleep2(250, ctx.signal);
+        }
+      })();
+      await withTimeout(settled, 20 * 6e4, `agent turn ${a.agentId}`, ctx.signal);
+      this.log("info", `run ${a.agentId}: seq ${seq0} -> ${agent.session?.seq}`);
+      if (process.env.DSH_ROOM_DEBUG_LOG && seq0 !== void 0) {
+        const sess = agent.session;
+        for (let i = seq0; i < (sess.seq ?? seq0); i++) this.log("info", `  ev ${i}: ${JSON.stringify(sess.eventAt?.(i)).slice(0, 700)}`);
+      }
+      if (!ctx.signal.aborted && seq0 !== void 0 && agent.session?.seq === seq0) throw new Error("agent session did not start a turn");
+      const failure = !ctx.signal.aborted && seq0 !== void 0 ? this.turnError(agent.session, seq0) : void 0;
+      if (failure) {
+        const key = `${conn.meta.roomId}:${a.agentId}`;
+        if (!retried && failure.code === "UNSUPPORTED_REASONING_EFFORT" && a.reasoningEffort) {
+          this.log("warn", `${a.agentId}: ${failure.message}; recreating its session with the model's default effort`);
+          this.noEffort.add(key);
+          conn.meta.agentNoEffort = [.../* @__PURE__ */ new Set([...conn.meta.agentNoEffort ?? [], a.agentId])];
+          this.agentHandles.delete(key);
+          if (conn.meta.agentSessions) delete conn.meta.agentSessions[a.agentId];
+          return this.runInSession(conn, a, ctx, true);
+        }
+        throw new Error(failure.message);
+      }
+    } catch (e) {
+      cancel();
+      if (agent.whenIdle) await withTimeout(agent.whenIdle(), 3e4, `agent stop ${a.agentId}`).catch(() => {
+      });
+      throw e;
+    } finally {
+      ctx.signal.removeEventListener("abort", cancel);
     }
   }
   /** Last turn/end error since `from`, if the agent's turn failed (provider/model errors). */
@@ -4229,7 +4343,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
             this.log("warn", `resume ${prevSid} for ${a.agentId} failed (${e.message}); creating a new session`);
           }
         }
-        const sessionId = `room-${conn.meta.roomId.slice(-8)}-${a.id}-${randomUUID2().slice(0, 6)}`;
+        const sessionId = `room-${conn.meta.roomId.slice(-8)}-${a.id}-${randomUUID3().slice(0, 6)}`;
         const create = (agentOptions, cwdPath) => svc.agents.create({
           sessionId,
           signal: this.abort.signal,
@@ -4360,6 +4474,7 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
       this.emit({ type: "message", roomId: conn.meta.roomId, message: m });
       this.routeLocal(conn, full);
     }
+    if (conn.local.loopback || conn.local.agents.length) await this.saveLocalHistory(conn);
     return { roomId: conn.meta.roomId, ...r };
   }
   // ── merge view: per-agent worktree diffs ─────────────────────────────────
@@ -4396,7 +4511,7 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
     if (!approved) throw new Error("merge needs explicit approval");
     const conn = this.room(roomId);
     const a = this.localAgent(conn, agentId);
-    if (this.scheduler.list(conn.meta.roomId).some((r2) => r2.agentId === a.agentId && r2.state === "running")) throw new Error(`${a.name} is still running \u2014 stop it or wait`);
+    if (this.scheduler.isExecuting(conn.meta.roomId, a.agentId)) throw new Error(`${a.name} is still running \u2014 wait for it to finish stopping`);
     const wt = conn.worktrees.get(a.agentId) ?? await this.findWorktree(conn, a);
     if (!wt) throw new Error(`${a.name} has no worktree yet`);
     const r = await mergeWorktree(wt, a.agentId);
@@ -4410,7 +4525,7 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
     if (!approved) throw new Error("discard needs explicit approval");
     const conn = this.room(roomId);
     const a = this.localAgent(conn, agentId);
-    if (this.scheduler.list(conn.meta.roomId).some((r) => r.agentId === a.agentId && r.state === "running")) throw new Error(`${a.name} is still running \u2014 stop it or wait`);
+    if (this.scheduler.isExecuting(conn.meta.roomId, a.agentId)) throw new Error(`${a.name} is still running \u2014 wait for it to finish stopping`);
     const wt = conn.worktrees.get(a.agentId) ?? await this.findWorktree(conn, a);
     if (!wt) return { ok: true, discarded: false };
     await discardWorktree(wt);
@@ -4469,8 +4584,10 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
     for (const conn of this.rooms.values()) {
       if (conn.heartbeat) clearInterval(conn.heartbeat);
       if (conn.presenceTimer) clearInterval(conn.presenceTimer);
+      clearTimeout(conn.announceTimer);
+      clearTimeout(conn.historyTimer);
       this.scheduler.stop(conn.meta.roomId);
-      if (conn.local.loopback) await this.saveLocalHistory(conn);
+      if (conn.local.loopback || conn.local.agents.length) await this.saveLocalHistory(conn);
       await this.disconnectAgents(conn);
       await conn.client?.dispose().catch(() => {
       });
@@ -4559,8 +4676,8 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
     ];
   }
 };
-var sleep2 = (ms, signal) => new Promise((resolve3, reject) => {
-  const t = setTimeout(resolve3, ms);
+var sleep2 = (ms, signal) => new Promise((resolve4, reject) => {
+  const t = setTimeout(resolve4, ms);
   signal?.addEventListener("abort", () => {
     clearTimeout(t);
     reject(new Error("stopped"));
@@ -4608,7 +4725,7 @@ Written by ${a.agentId} (${a.name}) at ${(/* @__PURE__ */ new Date()).toISOStrin
 
 // src/config.ts
 import { homedir } from "node:os";
-import { join as join4, isAbsolute as isAbsolute2 } from "node:path";
+import { join as join4, isAbsolute as isAbsolute3 } from "node:path";
 var AUTO = /* @__PURE__ */ new Set(["off", "mention", "mention-or-task"]);
 function expand(p) {
   return p.startsWith("~/") ? join4(homedir(), p.slice(2)) : p;
@@ -4621,7 +4738,7 @@ function normalizeConfig(raw) {
   const relayUrl = str2("relayUrl") ?? DEFAULT_RELAY_URL;
   if (!/^wss?:\/\//.test(relayUrl)) throw new Error(`dsh-room: relayUrl must be ws:// or wss://, got ${relayUrl}`);
   const workspacePath = expand(str2("workspacePath") ?? "~/.collab/workspace");
-  if (!isAbsolute2(workspacePath)) throw new Error("dsh-room: workspacePath must be absolute");
+  if (!isAbsolute3(workspacePath)) throw new Error("dsh-room: workspacePath must be absolute");
   return {
     relayUrl,
     invite: str2("invite"),
@@ -4837,6 +4954,27 @@ async function readJson2(req) {
 }
 var str = (v) => typeof v === "string" && v.trim() ? v.trim() : void 0;
 var strs = (v) => Array.isArray(v) ? v.filter((x) => typeof x === "string") : typeof v === "string" ? v.split(/[\s,]+/).filter(Boolean) : void 0;
+function peerGrants(value) {
+  const object = (v) => {
+    if (!v || typeof v !== "object" || Array.isArray(v)) throw new HttpError(400, "peerGrants must contain objects");
+    return v;
+  };
+  const grants = (v) => {
+    const input2 = object(v), out = {};
+    for (const cap of ["read", "write", "exec", "delete"]) {
+      if (!(cap in input2)) continue;
+      const grant = input2[cap];
+      if (grant !== "auto" && grant !== "ask" && grant !== "deny") throw new HttpError(400, `invalid peer grant for ${cap}`);
+      out[cap] = grant;
+    }
+    return out;
+  };
+  const input = object(value);
+  return {
+    default: "default" in input ? grants(input.default) : {},
+    byAgent: "byAgent" in input ? Object.fromEntries(Object.entries(object(input.byAgent)).map(([id, v]) => [id, grants(v)])) : {}
+  };
+}
 function createApiHandler(bridge, connection) {
   return async (req, res) => {
     const conn = connection();
@@ -4960,6 +5098,7 @@ function createApiHandler(bridge, connection) {
             if (k in b) patch[k] = b[k];
           }
           if (b.permissions && typeof b.permissions === "object") patch.permissions = b.permissions;
+          if ("peerGrants" in b) patch.peerGrants = peerGrants(b.peerGrants);
           return sendJson2(res, 200, await bridge.updateMemberConfig(roomId, patch));
         }
         if (method === "GET" && action === "mcp") return sendJson2(res, 200, { tools: (await Promise.resolve().then(() => (init_mcp_workspace(), mcp_workspace_exports))).MCP_TOOL_DEFS });
@@ -4975,7 +5114,7 @@ function createApiHandler(bridge, connection) {
       }
       throw new HttpError(404, `no route ${method} ${API}${path}`);
     } catch (e) {
-      const status = e instanceof HttpError ? e.status : /not in room|not in a collab room|no local agent/.test(e.message) ? 404 : /needs explicit approval/.test(e.message) ? 403 : 500;
+      const status = e instanceof HttpError ? e.status : /not in room|not in a collab room|no local agent/.test(e.message) ? 404 : /needs explicit approval|peer grant deny|^denied:/.test(e.message) ? 403 : 500;
       if (!res.headersSent) sendJson2(res, status, { error: e.message });
     }
   };
