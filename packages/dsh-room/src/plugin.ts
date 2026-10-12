@@ -215,6 +215,9 @@ class RoomConn {
   client: CollabClient | null = null;
   hostJoin?: Promise<void>;
   agentErrors = new Map<string, string>();
+  agentStatuses = new Map<string, RoomStatus>();
+  agentRetries = new Map<string, ReturnType<typeof setTimeout>>();
+  agentRetryAttempts = new Map<string, number>();
   status: RoomStatus = "connecting";
   error?: string;
   messages: RoomMessage[] = [];
@@ -1415,7 +1418,7 @@ export class CollabBridge {
 
   /** Join every configured local agent as its own room member (own keypair, same transport as the host). */
   private async connectAgents(conn: RoomConn) {
-    const pending = conn.local.agents.filter((a) => !conn.agents.get(a.agentId)?.isJoined());
+    const pending = conn.local.agents.filter((a) => !conn.agents.get(a.agentId)?.isJoined() && !(conn.agents.has(a.agentId) && conn.agentStatuses.get(a.agentId) === "connecting"));
     await Promise.all(
       pending.map((a) =>
         this.connectAgent(conn, a).catch((e) => this.log("warn", `local agent ${a.agentId} join failed: ${(e as Error).message}`)),
@@ -1427,19 +1430,44 @@ export class CollabBridge {
   private async connectAgent(conn: RoomConn, a: LocalAgentConfig) {
     const existing = conn.agentJoins.get(a.agentId);
     if (existing) return existing.promise;
+    clearTimeout(conn.agentRetries.get(a.agentId));
+    conn.agentRetries.delete(a.agentId);
     const job = { promise: Promise.resolve() };
     conn.agentJoins.set(a.agentId, job);
     conn.agentErrors.delete(a.agentId);
+    conn.agentStatuses.set(a.agentId, "connecting");
     this.emit({ type: "rooms" });
     const active = () => !this.disposed && this.rooms.get(conn.meta.roomId) === conn && conn.local.agents.includes(a) && conn.agentJoins.get(a.agentId) === job;
     job.promise = withTimeout(this.connectAgentInner(conn, a, active), conn.local.loopback ? 8_000 : 20_000, `agent ${a.agentId} join`).catch((error) => {
-      if (active()) conn.agentErrors.set(a.agentId, (error as Error).message);
+      if (active()) {
+        conn.agentErrors.set(a.agentId, (error as Error).message);
+        this.retryAgent(conn, a);
+      }
       throw error;
     }).finally(() => {
       if (conn.agentJoins.get(a.agentId) === job) conn.agentJoins.delete(a.agentId);
       this.emit({ type: "rooms" });
     });
     return job.promise;
+  }
+
+  /** A failed first join has no live SDK client to reconnect. Keep retrying
+   * configured members until they join or their room/member is removed. */
+  private retryAgent(conn: RoomConn, a: LocalAgentConfig) {
+    if (this.disposed || this.rooms.get(conn.meta.roomId) !== conn || !conn.local.agents.includes(a)) return;
+    conn.agentStatuses.set(a.agentId, "connecting");
+    if (conn.agentRetries.has(a.agentId)) return;
+    const attempt = conn.agentRetryAttempts.get(a.agentId) ?? 0;
+    conn.agentRetryAttempts.set(a.agentId, attempt + 1);
+    const delay = Math.min(1_000 * 2 ** Math.min(attempt, 5), 30_000);
+    const timer = setTimeout(() => {
+      conn.agentRetries.delete(a.agentId);
+      if (this.disposed || this.rooms.get(conn.meta.roomId) !== conn || !conn.local.agents.includes(a)) return;
+      if (!conn.client?.isJoined()) { this.retryAgent(conn, a); return; }
+      void this.connectAgent(conn, a).catch((e) => this.log("warn", `local agent ${a.agentId} retry failed: ${(e as Error).message}`));
+    }, delay);
+    timer.unref?.();
+    conn.agentRetries.set(a.agentId, timer);
   }
 
   private async connectAgentInner(conn: RoomConn, a: LocalAgentConfig, active: () => boolean) {
@@ -1454,6 +1482,21 @@ export class CollabBridge {
       autoReply: "off",
       reconnect: !conn.local.loopback,
       capabilities: ["collab.v1", "dsh", "member.config", "local-agent"],
+    });
+    // Join-job ownership ends after joining; socket ownership lasts until the
+    // configured member is removed, including idle periods and SDK reconnects.
+    const current = () => !this.disposed && this.rooms.get(conn.meta.roomId) === conn && conn.local.agents.includes(a) && conn.agents.get(a.agentId) === client;
+    client.onStatus((status, detail) => {
+      if (!current()) return;
+      conn.agentStatuses.set(a.agentId, status === "connected" ? "online" : "connecting");
+      if (status === "connected") {
+        conn.agentErrors.delete(a.agentId);
+        conn.agentRetryAttempts.delete(a.agentId);
+        void this.announceAgentConfig(conn, a).catch(() => {});
+      } else if (detail && detail !== "reconnect") {
+        conn.agentErrors.set(a.agentId, detail);
+      }
+      this.emit({ type: "rooms" });
     });
     // Routing is central (host bridge sees every message); an agent connection only answers MCP calls addressed to it.
     client.onPayload((p, meta) => {
@@ -1504,6 +1547,10 @@ export class CollabBridge {
   }
 
   private async disconnectAgents(conn: RoomConn) {
+    for (const timer of conn.agentRetries.values()) clearTimeout(timer);
+    conn.agentRetries.clear();
+    conn.agentRetryAttempts.clear();
+    conn.agentStatuses.clear();
     conn.agentJoins.clear();
     conn.agentErrors.clear();
     const list = [...conn.agents.values()];
@@ -1586,6 +1633,10 @@ export class CollabBridge {
     conn.removedAgentIds.add(a.agentId);
     conn.agentJoins.delete(a.agentId);
     conn.agentErrors.delete(a.agentId);
+    clearTimeout(conn.agentRetries.get(a.agentId));
+    conn.agentRetries.delete(a.agentId);
+    conn.agentRetryAttempts.delete(a.agentId);
+    conn.agentStatuses.delete(a.agentId);
     const client = conn.agents.get(a.agentId);
     conn.agents.delete(a.agentId);
     await client?.dispose().catch(() => {});
@@ -2222,7 +2273,7 @@ export class CollabBridge {
           resolvedModel: this.resolvedModel(conn, a),
           sessionId: conn.meta.agentSessions?.[a.agentId],
           online: !!conn.agents.get(a.agentId)?.isJoined(),
-          connectionStatus: conn.agents.get(a.agentId)?.isJoined() ? "online" : conn.agentJoins.has(a.agentId) || conn.status === "connecting" ? "connecting" : "offline",
+          connectionStatus: conn.agents.get(a.agentId)?.isJoined() ? "online" : conn.agentStatuses.get(a.agentId) ?? (conn.agentJoins.has(a.agentId) || conn.status === "connecting" ? "connecting" : "offline"),
           error: conn.agentErrors.get(a.agentId),
           state: (r?.state as LocalAgentView["state"]) ?? "idle",
           worktree: wt ? { branch: wt.branch, path: wt.path } : null,

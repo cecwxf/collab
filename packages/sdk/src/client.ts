@@ -80,6 +80,7 @@ export class CollabClient {
   private cursor?: CollabClientOptions["cursor"];
   private seenIds = new Set<string>();
   private pingTimer?: ReturnType<typeof setInterval>;
+  private retryDelay?: { timer: ReturnType<typeof setTimeout>; resolve: () => void };
 
   constructor(opts: CollabClientOptions) {
     this.identity = opts.identity;
@@ -96,6 +97,7 @@ export class CollabClient {
     this.transport.onFrame((f) => this.onFrame(f));
     this.transport.onClose(() => {
       this.joined = false;
+      this.stopPing();
       this.setConnStatus("disconnected", "ws_closed");
       if (this.reconnect && !this.disposed && !this.reconnecting) {
         this.setConnStatus("connecting", "reconnect");
@@ -295,6 +297,11 @@ export class CollabClient {
   async dispose(): Promise<void> {
     this.disposed = true;
     this.reconnect = false;
+    if (this.retryDelay) {
+      clearTimeout(this.retryDelay.timer);
+      this.retryDelay.resolve();
+      this.retryDelay = undefined;
+    }
     await this.leave();
     this.transport.close("dispose");
     this.stopPing();
@@ -519,14 +526,16 @@ export class CollabClient {
   private async reconnectLoop(): Promise<void> {
     // Exponential backoff with jitter — avoid reconnect storms that wake room DOs.
     let delay = 1_000;
-    let attempts = 0;
     while (!this.disposed && !this.joined) {
       try {
         this.setConnStatus("connecting", "reconnect");
         const jitter = Math.floor(Math.random() * Math.min(500, delay / 4));
-        await sleep(delay + jitter);
+        await new Promise<void>((resolve) => {
+          this.retryDelay = { timer: setTimeout(resolve, delay + jitter), resolve };
+        });
+        this.retryDelay = undefined;
+        if (this.disposed) return;
         await this.join();
-        attempts = 0;
         // Presence is optional; skip if join already refreshed peer list for peers.
         try {
           await this.publish({ kind: "presence", state: "online" });
@@ -534,13 +543,9 @@ export class CollabClient {
           /* optional */
         }
         return;
-      } catch {
-        attempts++;
+      } catch (error) {
         delay = Math.min(delay * 2, 30_000);
-        if (attempts > 50) {
-          this.setConnStatus("disconnected", "reconnect_gave_up");
-          return;
-        }
+        if (!this.disposed) this.setConnStatus("connecting", (error as Error).message);
       }
     }
   }

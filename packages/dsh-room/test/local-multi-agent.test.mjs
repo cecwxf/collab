@@ -612,7 +612,7 @@ test('retrying the current relay reconnects the offline room and reports agent j
     fail=true;const agent=await b.addLocalAgent(room.roomId,{name:'Retry agent'});
     for(let i=0;!conn.agentErrors.has(agent.agentId)&&i<100;i++)await sleep(10);
     const offline=b.view(conn).local.agents.find(a=>a.agentId===agent.agentId);
-    assert.equal(offline.connectionStatus,'offline');assert.match(offline.error,/test relay unavailable/);assert.equal(offline.online,false);
+    assert.equal(offline.connectionStatus,'connecting');assert.match(offline.error,/test relay unavailable/);assert.equal(offline.online,false);
     fail=false;await b.reconnectRoom(room.roomId);await waitConnected(b,room.roomId);
     assert.equal(b.view(conn).local.agents.find(a=>a.agentId===agent.agentId).error,undefined);
   } finally {await b.dispose();await relay.close();}
@@ -648,4 +648,80 @@ test('switching a room to local-only cancels and drains its pending relay join',
  const {WsTransport}=await import('@collab/sdk');class PendingSocket extends EventTarget {static OPEN=1;readyState=0;close(){this.readyState=3;this.dispatchEvent(new Event('close'));}}
  const dir=await mkdtemp(join(tmpdir(),'lma-pending-switch-'));const b=await bridgeIn(dir,join(dir,'ws'));const original=b.transportFor.bind(b);b.transportFor=(conn,url)=>conn.local.loopback?original(conn,url):new WsTransport(url,PendingSocket);
  try {const room=await b.createRoom({mode:'relay'});for(let i=0;!b.room(room.roomId).client&&i<100;i++)await sleep(5);const result=await Promise.race([b.setTransport(room.roomId,'local'),sleep(300).then(()=>{throw Error('local switch blocked by old relay join');})]);assert.equal(result.status,'online');assert.equal(result.transport,'local');}finally{await b.dispose();}
+});
+
+test('an agent whose first connection fails recovers automatically while the host stays online', async () => {
+  const { LanRelayServer } = await import('@collab/lan-relay');
+  const relay = new LanRelayServer({ host: '127.0.0.1', port: 0, mdns: false });
+  await relay.listen();
+  const dir = await mkdtemp(join(tmpdir(), 'lma-agent-auto-retry-'));
+  const b = await bridgeIn(dir, join(dir, 'ws'));
+  b.config.relayUrl = `ws://127.0.0.1:${relay.port}`;
+  try {
+    const room = await b.createRoom({ mode: 'relay' });
+    await waitConnected(b, room.roomId);
+    const conn = b.room(room.roomId), host = conn.client;
+    const original = b.transportFor.bind(b);
+    let attempts = 0;
+    b.transportFor = (...args) => {
+      const transport = original(...args), connect = transport.connect.bind(transport);
+      transport.connect = async (...a) => { if (++attempts === 1) throw Error('temporary agent connection failure'); return connect(...a); };
+      return transport;
+    };
+    const agent = await b.addLocalAgent(room.roomId, { name: 'Always connected' });
+    await waitConnected(b, room.roomId, 2500);
+    assert.equal(conn.client, host, 'the host must not need a manual reconnect');
+    assert.equal(b.view(conn).local.agents.find(a => a.agentId === agent.agentId).error, undefined);
+    assert.ok(attempts >= 2, 'failed agent connection must retry without user action');
+  } finally { await b.dispose(); await relay.close(); }
+});
+
+test('an idle agent reconnects its own socket and republishes configuration without replacing the host', async () => {
+  const { LanRelayServer } = await import('@collab/lan-relay');
+  const relay = new LanRelayServer({ host: '127.0.0.1', port: 0, mdns: false }); await relay.listen();
+  const dir = await mkdtemp(join(tmpdir(), 'lma-agent-idle-retry-')), b = await bridgeIn(dir, join(dir, 'ws'));
+  b.config.relayUrl = `ws://127.0.0.1:${relay.port}`;
+  try {
+    const room = await b.createRoom({ mode: 'relay', agents: ['reviewer'] }); await waitConnected(b, room.roomId);
+    const conn = b.room(room.roomId), a = conn.local.agents[0], client = conn.agents.get(a.agentId), host = conn.client;
+    assert.equal(b.view(conn).local.agents[0].state, 'idle');
+    let announced = false;
+    host.onPayload((p, meta) => { if (p.kind === 'member.config' && meta.from === a.agentId) announced = true; });
+    await sleep(30); announced = false;
+    client.transport.ws.terminate();
+    for (let i = 0; client.isJoined() && i < 100; i++) await sleep(5);
+    assert.equal(host.isJoined(), true);
+    assert.equal(b.view(conn).local.agents[0].connectionStatus, 'connecting');
+    await b.connectAgents(conn);
+    assert.equal(conn.agents.get(a.agentId), client, 'a recovering member owns its existing socket');
+    await waitConnected(b, room.roomId, 2500);
+    for (let i = 0; !announced && i < 100; i++) await sleep(5);
+    assert.equal(announced, true, 'rejoined member must reannounce its configuration');
+    assert.equal(conn.client, host);
+    assert.equal(b.view(conn).local.agents[0].error, undefined);
+    assert.equal(b.view(conn).local.agents[0].state, 'idle');
+  } finally { await b.dispose(); await relay.close(); }
+});
+
+test('removing a member or switching to local cancels failed-join retries', async () => {
+  const { LanRelayServer } = await import('@collab/lan-relay');
+  const relay = new LanRelayServer({ host: '127.0.0.1', port: 0, mdns: false }); await relay.listen();
+  const dir = await mkdtemp(join(tmpdir(), 'lma-agent-retry-cancel-')), b = await bridgeIn(dir, join(dir, 'ws'));
+  b.config.relayUrl = `ws://127.0.0.1:${relay.port}`;
+  try {
+    const room = await b.createRoom({ mode: 'relay' }); await waitConnected(b, room.roomId);
+    const conn = b.room(room.roomId), original = b.transportFor.bind(b); let attempts = 0;
+    b.transportFor = (...args) => { const t = original(...args); t.connect = async () => { attempts++; throw Error('temporary member failure'); }; return t; };
+    const a = await b.addLocalAgent(room.roomId, { name: 'Remove during retry' });
+    for (let i = 0; !conn.agentRetries.has(a.agentId) && i < 100; i++) await sleep(5);
+    assert.equal(conn.agentRetries.size, 1);
+    await b.removeLocalAgent(room.roomId, a.agentId);
+    assert.equal(conn.agentRetries.size, 0);
+    await sleep(1100); assert.equal(attempts, 1);
+    const next = await b.addLocalAgent(room.roomId, { name: 'Switch during retry' });
+    for (let i = 0; !conn.agentRetries.has(next.agentId) && i < 100; i++) await sleep(5);
+    b.transportFor = original;
+    await b.setTransport(room.roomId, 'local'); await waitConnected(b, room.roomId);
+    assert.equal(conn.agentRetries.size, 0);
+  } finally { await b.dispose(); await relay.close(); }
 });

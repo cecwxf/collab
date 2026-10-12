@@ -124,6 +124,9 @@ declare class RoomConn {
     client: CollabClient | null;
     hostJoin?: Promise<void>;
     agentErrors: Map<string, string>;
+    agentStatuses: Map<string, RoomStatus>;
+    agentRetries: Map<string, NodeJS.Timeout>;
+    agentRetryAttempts: Map<string, number>;
     status: RoomStatus;
     error?: string;
     messages: RoomMessage[];
@@ -582,6 +585,9 @@ export declare class CollabBridge {
     /** Join every configured local agent as its own room member (own keypair, same transport as the host). */
     private connectAgents;
     private connectAgent;
+    /** A failed first join has no live SDK client to reconnect. Keep retrying
+     * configured members until they join or their room/member is removed. */
+    private retryAgent;
     private connectAgentInner;
     private announceAgentConfig;
     private disconnectAgents;

@@ -28,6 +28,29 @@ try {
  const evidence=await Promise.all(fixtures.map(async f=>{
   const {h,p,author,reviewer}=f;
   await until(async()=>{const r=await f.view();return r.status==='online'&&r.local.agents.every(a=>a.online);},'automatic host and offline agent recovery',40000);
+  // Fault only a new agent's first handshake, leaving its host online. Then
+  // disconnect only that idle agent and observe recovery without API retries.
+  const controlledRoom=relay.room(f.roomId),onMessage=controlledRoom.onMessage.bind(controlledRoom);
+  const rejected=new Set(),pings=new Map();
+  controlledRoom.onMessage=async(socket,text)=>{
+   for(const line of text.split('\n').filter(Boolean)){
+    const frame=JSON.parse(line);
+    if(frame.type==='ctrl'&&frame.method==='ping'&&socket.agentId)pings.set(socket.agentId,(pings.get(socket.agentId)||0)+1);
+    if(frame.type==='ctrl'&&frame.method==='join'&&frame.agentId.startsWith('persistence-probe.')&&!rejected.has(frame.agentId)){
+     rejected.add(frame.agentId);controlledRoom.error(socket,'temporary','Intentional first agent join failure');return;
+    }
+   }
+   return onMessage(socket,text);
+  };
+  const probe=await api(h,p+'/agents',{name:'Persistence probe',scope:'read',reasoningEffort:'low'});
+  await until(async()=>{const r=await f.view();assert.equal(r.status,'online');return rejected.has(probe.agentId)&&r.local.agents.find(a=>a.agentId===probe.agentId)?.online;},'agent first-join automatic retry with host online',15000);
+  const socket=[...controlledRoom.socks].find(s=>s.agentId===probe.agentId&&s.joined);assert.ok(socket);socket.ws.terminate();
+  await until(async()=>{const r=await f.view();assert.equal(r.status,'online');return r.local.agents.find(a=>a.agentId===probe.agentId)?.connectionStatus==='connecting';},'individual member connecting state',5000);
+  await until(async()=>{const r=await f.view(),a=r.local.agents.find(a=>a.agentId===probe.agentId);return a?.online&&!a.error;},'idle agent socket rejoin',15000);
+  const soakMs=Number(process.env.DSH_RECOVERY_SOAK_MS||0),soakEnd=Date.now()+soakMs;
+  while(Date.now()<soakEnd){const r=await f.view();assert.equal(r.status,'online');assert.ok(r.local.agents.every(a=>a.online&&a.state==='idle'));await sleep(Math.min(2000,Math.max(1,soakEnd-Date.now())));}
+  const idleProbe=(await f.view()).local.agents.find(a=>a.agentId===probe.agentId);assert.equal(idleProbe.sessionId,undefined);
+  if(soakMs>=95000)assert.ok(pings.get(probe.agentId)>=2,'idle member must send at least two keepalive frames');
   const messages=async()=>(await api(h,p+'/messages')).messages;
   async function taskDone(task){await until(async()=> (await messages()).some(m=>m.taskId===task.taskId&&m.status==='done'),'real model task complete');await until(async()=>!(await api(h,p+'/runs')).runs.some(r=>['running','queued','approval'].includes(r.state)),'real agent idle');}
   await taskDone(await api(h,p+'/task',{title:'Write recovery proof',assignee:author.agentId,body:'Create recovery-note.md containing a Markdown heading "Recovered collaboration" and a sentence stating room connectivity recovered. Use the native file tools in your assigned worktree, do not merge. Mark this task done with a link [Recovery note](recovery-note.md), then post the link to the room using collab_send without mentions.'}));
@@ -41,7 +64,7 @@ try {
   await until(async()=>{const r=(await api(h,'/state')).rooms.find(r=>r.roomId===vps.roomId);return r.status==='online'&&r.local.agents.every(a=>a.online);},'VPS host and agent handshake',30000);
   const marker='VPS verified '+h.host;await api(h,vp+'/send',{text:marker});assert.ok((await api(h,vp+'/messages')).messages.some(m=>m.text===marker));
   console.log(`REAL ${h.host} PASS: initial relay failure → automatic recovery → Author/Reviewer model collaboration → native file preview; VPS host/agent join and chat pass.`);
-  const state=await api(h,'/state');return {host:h.host,version:state.version,model:state.defaultModel,initialError:f.initialError,automaticRecovery:true,agentsAddedOfflineRecovered:true,vpsJoinAndChat:true,room:await f.view(),messages:await messages(),runs,preview};
+  const state=await api(h,'/state');return {host:h.host,version:state.version,model:state.defaultModel,initialError:f.initialError,automaticRecovery:true,agentsAddedOfflineRecovered:true,agentFirstJoinRetriesAutomatically:true,individualIdleAgentRejoins:true,idleSoakMs:soakMs,idleAgentKeepaliveFrames:pings.get(probe.agentId)||0,idleAgentNoModelSession:true,vpsJoinAndChat:true,room:await f.view(),messages:await messages(),runs,preview};
  }));
  for (const [i,f] of fixtures.entries()) {
   assert.equal((await api(f.h,f.p+'/delete',{})).left,true);

@@ -196,3 +196,30 @@ it('closing a pending websocket settles its connection promise promptly',async()
  const result=transport.connect(100).then(()=>({error:''}),e=>({error:e.message}));transport.close();
  const outcome=await Promise.race([result,sleep(200).then(()=>({error:'still pending'}))]);assert.match(outcome.error,/closed|cancelled/);
 });
+
+describe('persistent membership', () => {
+  it('keeps retrying beyond 50 failures and cancels the pending retry on disposal', async (t) => {
+    const hub = new RoomHub(), room = CollabClient.createRoom();
+    const transport = CollabClient.mockTransport(hub);
+    const client = new CollabClient({ identity: await generateIdentity('persistent'), roomId: room.roomId, roomKey: room.roomKey, transport, reconnect: true });
+    await client.join();
+    let attempts = 0;
+    transport.connect = async () => { attempts++; throw Error('temporary network failure'); };
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      transport.close();
+      for (let i = 0; i < 60; i++) { t.mock.timers.tick(31_000); for (let j = 0; j < 10; j++) await Promise.resolve(); }
+      assert.ok(attempts >= 55, `membership retry stopped after ${attempts} attempts`);
+      const before = attempts;
+      let stopped = false;
+      const pending = client['reconnecting']?.then(() => { stopped = true; });
+      await client.dispose();
+      for (let j = 0; j < 10; j++) await Promise.resolve();
+      assert.equal(stopped, true, 'disposal must cancel the pending delay immediately');
+      await pending;
+      t.mock.timers.tick(31_000);
+      for (let j = 0; j < 10; j++) await Promise.resolve();
+      assert.equal(attempts, before, 'disposed members must not reconnect');
+    } finally { await client.dispose(); t.mock.timers.reset(); }
+  });
+});
