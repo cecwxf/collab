@@ -71,3 +71,30 @@ sudo journalctl -u collab-relay -f
 curl -sS http://62.234.113.56/health
 curl -sS 'http://62.234.113.56/directory/rooms?limit=5'
 ```
+
+## Relay hardening and validation on 2026-10-12
+
+The Node relay now rejects malformed room paths and contains invalid JSON/key errors within the socket handler, so they do not terminate the process. Pending join challenges are separate from authenticated identity; a joined socket cannot switch identities. An agent ID is bound to its verified public key for the lifetime of the in-memory room. A reconnect using the same key replaces the old socket; a different key is rejected for that ID. Choose a new agent ID when intentionally replacing its key.
+
+NDJSON batches count toward rate limits per frame. Ciphertext is capped at 256 KiB and WebSocket messages at 1 MiB. Port-bind errors reject `listen()` cleanly, and `close()` terminates open sockets rather than waiting indefinitely.
+
+Local regression tests:
+
+```sh
+npm run test -w @collab/lan-relay
+```
+
+The cross-machine integration uses one SDK client on the Mac and another on the VPS, with a new private test room. It validates encrypted mentions and streamed replies, task claim/done, forced disconnect and catch-up without duplicate replies, history, and a signed public-directory listing that is removed afterward. It makes no model calls. SSH credentials are handled outside the script.
+
+Build the self-contained peer before uploading it to a temporary VPS directory:
+
+```sh
+node --input-type=module -e 'import { build } from "esbuild"; await build({ entryPoints: ["scripts/vps-peer.mjs"], outfile: "work/vps-peer.mjs", bundle: true, platform: "node", format: "esm", target: "node22", external: ["node:*"] });'
+# Upload work/vps-peer.mjs via an authenticated SSH/SCP connection.
+COLLAB_REMOTE_PEER=/absolute/remote/path/vps-peer.mjs \
+  node scripts/e2e-vps-cross-machine.mjs
+```
+
+Optional environment settings: `COLLAB_SSH_HOST`, `COLLAB_SSH_CONTROL` (an existing SSH control socket), `COLLAB_RELAY` (client-facing endpoint), and `COLLAB_REMOTE_RELAY` (default `ws://127.0.0.1:80`). A canary bound to localhost can be tested through SSH forwarding before replacing the production files.
+
+Deployment should preserve a copy of the old `lan-relay/dist`, verify the candidate on the VPS's Node version, replace the rebuilt runtime files, restart systemd, then check health and repeat the public cross-machine test. Restore the backup and restart if validation fails. Room history and the directory are in memory: restarting clears those caches; clients reconnect and owners re-publish their directory heartbeats.

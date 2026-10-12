@@ -63,19 +63,29 @@ export class LanRelayServer {
         "Collab LAN / VPS Relay\nWS: /ws/:roomId\nDirectory: GET|POST /directory/rooms, DELETE /directory/rooms/:roomId\nHealth: /health\nmDNS: _collab._tcp.local\n",
       );
     });
-    this.wss = new WebSocketServer({ noServer: true });
+    this.wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
     this.http.on("upgrade", (req, socket, head) => {
-      const m = /^\/ws\/([^/?#]+)/.exec(req.url ?? "");
+      const m = /^\/ws\/([^/?#]+)\/?(?:\?[^#]*)?$/.exec(req.url ?? "");
       if (!m) {
         socket.destroy();
         return;
       }
-      const roomId = decodeURIComponent(m[1]!);
+      let roomId: string;
+      try {
+        roomId = decodeURIComponent(m[1]!);
+        if (!/^[A-Za-z0-9_-]{1,128}$/.test(roomId)) throw new Error("invalid roomId");
+      } catch {
+        socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+        return;
+      }
       this.wss!.handleUpgrade(req, socket, head, (ws) => {
         this.room(roomId).attach(ws);
       });
     });
-    await new Promise<void>((resolve) => this.http!.listen(port, host, resolve));
+    await new Promise<void>((resolve, reject) => {
+      this.http!.once("error", reject);
+      this.http!.listen(port, host, () => { this.http!.off("error", reject); resolve(); });
+    });
     const addr = this.http.address();
     this.port = typeof addr === "object" && addr ? addr.port : port;
     if (this.opts.mdns !== false) {
@@ -86,7 +96,8 @@ export class LanRelayServer {
 
   async close() {
     this.stopMdns?.();
-    await new Promise<void>((resolve) => this.wss?.close(() => resolve()));
-    await new Promise<void>((resolve) => this.http?.close(() => resolve()));
+    for (const ws of this.wss?.clients ?? []) ws.terminate();
+    if (this.wss) await new Promise<void>((resolve) => this.wss!.close(() => resolve()));
+    if (this.http) await new Promise<void>((resolve) => this.http!.close(() => resolve()));
   }
 }
