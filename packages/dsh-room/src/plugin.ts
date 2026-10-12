@@ -1632,11 +1632,13 @@ export class CollabBridge {
       await this.reconnectRoom(roomId);
       return { ...this.view(conn), invite: conn.meta.invite };
     }
+    const previousJoin = conn.hostJoin;
     await this.saveLocalHistory(conn);
     this.cancelMcp(conn, new Error("MCP room transport changed"));
     await this.disconnectAgents(conn);
     await conn.client?.dispose().catch(() => {});
     conn.client = null;
+    if (previousJoin) await previousJoin.catch(() => {});
     conn.lastSeenPeers.clear();
     conn.local.loopback = wantLoopback;
     conn.status = "connecting";

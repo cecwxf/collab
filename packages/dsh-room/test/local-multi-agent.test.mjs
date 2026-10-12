@@ -643,3 +643,9 @@ test('removing a room releases its hosted sessions and keeps workspace output fi
  const dir=await mkdtemp(join(tmpdir(),'lma-delete-room-')),ws=join(dir,'ws');await mkdir(ws);await writeFile(join(ws,'output.md'),'keep this output');const b=await bridgeIn(dir,ws);let disposed=0;
  try {const room=await b.createRoom({localOnly:true,agents:['reviewer']});await waitConnected(b,room.roomId);const agent=b.room(room.roomId).local.agents[0];b.agentHandles.set(`${room.roomId}:${agent.agentId}`,Promise.resolve({agent:{session:{id:'kept-native-session'}},dispose:async()=>{disposed++;}}));b.room(room.roomId).meta.public=true;b.directory.unlist=async()=>{throw Error('offline directory');};const removed=await b.leave(room.roomId);assert.match(removed.directoryWarning,/listing/);await sleep(10);assert.equal(disposed,1);assert.ok(!b.state().rooms.some(r=>r.roomId===room.roomId));assert.equal(JSON.parse(await readFile(b.config.statePath,'utf8')).rooms.length,0);assert.equal(await readFile(join(ws,'output.md'),'utf8'),'keep this output');}finally{await b.dispose();}
 });
+
+test('switching a room to local-only cancels and drains its pending relay join',async()=>{
+ const {WsTransport}=await import('@collab/sdk');class PendingSocket extends EventTarget {static OPEN=1;readyState=0;close(){this.readyState=3;this.dispatchEvent(new Event('close'));}}
+ const dir=await mkdtemp(join(tmpdir(),'lma-pending-switch-'));const b=await bridgeIn(dir,join(dir,'ws'));const original=b.transportFor.bind(b);b.transportFor=(conn,url)=>conn.local.loopback?original(conn,url):new WsTransport(url,PendingSocket);
+ try {const room=await b.createRoom({mode:'relay'});for(let i=0;!b.room(room.roomId).client&&i<100;i++)await sleep(5);const result=await Promise.race([b.setTransport(room.roomId,'local'),sleep(300).then(()=>{throw Error('local switch blocked by old relay join');})]);assert.equal(result.status,'online');assert.equal(result.transport,'local');}finally{await b.dispose();}
+});

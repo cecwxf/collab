@@ -1265,6 +1265,7 @@ var WsTransport = class {
   buf = "";
   _connected = false;
   generation = 0;
+  cancelConnect;
   constructor(url, Socket = globalThis.WebSocket) {
     this.url = url;
     this.Socket = Socket;
@@ -1275,8 +1276,9 @@ var WsTransport = class {
   async connect(timeoutMs = 8e3) {
     if (this._connected && this.ws?.readyState === this.Socket.OPEN)
       return;
-    this.teardownSocket();
+    this.cancelConnect?.("replaced");
     const gen = ++this.generation;
+    this.teardownSocket();
     await new Promise((resolve5, reject) => {
       const ws = new this.Socket(this.url);
       this.ws = ws;
@@ -1286,6 +1288,8 @@ var WsTransport = class {
           return;
         settled = true;
         clearTimeout(timer);
+        if (this.cancelConnect === cancel)
+          this.cancelConnect = void 0;
         if (err) {
           try {
             ws.close(1e3, "connect-failed");
@@ -1301,6 +1305,16 @@ var WsTransport = class {
           resolve5();
         }
       };
+      const cancel = (reason) => {
+        if (settled)
+          return;
+        settled = true;
+        clearTimeout(timer);
+        if (this.cancelConnect === cancel)
+          this.cancelConnect = void 0;
+        reject(new Error(`WebSocket connection ${reason}`));
+      };
+      this.cancelConnect = cancel;
       const timer = setTimeout(() => finish(new Error(`WebSocket connect timeout (${timeoutMs}ms) to ${this.url}`)), timeoutMs);
       ws.addEventListener("open", () => {
         if (gen !== this.generation) {
@@ -1368,6 +1382,7 @@ var WsTransport = class {
     this.closeHandlers.push(handler);
   }
   close(_reason = "closed") {
+    this.cancelConnect?.("closed");
     this.generation++;
     this.teardownSocket();
   }
@@ -4383,12 +4398,15 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
       await this.reconnectRoom(roomId);
       return { ...this.view(conn), invite: conn.meta.invite };
     }
+    const previousJoin = conn.hostJoin;
     await this.saveLocalHistory(conn);
     this.cancelMcp(conn, new Error("MCP room transport changed"));
     await this.disconnectAgents(conn);
     await conn.client?.dispose().catch(() => {
     });
     conn.client = null;
+    if (previousJoin) await previousJoin.catch(() => {
+    });
     conn.lastSeenPeers.clear();
     conn.local.loopback = wantLoopback;
     conn.status = "connecting";

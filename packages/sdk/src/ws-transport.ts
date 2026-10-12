@@ -14,6 +14,7 @@ export class WsTransport implements Transport {
   private buf = "";
   private _connected = false;
   private generation = 0;
+  private cancelConnect?: (reason: string) => void;
 
   constructor(readonly url: string, private readonly Socket: typeof WebSocket = globalThis.WebSocket) {}
 
@@ -23,9 +24,10 @@ export class WsTransport implements Transport {
 
   async connect(timeoutMs = 8_000): Promise<void> {
     if (this._connected && this.ws?.readyState === this.Socket.OPEN) return;
-    // Drop any half-open socket before opening a new one
-    this.teardownSocket();
+    // Settle a superseded attempt before invalidating its socket callbacks.
+    this.cancelConnect?.("replaced");
     const gen = ++this.generation;
+    this.teardownSocket();
     await new Promise<void>((resolve, reject) => {
       const ws = new this.Socket(this.url);
       this.ws = ws;
@@ -34,6 +36,7 @@ export class WsTransport implements Transport {
         if (settled || gen !== this.generation) return;
         settled = true;
         clearTimeout(timer);
+        if (this.cancelConnect === cancel) this.cancelConnect = undefined;
         if (err) {
           try { ws.close(1000, "connect-failed"); } catch { /* */ }
           if (this.ws === ws) { this.ws = null; this._connected = false; }
@@ -43,6 +46,13 @@ export class WsTransport implements Transport {
           resolve();
         }
       };
+      const cancel = (reason: string) => {
+        if (settled) return;
+        settled = true;clearTimeout(timer);
+        if (this.cancelConnect === cancel) this.cancelConnect = undefined;
+        reject(new Error(`WebSocket connection ${reason}`));
+      };
+      this.cancelConnect = cancel;
       const timer = setTimeout(() => finish(new Error(`WebSocket connect timeout (${timeoutMs}ms) to ${this.url}`)), timeoutMs);
       ws.addEventListener("open", () => {
         if (gen !== this.generation) {
@@ -106,6 +116,7 @@ export class WsTransport implements Transport {
   }
 
   close(_reason = "closed"): void {
+    this.cancelConnect?.("closed");
     this.generation++;
     this.teardownSocket();
   }

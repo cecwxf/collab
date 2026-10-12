@@ -10,7 +10,7 @@ The same package supports **dsh web** and the official **DeepSeek Harness Deskto
 ### Web
 
 ```sh
-dsh plugin --profile web add @cecwxf/dsh-room@0.3.10
+dsh plugin --profile web add @cecwxf/dsh-room@0.3.11
 dsh web
 ```
 
@@ -18,12 +18,12 @@ Open the printed URL and select **DSH Room** in the sidebar.
 
 ### Desktop
 
-Install `@cecwxf/dsh-room@0.3.10` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
+Install `@cecwxf/dsh-room@0.3.11` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
 
 The npm-installed `dsh` command rejects `--profile desktop` with `profile "desktop" is managed exclusively by the Electron application`. For a command-line installation, launch Desktop once, fully quit it, and use **its bundled command**, not the npm CLI. For a macOS app in `/Applications`:
 
 ```sh
-"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.10
+"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.11
 ```
 
 Reopen Desktop and select **DSH Room**. **Manage dsh Command…** in Desktop's application menu can register that bundled command on PATH.
@@ -191,3 +191,5 @@ The Node host uses the package's `ws` implementation for relay sockets, avoiding
 Room headers provide **Edit room settings** for name, description and tags. Changes persist without replacing the room, agents or workspace; names are local labels, and owned public rooms also refresh their directory listing. The native workspace toolbar has a **New room** shortcut, and every expanded workspace has a visible **New room** row preselecting that workspace. Original native controls and rows remain owned by dsh and are restored on plugin unload.
 
 Room rows provide an **⋯** menu with **Edit room** and **Delete room**. Deletion requires its confirmation dialog and removes the room from this host, stops its local tasks, disconnects hosted members and releases background session handles. Native conversation history and workspace/worktree files are retained, and remote hosts keep their membership. An owned public listing is unlisted as part of removal.
+
+Version 0.3.11 also settles cancelled WebSocket connect promises and drains the old host join before changing transports, so an in-flight relay connection cannot block a switch to Local only.

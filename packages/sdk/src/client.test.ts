@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { generateIdentity, encodePayload, encrypt } from "@collab/protocol";
-import { CollabClient, RoomHub } from "./client.js";
+import { CollabClient, RoomHub, WsTransport } from "./client.js";
 
 describe("CollabClient mock relay", () => {
   it("rejoining replays messages missed offline once through onPayload", async () => {
@@ -188,4 +188,11 @@ it('keeps a peer update received immediately after joined before the join promis
   });
   const client=new CollabClient({identity,roomId:room.roomId,roomKey:room.roomKey,transport});
   try {await client.join();assert.ok(client.getPeers().some(p=>p.agentId===newcomer.agentId),'join must not overwrite newer presence with its older response snapshot');}finally{await client.dispose();}
+});
+
+it('closing a pending websocket settles its connection promise promptly',async()=>{
+ class PendingSocket extends EventTarget {static OPEN=1;readyState=0;close(){this.readyState=3;this.dispatchEvent(new Event('close'));}}
+ const transport=new WsTransport('ws://pending.test',PendingSocket as unknown as typeof WebSocket);
+ const result=transport.connect(100).then(()=>({error:''}),e=>({error:e.message}));transport.close();
+ const outcome=await Promise.race([result,sleep(200).then(()=>({error:'still pending'}))]);assert.match(outcome.error,/closed|cancelled/);
 });
