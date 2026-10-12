@@ -5,14 +5,17 @@ const AGENT_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" 
 
 /** dsh has no workspace-child extension seat. Add only owned nodes; never move React-owned rows. */
 export function installRoomGroups(store, native, layout, sessions) {
-  if (typeof document === 'undefined' || !native) return () => {};
+  if (typeof document === 'undefined' || typeof native?.list?.getSnapshot !== 'function') return () => {};
+  // Optional client services differ across dsh runtimes. Their presence does not
+  // guarantee that a snapshot store (or its subscription method) is available.
+  const panelInfo=layout?.panelInfo,sessionList=sessions?.list;
   let frame=0,alive=true;
   const wrappers=new Set();
   const markHidden=(row,hidden)=>{if(hidden)row.setAttribute('data-rm-grouped-session','');else row.removeAttribute('data-rm-grouped-session');};
   const decorate=()=>{
-    const state=store.getSnapshot(),workspaces=native.list.getSnapshot().items||[];
-    const panelActive=layout.panelInfo.getSnapshot().activePanelId==='collab';
-    const current=Object.values(sessions?.list.getSnapshot().byId||{}).find(s=>(s.retainedBy?.mainView||0)>0)?.id;
+    const state=store.getSnapshot(),workspaces=native.list.getSnapshot()?.items||[];
+    const panelActive=panelInfo?.getSnapshot?.()?.activePanelId==='collab';
+    const current=Object.values(sessionList?.getSnapshot?.()?.byId||{}).find(s=>(s.retainedBy?.mainView||0)>0)?.id;
     const hidden=new Set();
     for(const row of document.querySelectorAll('[data-row-key^="workspace:"]')) {
       const key=row.getAttribute('data-row-key').slice('workspace:'.length);
@@ -65,7 +68,9 @@ export function installRoomGroups(store, native, layout, sessions) {
   };
   const schedule=()=>{if(alive&&!frame)frame=requestAnimationFrame(()=>{frame=0;decorate();});};
   const observer=new MutationObserver(schedule);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['aria-expanded']});
-  const unsubscribers=[store.subscribe(schedule),native.list.subscribe(schedule),layout.panelInfo.subscribe(schedule),sessions?.list.subscribe(schedule)].filter(Boolean);
+  const unsubscribers=[store,native.list,panelInfo,sessionList]
+    .filter(source=>typeof source?.subscribe==='function')
+    .map(source=>source.subscribe(schedule)).filter(off=>typeof off==='function');
   schedule();
   return ()=>{alive=false;observer.disconnect();for(const off of unsubscribers)off();if(frame)cancelAnimationFrame(frame);for(const wrapper of wrappers)wrapper.remove();for(const row of document.querySelectorAll('[data-rm-grouped-session]'))markHidden(row,false);};
 }

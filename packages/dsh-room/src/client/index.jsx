@@ -10,7 +10,7 @@ import { sameWorkspacePath, fileCandidates, inlineFile } from "./files.js";
 import { installRoomGroups } from "./workspace-rooms.js";
 
 export const name = "dsh-room-client";
-export const inject = ["slots", "layout", "workspaces", "uiWorkspace", "sidebarRight"];
+export const inject = ["slots", "layout", "workspaces", "sessions", "uiWorkspace", "sidebarRight"];
 const PANEL_ID = "collab";
 
 const Svg = ({ size = 16, children }) => (
@@ -1509,8 +1509,8 @@ function installStyles() {
  * appended to the workspace "…" menu. Nothing native is hidden or replaced. */
 const ROOM_SVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="2"/><path d="M5.5 6.5h5M5.5 9.5h3.5"/></svg>';
 function installWorkspaceDecorator(store, native, onNewRoom) {
-  if (typeof document === "undefined" || !native) return () => {};
-  const wsFor = (key) => (native.list.getSnapshot().items || []).find((w) => w.workspaceId === key);
+  if (typeof document === "undefined" || typeof native?.list?.getSnapshot !== "function") return () => {};
+  const wsFor = (key) => (native.list.getSnapshot()?.items || []).find((w) => w.workspaceId === key);
   const rowKey = (row) => (row.getAttribute("data-row-key") || "").slice("workspace:".length);
   const open = (key) => { const w = wsFor(key); if (w) onNewRoom({ id: w.workspaceId, path: w.path, title: wsTitle(w) }); };
   const newSessionButton = row => {
@@ -1597,8 +1597,8 @@ export function apply(ctx) {
   store.native = native || null;
   store.uiWorkspace = ctx.uiWorkspace;
   store.sidebarRight = ctx.sidebarRight;
-  store.nativeList = native && native.list ? {
-    subscribe: (listener) => native.list.subscribe(listener),
+  store.nativeList = typeof native?.list?.getSnapshot === "function" ? {
+    subscribe: (listener) => native.list.subscribe?.(listener) || NO_SUB(),
     getSnapshot: () => native.list.getSnapshot(),
   } : null;
   ctx.effect(() => installStyles(), "dsh-room: styles");
@@ -1614,5 +1614,5 @@ export function apply(ctx) {
   ctx.slots.inject("sidebar.session.row.leading", () => ctx.slots.register({ name: "sidebar.session.row.leading", id: "dsh-room-session-mark", inject: () => ({ store }) }, RoomSessionMark));
   // …and add "New room" next to each workspace's native "New session".
   ctx.effect(() => installWorkspaceDecorator(store, native, (workspace) => store.actions.openDialog({ kind: "create", workspace })), "dsh-room: workspace New room");
-  ctx.effect(() => installRoomGroups(store, native, ctx.layout, ctx.get ? ctx.get("sessions", false) : ctx.sessions), "dsh-room: workspace room groups");
+  ctx.effect(() => installRoomGroups(store, native, ctx.layout, ctx.get ? ctx.get("sessions") : ctx.sessions), "dsh-room: workspace room groups");
 }

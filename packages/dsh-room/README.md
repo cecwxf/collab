@@ -10,7 +10,7 @@ The same package supports **dsh web** and the official **DeepSeek Harness Deskto
 ### Web
 
 ```sh
-dsh plugin --profile web add @cecwxf/dsh-room@0.3.8
+dsh plugin --profile web add @cecwxf/dsh-room@0.3.9
 dsh web
 ```
 
@@ -18,21 +18,19 @@ Open the printed URL and select **DSH Room** in the sidebar.
 
 ### Desktop
 
-Launch Desktop once to initialize its profile, then **fully quit** it. Use the Desktop-provided `dsh` command to install into its own profile:
+Install `@cecwxf/dsh-room@0.3.9` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
+
+The npm-installed `dsh` command rejects `--profile desktop` with `profile "desktop" is managed exclusively by the Electron application`. For a command-line installation, launch Desktop once, fully quit it, and use **its bundled command**, not the npm CLI. For a macOS app in `/Applications`:
 
 ```sh
-dsh plugin --profile desktop add @cecwxf/dsh-room@0.3.8
+"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.9
 ```
 
-Reopen Desktop and select **DSH Room**. Its plugin manager can also install the package. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
-
-If `dsh` on PATH is the npm CLI, use **Manage dsh Command…** in Desktop's application menu or invoke its bundled command directly. For a macOS app in `/Applications`:
-
-```sh
-"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.8
-```
+Reopen Desktop and select **DSH Room**. **Manage dsh Command…** in Desktop's application menu can register that bundled command on PATH.
 
 Desktop owns its executable profile: the npm CLI cannot initialize or mutate that profile. See the [official Desktop installation rules](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/desktop/README.md#bundled-command-runtime).
+
+Version 0.3.9 fixes a client loader crash (`Cannot read properties of undefined (reading 'subscribe')`) by declaring the session service dependency and checking optional snapshot/subscription interfaces before use. Missing workspace state leaves native session rows visible.
 
 After an upgrade, fully restart the relevant host. Web users may also need a hard refresh. `/api/collab/version` reports the loaded package version.
 

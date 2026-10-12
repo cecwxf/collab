@@ -383,8 +383,9 @@ function createRoomsStore() {
 var ROOM_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="2"/><path d="M5.5 6.5h5M5.5 9.5h3.5"/></svg>';
 var AGENT_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" aria-hidden="true"><rect x="3" y="5" width="10" height="7.5" rx="2"/><path d="M8 2.5V5M6 8.5h.01M10 8.5h.01"/></svg>';
 function installRoomGroups(store, native, layout, sessions) {
-  if (typeof document === "undefined" || !native) return () => {
+  if (typeof document === "undefined" || typeof native?.list?.getSnapshot !== "function") return () => {
   };
+  const panelInfo = layout?.panelInfo, sessionList = sessions?.list;
   let frame = 0, alive = true;
   const wrappers = /* @__PURE__ */ new Set();
   const markHidden = (row, hidden) => {
@@ -392,9 +393,9 @@ function installRoomGroups(store, native, layout, sessions) {
     else row.removeAttribute("data-rm-grouped-session");
   };
   const decorate = () => {
-    const state = store.getSnapshot(), workspaces = native.list.getSnapshot().items || [];
-    const panelActive = layout.panelInfo.getSnapshot().activePanelId === "collab";
-    const current = Object.values(sessions?.list.getSnapshot().byId || {}).find((s) => (s.retainedBy?.mainView || 0) > 0)?.id;
+    const state = store.getSnapshot(), workspaces = native.list.getSnapshot()?.items || [];
+    const panelActive = panelInfo?.getSnapshot?.()?.activePanelId === "collab";
+    const current = Object.values(sessionList?.getSnapshot?.()?.byId || {}).find((s) => (s.retainedBy?.mainView || 0) > 0)?.id;
     const hidden = /* @__PURE__ */ new Set();
     for (const row of document.querySelectorAll('[data-row-key^="workspace:"]')) {
       const key = row.getAttribute("data-row-key").slice("workspace:".length);
@@ -519,7 +520,7 @@ function installRoomGroups(store, native, layout, sessions) {
   };
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-expanded"] });
-  const unsubscribers = [store.subscribe(schedule), native.list.subscribe(schedule), layout.panelInfo.subscribe(schedule), sessions?.list.subscribe(schedule)].filter(Boolean);
+  const unsubscribers = [store, native.list, panelInfo, sessionList].filter((source) => typeof source?.subscribe === "function").map((source) => source.subscribe(schedule)).filter((off) => typeof off === "function");
   schedule();
   return () => {
     alive = false;
@@ -534,7 +535,7 @@ function installRoomGroups(store, native, layout, sessions) {
 // src/client/index.jsx
 var import_jsx_runtime = require("react/jsx-runtime");
 var name = "dsh-room-client";
-var inject = ["slots", "layout", "workspaces", "uiWorkspace", "sidebarRight"];
+var inject = ["slots", "layout", "workspaces", "sessions", "uiWorkspace", "sidebarRight"];
 var PANEL_ID = "collab";
 var Svg = ({ size = 16, children }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { width: size, height: size, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "1.15", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children });
 var RoomsIcon = ({ size }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Svg, { size, children: [
@@ -2335,9 +2336,9 @@ function installStyles() {
 }
 var ROOM_SVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="2"/><path d="M5.5 6.5h5M5.5 9.5h3.5"/></svg>';
 function installWorkspaceDecorator(store, native, onNewRoom) {
-  if (typeof document === "undefined" || !native) return () => {
+  if (typeof document === "undefined" || typeof native?.list?.getSnapshot !== "function") return () => {
   };
-  const wsFor = (key) => (native.list.getSnapshot().items || []).find((w) => w.workspaceId === key);
+  const wsFor = (key) => (native.list.getSnapshot()?.items || []).find((w) => w.workspaceId === key);
   const rowKey = (row) => (row.getAttribute("data-row-key") || "").slice("workspace:".length);
   const open = (key) => {
     const w = wsFor(key);
@@ -2448,8 +2449,8 @@ function apply(ctx) {
   store.native = native || null;
   store.uiWorkspace = ctx.uiWorkspace;
   store.sidebarRight = ctx.sidebarRight;
-  store.nativeList = native && native.list ? {
-    subscribe: (listener) => native.list.subscribe(listener),
+  store.nativeList = typeof native?.list?.getSnapshot === "function" ? {
+    subscribe: (listener) => native.list.subscribe?.(listener) || NO_SUB(),
     getSnapshot: () => native.list.getSnapshot()
   } : null;
   ctx.effect(() => installStyles(), "dsh-room: styles");
@@ -2467,7 +2468,7 @@ function apply(ctx) {
   ctx.slots.inject("shell.overlay", () => ctx.slots.register({ name: "shell.overlay", id: "dsh-room-dialogs", inject: () => ({ store }) }, Overlay));
   ctx.slots.inject("sidebar.session.row.leading", () => ctx.slots.register({ name: "sidebar.session.row.leading", id: "dsh-room-session-mark", inject: () => ({ store }) }, RoomSessionMark));
   ctx.effect(() => installWorkspaceDecorator(store, native, (workspace) => store.actions.openDialog({ kind: "create", workspace })), "dsh-room: workspace New room");
-  ctx.effect(() => installRoomGroups(store, native, ctx.layout, ctx.get ? ctx.get("sessions", false) : ctx.sessions), "dsh-room: workspace room groups");
+  ctx.effect(() => installRoomGroups(store, native, ctx.layout, ctx.get ? ctx.get("sessions") : ctx.sessions), "dsh-room: workspace room groups");
 }
 
 		return module.exports;
@@ -2857,8 +2858,9 @@ function createRoomsStore() {
 var ROOM_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="2"/><path d="M5.5 6.5h5M5.5 9.5h3.5"/></svg>';
 var AGENT_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" aria-hidden="true"><rect x="3" y="5" width="10" height="7.5" rx="2"/><path d="M8 2.5V5M6 8.5h.01M10 8.5h.01"/></svg>';
 function installRoomGroups(store, native, layout, sessions) {
-  if (typeof document === "undefined" || !native) return () => {
+  if (typeof document === "undefined" || typeof native?.list?.getSnapshot !== "function") return () => {
   };
+  const panelInfo = layout?.panelInfo, sessionList = sessions?.list;
   let frame = 0, alive = true;
   const wrappers = /* @__PURE__ */ new Set();
   const markHidden = (row, hidden) => {
@@ -2866,9 +2868,9 @@ function installRoomGroups(store, native, layout, sessions) {
     else row.removeAttribute("data-rm-grouped-session");
   };
   const decorate = () => {
-    const state = store.getSnapshot(), workspaces = native.list.getSnapshot().items || [];
-    const panelActive = layout.panelInfo.getSnapshot().activePanelId === "collab";
-    const current = Object.values(sessions?.list.getSnapshot().byId || {}).find((s) => (s.retainedBy?.mainView || 0) > 0)?.id;
+    const state = store.getSnapshot(), workspaces = native.list.getSnapshot()?.items || [];
+    const panelActive = panelInfo?.getSnapshot?.()?.activePanelId === "collab";
+    const current = Object.values(sessionList?.getSnapshot?.()?.byId || {}).find((s) => (s.retainedBy?.mainView || 0) > 0)?.id;
     const hidden = /* @__PURE__ */ new Set();
     for (const row of document.querySelectorAll('[data-row-key^="workspace:"]')) {
       const key = row.getAttribute("data-row-key").slice("workspace:".length);
@@ -2993,7 +2995,7 @@ function installRoomGroups(store, native, layout, sessions) {
   };
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-expanded"] });
-  const unsubscribers = [store.subscribe(schedule), native.list.subscribe(schedule), layout.panelInfo.subscribe(schedule), sessions?.list.subscribe(schedule)].filter(Boolean);
+  const unsubscribers = [store, native.list, panelInfo, sessionList].filter((source) => typeof source?.subscribe === "function").map((source) => source.subscribe(schedule)).filter((off) => typeof off === "function");
   schedule();
   return () => {
     alive = false;
@@ -3008,7 +3010,7 @@ function installRoomGroups(store, native, layout, sessions) {
 // src/client/index.jsx
 var import_jsx_runtime = require("react/jsx-runtime");
 var name = "dsh-room-client";
-var inject = ["slots", "layout", "workspaces", "uiWorkspace", "sidebarRight"];
+var inject = ["slots", "layout", "workspaces", "sessions", "uiWorkspace", "sidebarRight"];
 var PANEL_ID = "collab";
 var Svg = ({ size = 16, children }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { width: size, height: size, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "1.15", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children });
 var RoomsIcon = ({ size }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Svg, { size, children: [
@@ -4809,9 +4811,9 @@ function installStyles() {
 }
 var ROOM_SVG = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="2"/><path d="M5.5 6.5h5M5.5 9.5h3.5"/></svg>';
 function installWorkspaceDecorator(store, native, onNewRoom) {
-  if (typeof document === "undefined" || !native) return () => {
+  if (typeof document === "undefined" || typeof native?.list?.getSnapshot !== "function") return () => {
   };
-  const wsFor = (key) => (native.list.getSnapshot().items || []).find((w) => w.workspaceId === key);
+  const wsFor = (key) => (native.list.getSnapshot()?.items || []).find((w) => w.workspaceId === key);
   const rowKey = (row) => (row.getAttribute("data-row-key") || "").slice("workspace:".length);
   const open = (key) => {
     const w = wsFor(key);
@@ -4922,8 +4924,8 @@ function apply(ctx) {
   store.native = native || null;
   store.uiWorkspace = ctx.uiWorkspace;
   store.sidebarRight = ctx.sidebarRight;
-  store.nativeList = native && native.list ? {
-    subscribe: (listener) => native.list.subscribe(listener),
+  store.nativeList = typeof native?.list?.getSnapshot === "function" ? {
+    subscribe: (listener) => native.list.subscribe?.(listener) || NO_SUB(),
     getSnapshot: () => native.list.getSnapshot()
   } : null;
   ctx.effect(() => installStyles(), "dsh-room: styles");
@@ -4941,7 +4943,7 @@ function apply(ctx) {
   ctx.slots.inject("shell.overlay", () => ctx.slots.register({ name: "shell.overlay", id: "dsh-room-dialogs", inject: () => ({ store }) }, Overlay));
   ctx.slots.inject("sidebar.session.row.leading", () => ctx.slots.register({ name: "sidebar.session.row.leading", id: "dsh-room-session-mark", inject: () => ({ store }) }, RoomSessionMark));
   ctx.effect(() => installWorkspaceDecorator(store, native, (workspace) => store.actions.openDialog({ kind: "create", workspace })), "dsh-room: workspace New room");
-  ctx.effect(() => installRoomGroups(store, native, ctx.layout, ctx.get ? ctx.get("sessions", false) : ctx.sessions), "dsh-room: workspace room groups");
+  ctx.effect(() => installRoomGroups(store, native, ctx.layout, ctx.get ? ctx.get("sessions") : ctx.sessions), "dsh-room: workspace room groups");
 }
 
 		return module.exports;
