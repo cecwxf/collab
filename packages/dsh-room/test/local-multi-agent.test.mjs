@@ -546,3 +546,18 @@ test("model-facing history and room state contain only lossless JSON values", as
   const dir=await mkdtemp(join(tmpdir(),'lma-tool-json-'));const b=await bridgeIn(dir,join(dir,'ws'));
   try {const room=await b.createRoom({localOnly:true});await waitConnected(b,room.roomId);await b.send(room.roomId,'json history marker');for(const name of ['collab_history','collab_rooms','collab_peers']){const out=await b.tools().find(t=>t.name===name).execute({roomId:room.roomId},{});assert.deepEqual(out,JSON.parse(JSON.stringify(out)),name+' must satisfy dsh lossless JSON output validation');}}finally{await b.dispose();}
 });
+
+test("removing an agent during its background join never leaves an online ghost", async () => {
+  const dir=await mkdtemp(join(tmpdir(),'lma-remove-joining-'));const b=await bridgeIn(dir,join(dir,'ws'));
+  let release;
+  try {
+    const room=await b.createRoom({localOnly:true});await waitConnected(b,room.roomId);
+    const original=b.transportFor.bind(b);b.transportFor=(...args)=>{const t=original(...args);const connect=t.connect.bind(t);t.connect=async(...a)=>{await new Promise(r=>{release=r;});return connect(...a);};return t;};
+    const agent=await b.addLocalAgent(room.roomId,{name:'Disposable'});
+    for(let i=0;!release&&i<200;i++)await sleep(5);assert.ok(release);
+    await b.removeLocalAgent(room.roomId,agent.agentId);release();await sleep(150);
+    assert.ok(!b.room(room.roomId).agents.has(agent.agentId));
+    assert.ok(!b.room(room.roomId).client.getPeers().some(p=>p.agentId===agent.agentId));
+    assert.ok(!b.view(b.room(room.roomId)).members.some(p=>p.agentId===agent.agentId));
+  } finally { release?.();await b.dispose(); }
+});

@@ -1,3 +1,4 @@
+import { join } from "node:path";
 /**
  * dsh room — DeepSeek Harness plugin for Collab rooms (sidebar: DSH Room).
  * Host half: tools, the `/collab` command, the /api/collab routes the Rooms UI uses,
@@ -16,8 +17,10 @@ export { PLUGIN_VERSION, CollabBridge, mockLocalRunner } from "./plugin.js";
 export { Config, normalizeConfig };
 export { AGENT_PRESETS } from "./local-agents.js";
 
-export function apply(ctx: HostContext, config: DshCollabConfig) {
-  const bridge = new CollabBridge(ctx, normalizeConfig(config));
+export function apply(ctx: HostContext, config: Partial<DshCollabConfig>) {
+  const profile = ctx.get("profileContext", false) as { name?: string; dir?: string } | undefined;
+  const dataRoot = profile?.name === "desktop" && profile.dir ? join(profile.dir, ".collab") : undefined;
+  const bridge = new CollabBridge(ctx, normalizeConfig(config, dataRoot));
   const unregister = bridge.tools().map((t) => ctx.tools.register(t));
   ctx.effect(() => () => {
     for (const u of unregister) u();

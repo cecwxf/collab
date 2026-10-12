@@ -3,56 +3,59 @@
 DeepSeek Harness plugin **dsh room** (sidebar label **DSH Room**) for Collab rooms: accountless, end-to-end encrypted, one-to-many agent collaboration over the default VPS Node relay (optional Cloudflare).
 
 
-## Confirm / upgrade to 0.3.3
+## Install in Web and Desktop
 
-User hangs on **Creating…** for Local-only were caused by older builds (≤0.3.1) awaiting joins with no timeout, and by `bridge.start()` blocking every API call while rejoining rooms. **0.3.3** returns create immediately.
+The same package supports **dsh web** and the official **DeepSeek Harness Desktop** (verified with both 0.2.0-rc.2 runtimes on macOS). Desktop uses the shared Web client, so `dsh.client.platform: web` is intentional; do not change it to `desktop`.
 
-```bash
-# in the dsh profile that has dsh-room (e.g. ~/.dsh/profiles/web)
-pnpm add @cecwxf/dsh-room@0.3.3
-# or: dsh plugin add @cecwxf/dsh-room@0.3.3
-```
-
-Then **fully restart dsh** (not only live-reload), hard-refresh the web UI (Ctrl+Shift+R), and confirm:
-
-```bash
-# dump-config / logs should show dsh-room 0.3.3
-curl -s http://127.0.0.1:<dsh-port>/api/collab/version
-# → {"name":"@cecwxf/dsh-room","version":"0.3.3"}
-```
-
-The Create dialog subtitle also shows `dsh-room 0.3.3`. If it still says `?` or an older version, the UI is serving a cached client — hard refresh again after restart.
-
-## Install (one-liner)
+### Web
 
 ```sh
-# Preferred — npm registry (after @cecwxf/dsh-room is published)
-dsh plugin --profile web add @cecwxf/dsh-room
+dsh plugin --profile web add @cecwxf/dsh-room@0.3.6
+dsh web
+```
 
-# From GitHub monorepo root (declares dsh.bundle; pulls packages/dsh-room)
+Open the printed URL and select **DSH Room** in the sidebar.
+
+### Desktop
+
+Launch Desktop once to initialize its profile, then **fully quit** it. Use the Desktop-provided `dsh` command to install into its own profile:
+
+```sh
+dsh plugin --profile desktop add @cecwxf/dsh-room@0.3.6
+```
+
+Reopen Desktop and select **DSH Room**. Its plugin manager can also install the package. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
+
+If `dsh` on PATH is the npm CLI, use **Manage dsh Command…** in Desktop's application menu or invoke its bundled command directly. For a macOS app in `/Applications`:
+
+```sh
+"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.6
+```
+
+Desktop owns its executable profile: the npm CLI cannot initialize or mutate that profile. See the [official Desktop installation rules](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/desktop/README.md#bundled-command-runtime).
+
+After an upgrade, fully restart the relevant host. Web users may also need a hard refresh. `/api/collab/version` reports the loaded package version.
+
+### Runtime data and concurrent use
+
+Web retains its existing `~/.collab` data. Desktop defaults to `<DSH_HOME>/profiles/desktop/.collab` for identity, room state, agent identities and fallback workspace. This prevents two simultaneously running hosts from sharing one relay identity or overwriting the same room-state file. Explicit `identityPath`, `statePath`, and `workspacePath` always take precedence.
+
+Earlier Desktop installs that used the legacy Web paths can retain their data by explicitly configuring those paths in the Desktop profile. Use distinct identity/state paths when running both hosts concurrently.
+
+### Other package sources
+
+```sh
 dsh plugin --profile web add github:cecwxf/collab#master
-
-# From GitHub subdirectory only
 dsh plugin --profile web add github:cecwxf/collab#path:packages/dsh-room
-
-# Local checkout
 dsh plugin --profile web add /absolute/path/to/collab/packages/dsh-room
 ```
 
-Then restart / open the profile:
-
-```sh
-dsh web --host 127.0.0.1 --port 3091
-```
-
-Open the URL → left rail **DSH Room**. Default relay is `ws://62.234.113.56:80` (public directory included).
-
-If pnpm asks to allow a `prepare` / build script, approve it once (or write `allowBuilds`).
+The same sources work with Desktop's bundled CLI and `--profile desktop`. Default relay: `ws://62.234.113.56:80`.
 
 ## What you get
 
-- **DSH Room UI** in the dsh web sidebar — create / join / search / chat / members / tasks.
-- **`/collab` slash commands** in any interactive composer (Web / TUI).
+- **DSH Room UI** in the Web and Desktop sidebar — create / join / search / chat / members / tasks.
+- **`/collab` slash commands** in any interactive composer (Web / Desktop / TUI).
 - **Model tools** (`collab_*`) so agents can create rooms, send, @mention, and manage tasks.
 - **Public directory** on the VPS relay for discoverable rooms (opt-in; public rooms are **not confidential**).
 
@@ -140,3 +143,13 @@ From the repository, run `npm test`, `npm run smoke`, and `npm run e2e:dsh:local
 For two running isolated real dsh hosts, `DSH_MAC_CONTROL=/path/mac.json DSH_VPS_CONTROL=/path/vps.json node scripts/e2e-dsh-cross-real.mjs` verifies Mac → VPS → Mac model cooperation. Each control file contains the authenticated API `base` and `cookie`; the Mac file also contains `roomId` and `invite`. Keep these files private and remove them after testing.
 
 In 0.3.5, the composer has separate model and reasoning-effort controls. Each menu updates only its own setting, and the other menus close when opened.
+
+
+For an installed official Desktop app, run the same real-provider suite against its actual Electron shell and bundled host:
+
+```sh
+# DEEPSEEK_API_KEY must be present in the process environment.
+DSH_DESKTOP_APP="/Applications/DeepSeek Harness.app" npm run e2e:dsh:real
+```
+
+On Windows, pass the installed `DeepSeek Harness.exe` path. The script initializes a disposable Desktop profile, quits before installing with its bundled CLI, restarts the actual app, and checks real sessions plus per-profile default storage. It does not alter the ordinary Desktop profile. Windows execution is supported by the harness path adapter but has not been run in this macOS validation.

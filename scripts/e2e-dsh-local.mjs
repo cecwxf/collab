@@ -79,7 +79,7 @@ try {
   assert.ok(Date.now() - t0 < 3000, "create returns promptly");
   const prefix = `/rooms/${encodeURIComponent(room.roomId)}`;
   const view = async () => (await api("/state")).rooms.find((r) => r.roomId === room.roomId);
-  await until(async () => (await view()).members.length === 4, "host and three agents joined");
+  await until(async () => (await view()).members.length === 4 && (await view()).status === "online" && (await view()).local.agents.every(a => a.online), "host and three agents joined");
   const coder = (await view()).local.agents.find((a) => a.name === "Coder");
   await api(prefix + "/send", { text: "@all hello" });
   await until(async () => (await api(prefix + "/messages")).messages.filter((m) => m.kind === "chat" && m.from !== "e2e-host").length === 2, "@all worker replies");

@@ -50,7 +50,7 @@ import { loadState, saveState, createWorkspaceMeta, type RoomMeta, type Workspac
 import { extractMentions } from "./commands.js";
 import { createRequire } from "node:module";
 const requirePkg = createRequire(import.meta.url);
-export const PLUGIN_VERSION: string = (() => { try { return requirePkg("../package.json").version as string; } catch { return "0.3.5"; } })();
+export const PLUGIN_VERSION: string = (() => { try { return requirePkg("../package.json").version as string; } catch { return "0.3.6"; } })();
 
 const SUMMARY_MAX = 120;
 const MESSAGES_MAX = 300;
@@ -216,6 +216,8 @@ class RoomConn {
   presenceTimer?: ReturnType<typeof setInterval>;
   /** local agentId → its own member connection. */
   agents = new Map<string, CollabClient>();
+  agentJoins = new Map<string, { promise: Promise<void> }>();
+  removedAgentIds = new Set<string>();
   threads = new ThreadTracker(6);
   /** local agentId → thread of its current run (messages it sends belong to that thread). */
   runThread = new Map<string, string>();
@@ -475,8 +477,8 @@ export class CollabBridge {
     client.onPayload((p, meta) => void this.onPayload(conn, p, meta.from, meta.seq));
     client.onPeers((peers, ev) => {
       const now = Date.now();
-      for (const peer of peers) conn.lastSeenPeers.set(peer.agentId, now);
-      if (ev?.type === "joined") conn.lastSeenPeers.set(ev.agentId, now);
+      for (const peer of peers) if (!conn.removedAgentIds.has(peer.agentId)) conn.lastSeenPeers.set(peer.agentId, now);
+      if (ev?.type === "joined" && !conn.removedAgentIds.has(ev.agentId)) conn.lastSeenPeers.set(ev.agentId, now);
       // On "left", do NOT delete immediately — grace window in view() keeps them online briefly.
       if (ev) this.log("info", `room ${roomId}: peer ${ev.type} ${ev.agentId} (${peers.length} in room)`);
       // A newly joined remote peer missed earlier member.config: re-announce ours + our local agents (debounced).
@@ -890,7 +892,7 @@ export class CollabBridge {
         const localAgents = conn.local.agents;
         // Always list configured local agents (even while background join is in flight).
         for (const a of localAgents) live.add(a.agentId);
-        const ids = [...live];
+        const ids = [...live].filter((id) => !conn.removedAgentIds.has(id));
         const cfgs = this.peerConfigs.get(conn.meta.roomId);
         return ids.map((agentId) => {
           const la = localAgents.find((a) => a.agentId === agentId);
@@ -1291,12 +1293,21 @@ export class CollabBridge {
   }
 
   private async connectAgent(conn: RoomConn, a: LocalAgentConfig) {
-    await withTimeout(this.connectAgentInner(conn, a), conn.local.loopback ? 8_000 : 20_000, `agent ${a.agentId} join`);
+    const existing = conn.agentJoins.get(a.agentId);
+    if (existing) return existing.promise;
+    const job = { promise: Promise.resolve() };
+    conn.agentJoins.set(a.agentId, job);
+    const active = () => !this.disposed && this.rooms.get(conn.meta.roomId) === conn && conn.local.agents.includes(a) && conn.agentJoins.get(a.agentId) === job;
+    job.promise = withTimeout(this.connectAgentInner(conn, a, active), conn.local.loopback ? 8_000 : 20_000, `agent ${a.agentId} join`).finally(() => {
+      if (conn.agentJoins.get(a.agentId) === job) conn.agentJoins.delete(a.agentId);
+    });
+    return job.promise;
   }
 
-  private async connectAgentInner(conn: RoomConn, a: LocalAgentConfig) {
+  private async connectAgentInner(conn: RoomConn, a: LocalAgentConfig, active: () => boolean) {
     const parsed = parseInviteUri(conn.meta.invite);
     const identity = await loadIdentity(this.agentIdentityPath(a.agentId), a.agentId);
+    if (!active()) return;
     const client = new CollabClient({
       identity,
       roomId: parsed.roomId,
@@ -1311,17 +1322,25 @@ export class CollabBridge {
       if (p.kind === "mcp.call" && (p as McpCallPayload).target === a.agentId) void this.handleMcpCall(conn, p as McpCallPayload, meta.from, a);
     });
     client.onPeers(() => this.emit({ type: "rooms" }));
-    if (this.disposed) return;
-    await client.join(conn.local.loopback ? 5_000 : 12_000);
-    if (this.disposed) {
-      await client.dispose().catch(() => {});
-      return;
-    }
+    if (!active()) { await client.dispose().catch(() => {}); return; }
+    // Register the pending socket so removal/transport switching can dispose it before join completes.
     const old = conn.agents.get(a.agentId);
     conn.agents.set(a.agentId, client);
-    if (old && old !== client) void old.dispose().catch(() => {});
-    await this.announceAgentConfig(conn, a).catch(() => {});
-    this.log("info", `local agent ${a.agentId} joined ${conn.meta.roomId}${conn.local.loopback ? " (loopback)" : ""}`);
+    if (old && old !== client) await old.dispose().catch(() => {});
+    try {
+      await client.join(conn.local.loopback ? 5_000 : 12_000);
+      if (!active() || conn.agents.get(a.agentId) !== client) {
+        if (conn.agents.get(a.agentId) === client) conn.agents.delete(a.agentId);
+        await client.dispose().catch(() => {});
+        return;
+      }
+      await this.announceAgentConfig(conn, a).catch(() => {});
+      this.log("info", `local agent ${a.agentId} joined ${conn.meta.roomId}${conn.local.loopback ? " (loopback)" : ""}`);
+    } catch (error) {
+      if (conn.agents.get(a.agentId) === client) conn.agents.delete(a.agentId);
+      await client.dispose().catch(() => {});
+      throw error;
+    }
   }
 
   private async announceAgentConfig(conn: RoomConn, a: LocalAgentConfig) {
@@ -1346,6 +1365,7 @@ export class CollabBridge {
   }
 
   private async disconnectAgents(conn: RoomConn) {
+    conn.agentJoins.clear();
     const list = [...conn.agents.values()];
     conn.agents.clear();
     await Promise.all(list.map((c) => c.dispose().catch(() => {})));
@@ -1384,6 +1404,7 @@ export class CollabBridge {
       createdAt: Date.now(),
     };
     if (cfg.moderator) for (const a of conn.local.agents) a.moderator = false;
+    conn.removedAgentIds.delete(cfg.agentId);
     conn.local.agents.push(cfg);
     await this.persist();
     this.emit({ type: "rooms" });
@@ -1421,10 +1442,14 @@ export class CollabBridge {
     const a = this.localAgent(conn, id);
     this.scheduler.stop(conn.meta.roomId, a.agentId);
     conn.local.agents = conn.local.agents.filter((x) => x !== a);
+    conn.removedAgentIds.add(a.agentId);
+    conn.agentJoins.delete(a.agentId);
     const client = conn.agents.get(a.agentId);
     conn.agents.delete(a.agentId);
     await client?.dispose().catch(() => {});
-    this.agentHandles.delete(`${conn.meta.roomId}:${a.agentId}`);
+    conn.lastSeenPeers.delete(a.agentId);
+    this.peerConfigs.get(roomId)?.delete(a.agentId);
+    await this.resetAgentSession(conn, a);
     conn.locks?.release(a.agentId);
     await this.persist();
     this.emit({ type: "rooms" });

@@ -1,5 +1,5 @@
 import type { DshCollabConfig } from "./adapter.js";
-export declare function normalizeConfig(raw: unknown): DshCollabConfig;
+export declare function normalizeConfig(raw: unknown, dataRoot?: string): DshCollabConfig;
 /**
  * Cordis accepts any Standard Schema v1 validator as `Config`
  * (cordis resolveConfig → Config["~standard"].validate). Hand-rolled so no schemastery import is needed.
@@ -9,7 +9,7 @@ export declare const Config: {
         version: 1;
         vendor: string;
         validate(value: unknown): {
-            value: DshCollabConfig;
+            value: Partial<DshCollabConfig>;
             issues?: undefined;
         } | {
             issues: {

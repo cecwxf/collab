@@ -644,6 +644,9 @@ var init_mcp_workspace = __esm({
   }
 });
 
+// src/index.ts
+import { join as join5 } from "node:path";
+
 // src/models.ts
 function resolveSelection(defaults, room = {}, agent = {}) {
   return {
@@ -2921,7 +2924,7 @@ var PLUGIN_VERSION = (() => {
   try {
     return requirePkg("../package.json").version;
   } catch {
-    return "0.3.5";
+    return "0.3.6";
   }
 })();
 var SUMMARY_MAX = 120;
@@ -3003,6 +3006,8 @@ var RoomConn = class {
   presenceTimer;
   /** local agentId → its own member connection. */
   agents = /* @__PURE__ */ new Map();
+  agentJoins = /* @__PURE__ */ new Map();
+  removedAgentIds = /* @__PURE__ */ new Set();
   threads = new ThreadTracker(6);
   /** local agentId → thread of its current run (messages it sends belong to that thread). */
   runThread = /* @__PURE__ */ new Map();
@@ -3217,8 +3222,8 @@ var CollabBridge = class {
     client.onPayload((p, meta) => void this.onPayload(conn, p, meta.from, meta.seq));
     client.onPeers((peers, ev) => {
       const now2 = Date.now();
-      for (const peer of peers) conn.lastSeenPeers.set(peer.agentId, now2);
-      if (ev?.type === "joined") conn.lastSeenPeers.set(ev.agentId, now2);
+      for (const peer of peers) if (!conn.removedAgentIds.has(peer.agentId)) conn.lastSeenPeers.set(peer.agentId, now2);
+      if (ev?.type === "joined" && !conn.removedAgentIds.has(ev.agentId)) conn.lastSeenPeers.set(ev.agentId, now2);
       if (ev) this.log("info", `room ${roomId}: peer ${ev.type} ${ev.agentId} (${peers.length} in room)`);
       if (ev?.type === "joined" && ev.agentId !== this.identity?.agentId && !conn.local.agents.some((a) => a.agentId === ev.agentId)) {
         clearTimeout(conn.announceTimer);
@@ -3617,7 +3622,7 @@ var CollabBridge = class {
       members: (() => {
         const localAgents = conn.local.agents;
         for (const a of localAgents) live.add(a.agentId);
-        const ids = [...live];
+        const ids = [...live].filter((id) => !conn.removedAgentIds.has(id));
         const cfgs = this.peerConfigs.get(conn.meta.roomId);
         return ids.map((agentId) => {
           const la = localAgents.find((a) => a.agentId === agentId);
@@ -3982,11 +3987,20 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     this.emit({ type: "rooms" });
   }
   async connectAgent(conn, a) {
-    await withTimeout(this.connectAgentInner(conn, a), conn.local.loopback ? 8e3 : 2e4, `agent ${a.agentId} join`);
+    const existing = conn.agentJoins.get(a.agentId);
+    if (existing) return existing.promise;
+    const job = { promise: Promise.resolve() };
+    conn.agentJoins.set(a.agentId, job);
+    const active = () => !this.disposed && this.rooms.get(conn.meta.roomId) === conn && conn.local.agents.includes(a) && conn.agentJoins.get(a.agentId) === job;
+    job.promise = withTimeout(this.connectAgentInner(conn, a, active), conn.local.loopback ? 8e3 : 2e4, `agent ${a.agentId} join`).finally(() => {
+      if (conn.agentJoins.get(a.agentId) === job) conn.agentJoins.delete(a.agentId);
+    });
+    return job.promise;
   }
-  async connectAgentInner(conn, a) {
+  async connectAgentInner(conn, a, active) {
     const parsed = parseInviteUri(conn.meta.invite);
     const identity = await loadIdentity(this.agentIdentityPath(a.agentId), a.agentId);
+    if (!active()) return;
     const client = new CollabClient({
       identity,
       roomId: parsed.roomId,
@@ -4000,20 +4014,32 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
       if (p.kind === "mcp.call" && p.target === a.agentId) void this.handleMcpCall(conn, p, meta.from, a);
     });
     client.onPeers(() => this.emit({ type: "rooms" }));
-    if (this.disposed) return;
-    await client.join(conn.local.loopback ? 5e3 : 12e3);
-    if (this.disposed) {
+    if (!active()) {
       await client.dispose().catch(() => {
       });
       return;
     }
     const old = conn.agents.get(a.agentId);
     conn.agents.set(a.agentId, client);
-    if (old && old !== client) void old.dispose().catch(() => {
+    if (old && old !== client) await old.dispose().catch(() => {
     });
-    await this.announceAgentConfig(conn, a).catch(() => {
-    });
-    this.log("info", `local agent ${a.agentId} joined ${conn.meta.roomId}${conn.local.loopback ? " (loopback)" : ""}`);
+    try {
+      await client.join(conn.local.loopback ? 5e3 : 12e3);
+      if (!active() || conn.agents.get(a.agentId) !== client) {
+        if (conn.agents.get(a.agentId) === client) conn.agents.delete(a.agentId);
+        await client.dispose().catch(() => {
+        });
+        return;
+      }
+      await this.announceAgentConfig(conn, a).catch(() => {
+      });
+      this.log("info", `local agent ${a.agentId} joined ${conn.meta.roomId}${conn.local.loopback ? " (loopback)" : ""}`);
+    } catch (error) {
+      if (conn.agents.get(a.agentId) === client) conn.agents.delete(a.agentId);
+      await client.dispose().catch(() => {
+      });
+      throw error;
+    }
   }
   async announceAgentConfig(conn, a) {
     const client = conn.agents.get(a.agentId);
@@ -4036,6 +4062,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     });
   }
   async disconnectAgents(conn) {
+    conn.agentJoins.clear();
     const list = [...conn.agents.values()];
     conn.agents.clear();
     await Promise.all(list.map((c) => c.dispose().catch(() => {
@@ -4072,6 +4099,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
       createdAt: Date.now()
     };
     if (cfg.moderator) for (const a of conn.local.agents) a.moderator = false;
+    conn.removedAgentIds.delete(cfg.agentId);
     conn.local.agents.push(cfg);
     await this.persist();
     this.emit({ type: "rooms" });
@@ -4107,11 +4135,15 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     const a = this.localAgent(conn, id);
     this.scheduler.stop(conn.meta.roomId, a.agentId);
     conn.local.agents = conn.local.agents.filter((x) => x !== a);
+    conn.removedAgentIds.add(a.agentId);
+    conn.agentJoins.delete(a.agentId);
     const client = conn.agents.get(a.agentId);
     conn.agents.delete(a.agentId);
     await client?.dispose().catch(() => {
     });
-    this.agentHandles.delete(`${conn.meta.roomId}:${a.agentId}`);
+    conn.lastSeenPeers.delete(a.agentId);
+    this.peerConfigs.get(roomId)?.delete(a.agentId);
+    await this.resetAgentSession(conn, a);
     conn.locks?.release(a.agentId);
     await this.persist();
     this.emit({ type: "rooms" });
@@ -4849,20 +4881,20 @@ var AUTO = /* @__PURE__ */ new Set(["off", "mention", "mention-or-task"]);
 function expand(p) {
   return p.startsWith("~/") ? join4(homedir(), p.slice(2)) : p;
 }
-function normalizeConfig(raw) {
+function normalizeConfig(raw, dataRoot = join4(homedir(), ".collab")) {
   const r = raw && typeof raw === "object" ? raw : {};
   const str2 = (k) => typeof r[k] === "string" && r[k].trim() ? r[k].trim() : void 0;
   const autoReply = str2("autoReply") ?? "mention-or-task";
   if (!AUTO.has(autoReply)) throw new Error(`dsh-room: autoReply must be off|mention|mention-or-task, got ${autoReply}`);
   const relayUrl = str2("relayUrl") ?? DEFAULT_RELAY_URL;
   if (!/^wss?:\/\//.test(relayUrl)) throw new Error(`dsh-room: relayUrl must be ws:// or wss://, got ${relayUrl}`);
-  const workspacePath = expand(str2("workspacePath") ?? "~/.collab/workspace");
+  const workspacePath = expand(str2("workspacePath") ?? join4(dataRoot, "workspace"));
   if (!isAbsolute3(workspacePath)) throw new Error("dsh-room: workspacePath must be absolute");
   return {
     relayUrl,
     invite: str2("invite"),
-    identityPath: expand(str2("identityPath") ?? "~/.collab/identity.json"),
-    statePath: expand(str2("statePath") ?? "~/.collab/state.json"),
+    identityPath: expand(str2("identityPath") ?? join4(dataRoot, "identity.json")),
+    statePath: expand(str2("statePath") ?? join4(dataRoot, "state.json")),
     agentName: str2("agentName"),
     autoReply,
     workspacePath,
@@ -4879,7 +4911,12 @@ var Config = {
     vendor: "dsh-room",
     validate(value) {
       try {
-        return { value: normalizeConfig(value) };
+        const normalized = normalizeConfig(value);
+        const raw = value && typeof value === "object" ? value : {};
+        for (const key of ["identityPath", "statePath", "workspacePath"]) {
+          if (typeof raw[key] !== "string" || !raw[key].trim()) delete normalized[key];
+        }
+        return { value: normalized };
       } catch (e) {
         return { issues: [{ message: e.message }] };
       }
@@ -5272,7 +5309,9 @@ init_local_agents();
 var name = "dsh-room";
 var inject = ["tools"];
 function apply(ctx, config) {
-  const bridge = new CollabBridge(ctx, normalizeConfig(config));
+  const profile = ctx.get("profileContext", false);
+  const dataRoot = profile?.name === "desktop" && profile.dir ? join5(profile.dir, ".collab") : void 0;
+  const bridge = new CollabBridge(ctx, normalizeConfig(config, dataRoot));
   const unregister = bridge.tools().map((t) => ctx.tools.register(t));
   ctx.effect(() => () => {
     for (const u of unregister) u();

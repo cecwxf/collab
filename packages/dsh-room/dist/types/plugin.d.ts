@@ -123,6 +123,10 @@ declare class RoomConn {
     presenceTimer?: ReturnType<typeof setInterval>;
     /** local agentId → its own member connection. */
     agents: Map<string, CollabClient>;
+    agentJoins: Map<string, {
+        promise: Promise<void>;
+    }>;
+    removedAgentIds: Set<string>;
     threads: ThreadTracker;
     /** local agentId → thread of its current run (messages it sends belong to that thread). */
     runThread: Map<string, string>;

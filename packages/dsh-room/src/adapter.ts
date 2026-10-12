@@ -112,14 +112,14 @@ export interface DshCollabConfig {
   relayUrl: string;
   /** Room to auto-join on start (collab://join/<roomId>#<roomKey>). */
   invite?: string;
-  /** Runtime room state (joined rooms + invites), mode 600. Default ~/.collab/state.json */
+  /** Runtime room state (joined rooms + invites), mode 600. Default ~/.collab/state.json on Web; <desktop profile>/.collab/state.json on Desktop */
   statePath: string;
-  /** Identity file (Ed25519 key + agentId). Default ~/.collab/identity.json */
+  /** Identity file (Ed25519 key + agentId). Default ~/.collab/identity.json on Web; <desktop profile>/.collab/identity.json on Desktop */
   identityPath: string;
   /** agentId used when the identity file is created for the first time (what peers @mention). */
   agentName?: string;
   autoReply: "off" | "mention" | "mention-or-task";
-  /** Workspace (cwd) for sessions woken by the room. Default ~/.collab/workspace */
+  /** Workspace (cwd) for sessions woken by the room. Default ~/.collab/workspace on Web; <desktop profile>/.collab/workspace on Desktop */
   workspacePath: string;
   agentPreset?: string;
   /** Permission preset for woken sessions. Room input is untrusted: default read-only. */

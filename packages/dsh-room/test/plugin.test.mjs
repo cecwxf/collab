@@ -53,3 +53,30 @@ describe("dsh-room plugin module (dsh 0.2 shape)", () => {
     assert.equal(ctx._tools.size, 0);
   });
 });
+
+describe("Web and Desktop storage ownership", () => {
+  it("defers default paths until profile context exists and retains explicit legacy paths", () => {
+    const validated=plugin.Config['~standard'].validate({});
+    assert.ok(!validated.issues);assert.equal(validated.value.identityPath,undefined);
+    const desktop=plugin.normalizeConfig(validated.value,'/test/profiles/desktop/.collab');
+    assert.equal(desktop.identityPath,'/test/profiles/desktop/.collab/identity.json');
+    assert.equal(desktop.statePath,'/test/profiles/desktop/.collab/state.json');
+    const web=plugin.normalizeConfig(validated.value);assert.notEqual(web.identityPath,desktop.identityPath);
+    const explicit=plugin.Config['~standard'].validate({identityPath:web.identityPath,statePath:web.statePath});
+    const custom=plugin.normalizeConfig(explicit.value,'/test/profiles/desktop/.collab');
+    assert.equal(custom.identityPath,web.identityPath);assert.equal(custom.statePath,web.statePath);
+  });
+  it("uses Desktop profile context in the mounted plugin, with a distinct identity/state", async () => {
+    const dir=await mkdtemp(join(tmpdir(),'desktop-profile-'));
+    const ctx=fakeCtx({profileContext:{name:'desktop',dir}});
+    plugin.apply(ctx,plugin.Config['~standard'].validate({}).value);
+    const rooms=ctx._tools.get('collab_rooms');
+    for(let i=0;i<100;i++){if((await rooms.execute({},{})).self)break;await new Promise(r=>setTimeout(r,20));}
+    const {readFile}=await import('node:fs/promises');
+    const statePath=join(dir,'.collab/state.json');
+    for(let i=0;i<100;i++){try{await readFile(statePath);break;}catch{await new Promise(r=>setTimeout(r,20));}}
+    assert.ok(JSON.parse(await readFile(join(dir,'.collab/identity.json'),'utf8')).agentId);
+    assert.equal(JSON.parse(await readFile(statePath,'utf8')).version,3);
+    for(const cleanup of ctx._effects)cleanup();
+  });
+});

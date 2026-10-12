@@ -1,7 +1,7 @@
 {
   "name": "@cecwxf/dsh-room",
-  "version": "0.3.5",
-  "description": "DSH Room — DeepSeek Harness plugin for accountless E2EE Collab rooms (sidebar: DSH Room)",
+  "version": "0.3.6",
+  "description": "DSH Room — Web and Desktop plugin for encrypted multi-agent collaboration",
   "type": "module",
   "license": "MIT",
   "author": "cecwxf",
