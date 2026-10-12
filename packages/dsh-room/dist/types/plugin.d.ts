@@ -1,5 +1,5 @@
 import { type ModelChoice } from "./models.js";
-import { DirectoryClient, type CollabPayload, type Identity } from "@collab/protocol";
+import { DirectoryClient, type CollabPayload, type Identity, type McpResultPayload } from "@collab/protocol";
 import { CollabClient, RoomHub } from "@collab/sdk";
 import { type LocalAgentConfig, type RoomLocalSettings, type IsolationMode } from "./local-agents.js";
 import { RunScheduler, ThreadTracker, type RunInfo } from "./orchestrator.js";
@@ -111,6 +111,13 @@ export interface BridgeEvent {
 /** One live room: connection, decrypted message log, wake bookkeeping. */
 declare class RoomConn {
     meta: RoomMeta;
+    mcpCalls: Map<string, {
+        target: string;
+        caller: string;
+        settle: (result: McpResultPayload) => void;
+        cancel: (error: Error) => void;
+    }>;
+    mcpServing: Map<string, AbortController>;
     client: CollabClient | null;
     status: RoomStatus;
     error?: string;
@@ -471,10 +478,19 @@ export declare class CollabBridge {
         decision: "allow" | "deny";
     }>;
     callLocalMcp(roomId: string, tool: string, args: Record<string, unknown>, from?: string): Promise<unknown>;
-    mcpCallPeer(roomId: string, target: string, tool: string, args: Record<string, unknown>): Promise<{
+    mcpCallPeer(roomId: string, target: string, tool: string, args: Record<string, unknown>, options?: {
+        caller?: string;
+        signal?: AbortSignal;
+        timeoutMs?: number;
+    }): Promise<{
         callId: string;
-        pending: boolean;
+        target: string;
+        ok: boolean;
+        result?: unknown;
+        error?: string;
     }>;
+    private cancelMcp;
+    private settleMcpResult;
     private handleMcpCall;
     private onPayload;
     /** Loop guard: replies do not wake (unless wakeOnReplies); at most maxWakesPerMinute per room. */

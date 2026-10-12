@@ -66,6 +66,8 @@ test("new files under a symlinked workspace are allowed; outside and dangling li
   const mcp = new WorkspaceMcp(cfg, new ApprovalQueue(), "room");
   await mcp.call("workspace_write", { path: "nested/new.txt", content: "ok" }, "peer");
   assert.equal(await readFile(join(root, "nested/new.txt"), "utf8"), "ok");
+  assert.equal((await mcp.call("workspace_list", { path: "nested" }, "peer")).path, "nested");
+  assert.equal((await mcp.call("workspace_search", { path: "nested", query: "ok" }, "peer")).hits[0].path, "nested/new.txt");
   await symlink(outside, join(root, "outside"));
   await assert.rejects(mcp.call("workspace_write", { path: "outside/nested/new.txt", content: "bad" }, "peer"), /escapes workspace/);
   await symlink(join(outside, "missing.txt"), join(root, "dangling"));

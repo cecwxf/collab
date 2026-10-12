@@ -16,6 +16,7 @@ import {
   type Identity,
   type MemberConfigPayload,
   type McpCallPayload,
+  type McpResultPayload,
   DEFAULT_LAN_HOST_PORT,
 } from "@collab/protocol";
 import { CollabClient, WsTransport, MockTransport, RoomHub } from "@collab/sdk";
@@ -34,8 +35,8 @@ import { RunScheduler, ThreadTracker, routeLocalTargets, type RunInfo, type RunR
 import { FileLocks, discardWorktree, ensureWorktree, gitTop, mergeWorktree, worktreeDiff, commitPending, mainStatus, type WorktreeInfo } from "./isolation.js";
 import { LanRelayServer, browseLanRelays } from "@collab/lan-relay";
 import { ApprovalQueue } from "./approval-queue.js";
-import { WorkspaceMcp } from "./mcp-workspace.js";
-import { defaultMemberConfig, publicMemberConfig, type RoomMemberConfig } from "./member-config.js";
+import { WorkspaceMcp, MCP_TOOL_DEFS } from "./mcp-workspace.js";
+import { MCP_TOOL_NAMES, defaultMemberConfig, publicMemberConfig, type RoomMemberConfig } from "./member-config.js";
 import type {
   AgentHandle,
   AgentLike,
@@ -204,6 +205,8 @@ export interface BridgeEvent {
 
 /** One live room: connection, decrypted message log, wake bookkeeping. */
 class RoomConn {
+  mcpCalls = new Map<string, { target: string; caller: string; settle: (result: McpResultPayload) => void; cancel: (error: Error) => void }>();
+  mcpServing = new Map<string, AbortController>();
   client: CollabClient | null = null;
   status: RoomStatus = "connecting";
   error?: string;
@@ -502,6 +505,7 @@ export class CollabBridge {
       } else {
         conn.status = "offline";
         conn.error = detail ?? "disconnected";
+        this.cancelMcp(conn, new Error("MCP room disconnected"));
       }
       this.emit({ type: "rooms" });
       this.log("info", `room ${roomId} connection ${status}${detail ? ` (${detail})` : ""}`);
@@ -774,6 +778,7 @@ export class CollabBridge {
     const conn = this.rooms.get(roomId);
     if (!conn) return { ok: true, left: false };
     this.rooms.delete(roomId);
+    this.cancelMcp(conn, new Error("MCP room left"));
     if (conn.heartbeat) clearInterval(conn.heartbeat);
       if (conn.presenceTimer) clearInterval(conn.presenceTimer);
     if (conn.meta.owner && conn.meta.public) {
@@ -1016,48 +1021,86 @@ export class CollabBridge {
     return mcp.call(tool, args ?? {}, from);
   }
 
-  async mcpCallPeer(roomId: string, target: string, tool: string, args: Record<string, unknown>) {
+  async mcpCallPeer(roomId: string, target: string, tool: string, args: Record<string, unknown>, options: { caller?: string; signal?: AbortSignal; timeoutMs?: number } = {}) {
     const conn = this.room(roomId);
-    if (!conn.client) throw new Error("room offline");
+    if (!conn.client?.isJoined()) throw new Error("room offline");
+    if (!MCP_TOOL_NAMES.includes(tool as typeof MCP_TOOL_NAMES[number])) throw new Error(`unknown MCP tool ${tool}`);
+    if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("MCP args must be an object");
+    const timeoutMs = options.timeoutMs ?? 130_000;
+    if (!Number.isFinite(timeoutMs) || timeoutMs < 1 || timeoutMs > 130_000) throw new Error("MCP timeoutMs must be between 1 and 130000");
+    if (options.signal?.aborted) throw new Error("MCP call aborted");
+    const caller = options.caller ?? this.identity!.agentId;
+    const localAgent = conn.local.agents.find(a => a.agentId === caller);
+    if (localAgent?.scope === "read" && /write|mkdir|delete|exec/.test(tool)) throw new Error("denied: read-only agent cannot request remote writes or execution");
     const callId = newMessageId();
-    await conn.client.publish({
-      kind: "mcp.call",
-      callId,
-      tool,
-      args: args ?? {},
-      target,
-    } as Record<string, unknown> & { kind: "mcp.call" });
-    return { callId, pending: true };
+    if (target === this.identity!.agentId && caller === target) {
+      return { callId, target, ok: true, result: await this.callLocalMcp(roomId, tool, args, caller) };
+    }
+    if (!conn.client.getPeers().some(p => p.agentId === target)) throw new Error(`MCP target ${target} is not online in this room`);
+    return new Promise<{ callId: string; target: string; ok: boolean; result?: unknown; error?: string }>((resolve, reject) => {
+      const finish = (result?: McpResultPayload, error?: Error) => {
+        if (!conn.mcpCalls.delete(callId)) return;
+        clearTimeout(timer);
+        options.signal?.removeEventListener("abort", abort);
+        if (error) reject(error);
+        else resolve({ callId, target, ok: result!.ok, ...(result!.ok ? { result: result!.result } : { error: result!.error ?? "remote MCP failed" }) });
+      };
+      const abort = () => finish(undefined, new Error("MCP call aborted"));
+      const timer = setTimeout(() => finish(undefined, new Error(`MCP ${tool} timed out after ${timeoutMs}ms`)), timeoutMs);
+      conn.mcpCalls.set(callId, { target, caller, settle: result => finish(result), cancel: error => finish(undefined, error) });
+      options.signal?.addEventListener("abort", abort, { once: true });
+      const payload = { kind: "mcp.call" as const, callId, tool, args, target, timeoutMs };
+      // Register before publishing: a fast peer may reply before the publish acknowledgement.
+      const sent = caller === this.identity!.agentId ? conn.client!.publish(payload) : this.publishAs(roomId, caller, payload);
+      sent.catch(error => finish(undefined, error instanceof Error ? error : new Error(String(error))));
+    });
+  }
+
+  private cancelMcp(conn: RoomConn, error: Error, caller?: string) {
+    for (const call of conn.mcpCalls.values()) if (!caller || call.caller === caller) call.cancel(error);
+    if (!caller) for (const controller of conn.mcpServing.values()) controller.abort();
+  }
+
+  private settleMcpResult(conn: RoomConn, p: McpResultPayload, from: string) {
+    const pending = conn.mcpCalls.get(p.callId);
+    // The transport verifies sender identity; also bind each reply to the requested target.
+    if (pending?.target === from && !p.pendingApproval) pending.settle(p);
   }
 
   private async handleMcpCall(conn: RoomConn, p: McpCallPayload, from: string, asAgent?: LocalAgentConfig) {
     if (!asAgent && p.target !== this.identity?.agentId) return;
+    const key = `${from}:${p.callId}`;
+    if (conn.mcpServing.has(key)) return;
     const mcp = this.mcpByRoom.get(conn.meta.roomId);
     const client = asAgent ? conn.agents.get(asAgent.agentId) : conn.client;
     if (!mcp || !client) {
       await client?.publish({ kind: "mcp.result", callId: p.callId, ok: false, error: "MCP not available" } as Record<string, unknown> & { kind: "mcp.result" });
       return;
     }
+    const controller = new AbortController();
+    conn.mcpServing.set(key, controller);
+    const timer = setTimeout(() => controller.abort(), Math.min(Math.max(p.timeoutMs ?? 130_000, 1), 130_000));
     try {
-      // A read-only local agent never exposes writes; non-git rooms honor file locks held by other local agents.
-      if (asAgent?.scope === "read" && /write|mkdir|delete|exec/.test(p.tool)) throw new Error(`denied: ${asAgent.agentId} is read-only`);
+      if (asAgent) throw new Error("MCP not enabled for this local agent; target its hosting member instead");
+      // Non-git rooms honor file locks held by other local agents.
       const target = typeof (p.args as { path?: unknown })?.path === "string" ? ((p.args as { path: string }).path) : undefined;
       if (target && conn.locks && /write|delete/.test(p.tool)) {
         const holder = conn.locks.holder(target);
         if (holder && holder !== from) throw new Error(`denied: ${target} is locked by ${holder}`);
       }
-      const result = await mcp.call(p.tool, p.args ?? {}, from);
+      const result = await mcp.call(p.tool, p.args ?? {}, from, controller.signal);
       await client.publish({ kind: "mcp.result", callId: p.callId, ok: true, result } as Record<string, unknown> & { kind: "mcp.result" });
     } catch (e) {
       const msg = (e as Error).message;
-      const pending = msg.startsWith("denied:") ? false : /denied|approval/.test(msg);
       await client.publish({
         kind: "mcp.result",
         callId: p.callId,
         ok: false,
         error: msg,
-        pendingApproval: /waiting|approval/.test(msg),
-      } as Record<string, unknown> & { kind: "mcp.result" });
+      } as Record<string, unknown> & { kind: "mcp.result" }).catch(() => {});
+    } finally {
+      clearTimeout(timer);
+      conn.mcpServing.delete(key);
     }
   }
 
@@ -1088,6 +1131,9 @@ export class CollabBridge {
       return;
     }
     if (p.kind === "mcp.result" || p.kind === "approval.request" || p.kind === "approval.response") {
+      if (p.kind === "mcp.result") {
+        this.settleMcpResult(conn, p, from);
+      }
       const m = toMessage(p, this.identity!.agentId, seq);
       if (m && conn.add(m)) this.emit({ type: "message", roomId: conn.meta.roomId, message: m });
       this.emit({ type: "rooms" });
@@ -1320,6 +1366,7 @@ export class CollabBridge {
     // Routing is central (host bridge sees every message); an agent connection only answers MCP calls addressed to it.
     client.onPayload((p, meta) => {
       if (p.kind === "mcp.call" && (p as McpCallPayload).target === a.agentId) void this.handleMcpCall(conn, p as McpCallPayload, meta.from, a);
+      if (p.kind === "mcp.result") this.settleMcpResult(conn, p, meta.from);
     });
     client.onPeers(() => this.emit({ type: "rooms" }));
     if (!active()) { await client.dispose().catch(() => {}); return; }
@@ -1440,6 +1487,7 @@ export class CollabBridge {
   async removeLocalAgent(roomId: string, id: string) {
     const conn = this.room(roomId);
     const a = this.localAgent(conn, id);
+    this.cancelMcp(conn, new Error("MCP calling agent removed"), a.agentId);
     this.scheduler.stop(conn.meta.roomId, a.agentId);
     conn.local.agents = conn.local.agents.filter((x) => x !== a);
     conn.removedAgentIds.add(a.agentId);
@@ -1488,6 +1536,7 @@ export class CollabBridge {
     const wantLoopback = target === "local";
     if (wantLoopback === conn.local.loopback && target !== "lan") return { ...this.view(conn), invite: conn.meta.invite };
     await this.saveLocalHistory(conn);
+    this.cancelMcp(conn, new Error("MCP room transport changed"));
     await this.disconnectAgents(conn);
     await conn.client?.dispose().catch(() => {});
     conn.client = null;
@@ -1618,6 +1667,8 @@ export class CollabBridge {
   /** Stop every local agent run in the room (queued, waiting approval, and running turns). */
   stopLocal(roomId: string, agentId?: string) {
     const conn = this.room(roomId);
+    if (agentId) this.cancelMcp(conn, new Error("MCP calling agent stopped"), agentId);
+    else for (const a of conn.local.agents) this.cancelMcp(conn, new Error("MCP calling agent stopped"), a.agentId);
     const n = this.scheduler.stop(conn.meta.roomId, agentId);
     for (const a of conn.local.agents) {
       if (agentId && a.agentId !== agentId) continue;
@@ -2062,6 +2113,7 @@ export class CollabBridge {
     this.abort.abort();
     this.listeners.clear();
     for (const conn of this.rooms.values()) {
+      this.cancelMcp(conn, new Error("MCP plugin disposed"));
       if (conn.heartbeat) clearInterval(conn.heartbeat);
       if (conn.presenceTimer) clearInterval(conn.presenceTimer);
       clearTimeout(conn.announceTimer);
@@ -2081,12 +2133,12 @@ export class CollabBridge {
     const obj = (properties: Record<string, unknown>, required: string[] = []) => ({ type: "object", properties, required });
     const s = (description: string) => ({ type: "string", description });
     const roomArg = { roomId: s("Room id (default: the active room)") };
-    const def = (name: string, description: string, parameters: Record<string, unknown>, run: (a: Record<string, unknown>, who: { conn: RoomConn; agent: LocalAgentConfig } | null) => Promise<unknown> | unknown): ToolDefinition => ({
+    const def = (name: string, description: string, parameters: Record<string, unknown>, run: (a: Record<string, unknown>, who: { conn: RoomConn; agent: LocalAgentConfig } | null, exec: Parameters<ToolDefinition["execute"]>[1]) => Promise<unknown> | unknown): ToolDefinition => ({
       name,
       description,
       parameters,
       output: { schema: {}, render: jsonRender },
-      timeoutMs: 30_000,
+      timeoutMs: name === "collab_mcp_call" ? 140_000 : 30_000,
       async execute(args, exec) {
         const a = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
         for (const key of (parameters.required as string[]) ?? []) {
@@ -2097,7 +2149,7 @@ export class CollabBridge {
         bridge.log("info", `tool ${name} by ${who?.agent.agentId ?? "host"}`);
         // dsh validates lossless JSON before rendering; optional view fields use undefined internally.
         // Match the HTTP JSON boundary so history/state remain usable by real model tool calls.
-        return JSON.parse(JSON.stringify((await run(a, who)) ?? { ok: true }));
+        return JSON.parse(JSON.stringify((await run(a, who, exec)) ?? { ok: true }));
       },
     });
     const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
@@ -2115,7 +2167,16 @@ export class CollabBridge {
       def("collab_rooms", "List the rooms you are in, with members and status.", obj({}), () => this.state()),
       def("collab_peers", "List the agentIds currently in a room, including yourself.", obj(roomArg), (a, who) => {
         const v = this.view(this.room(str(a.roomId) ?? who?.conn.meta.roomId));
-        return { roomId: v.roomId, name: v.name, self: who?.agent.agentId ?? this.identity!.agentId, peers: v.members.map((m) => ({ agentId: m.agentId, name: m.name, local: m.local, moderator: m.moderator || undefined })) };
+        return { roomId: v.roomId, name: v.name, self: who?.agent.agentId ?? this.identity!.agentId, peers: v.members.map((m) => {
+          const cfg = m.agentId === this.identity?.agentId ? publicMemberConfig(this.getMemberConfig(v.roomId)) : this.peerConfigs.get(v.roomId)?.get(m.agentId);
+          return { agentId: m.agentId, name: m.name, local: m.local, moderator: m.moderator || undefined, workspaceLabel: cfg?.workspaceLabel, mcpEnabled: cfg?.mcpEnabled ?? false, mcpTools: cfg?.mcpTools ?? [] };
+        }) };
+      }),
+      def("collab_mcp_tools", "List workspace MCP tools and schemas. Use collab_peers to find the target hosting member with mcpEnabled=true; local worker agents do not export a separate workspace.", obj(roomArg), () => ({ tools: MCP_TOOL_DEFS })),
+      def("collab_mcp_call", "Call a same-room member's workspace MCP and wait for the actual result. Use collab_peers to choose an mcpEnabled hosting member as target. Paths are relative to that member's workspace, not your local workspace. Reads respect peer grants; writes/exec may need approval on the target host. Never assume ok=true; report error on failure.", obj({ ...roomArg, target: s("agentId of the member exporting the workspace"), tool: { type: "string", enum: [...MCP_TOOL_NAMES] }, args: { type: "object", description: "Arguments from collab_mcp_tools schemas" }, timeoutMs: { type: "integer", minimum: 1, maximum: 130000, description: "Response deadline; default 130000ms includes target approval time" } }, ["target", "tool", "args"]), (a, who, exec) => {
+        const conn = this.room(str(a.roomId) ?? who?.conn.meta.roomId);
+        if (who && conn !== who.conn) throw new Error("denied: agent MCP call must stay in its own room");
+        return this.mcpCallPeer(conn.meta.roomId, str(a.target)!, str(a.tool)!, a.args as Record<string, unknown>, { caller: who?.agent.agentId, signal: exec.signal, timeoutMs: a.timeoutMs as number | undefined });
       }),
       def(
         "collab_send",

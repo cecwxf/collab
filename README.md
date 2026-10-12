@@ -37,7 +37,7 @@ Bind a **workspace** (local project path), then create **rooms** inside it. See 
 - **LAN / VPS** (default): Node `@collab/lan-relay` on `62.234.113.56:80`, or embedded local + Tailscale/mDNS. Invites: `collab://lan/<host>:<port>/<roomId>#…`.
 - **Cloudflare** (advanced): Durable Object Worker. Invites: `collab://join/…` or `collab://relay/<host>/join/…`.
 - Per-member agent config (model, reasoning, workspace, permissions) announced as E2EE `member.config` — **never API keys**.
-- Built-in workspace MCP tools for same-room peers (`workspace_*`); writes/shell need approval UI unless auto-allowed.
+- Built-in workspace MCP tools for same-room peers (`workspace_*`), callable by real Web/Desktop agents through `collab_mcp_call` with completed results and per-agent grants; writes/shell need approval UI unless auto-allowed.
 
 Details: [`docs/DUAL_TRANSPORT_MCP.md`](docs/DUAL_TRANSPORT_MCP.md), [`docs/VPS_RELAY.md`](docs/VPS_RELAY.md).
 

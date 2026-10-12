@@ -10,7 +10,7 @@ The same package supports **dsh web** and the official **DeepSeek Harness Deskto
 ### Web
 
 ```sh
-dsh plugin --profile web add @cecwxf/dsh-room@0.3.6
+dsh plugin --profile web add @cecwxf/dsh-room@0.3.7
 dsh web
 ```
 
@@ -21,7 +21,7 @@ Open the printed URL and select **DSH Room** in the sidebar.
 Launch Desktop once to initialize its profile, then **fully quit** it. Use the Desktop-provided `dsh` command to install into its own profile:
 
 ```sh
-dsh plugin --profile desktop add @cecwxf/dsh-room@0.3.6
+dsh plugin --profile desktop add @cecwxf/dsh-room@0.3.7
 ```
 
 Reopen Desktop and select **DSH Room**. Its plugin manager can also install the package. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
@@ -29,7 +29,7 @@ Reopen Desktop and select **DSH Room**. Its plugin manager can also install the 
 If `dsh` on PATH is the npm CLI, use **Manage dsh Command…** in Desktop's application menu or invoke its bundled command directly. For a macOS app in `/Applications`:
 
 ```sh
-"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.6
+"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.7
 ```
 
 Desktop owns its executable profile: the npm CLI cannot initialize or mutate that profile. See the [official Desktop installation rules](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/desktop/README.md#bundled-command-runtime).
@@ -131,6 +131,22 @@ Create room → defaults to **LAN / VPS** with `62.234.113.56:80` (public direct
 **MCP tools**: `workspace_list`, `workspace_read`, `workspace_stat`, `workspace_search`, `workspace_write`, `workspace_mkdir`, `workspace_delete`, `workspace_exec`.
 
 API: `GET/POST /api/collab/rooms/:id/config`, `POST /api/collab/rooms/:id/mcp`, `GET /api/collab/lan/browse`, `POST /api/collab/approvals/decide`.
+
+### Remote workspace access (0.3.7, Web and Desktop)
+
+Real model agents can call `collab_peers` to discover a hosting member with `mcpEnabled=true`, `collab_mcp_tools` to read the workspace tool schemas, then `collab_mcp_call` to execute a tool on that member. For example:
+
+```json
+{"roomId":"ROOM_ID","target":"HOST_MEMBER_AGENT_ID","tool":"workspace_read","args":{"path":"src/index.ts"}}
+```
+
+The tool waits for the completed response and returns `{callId,target,ok,result}` or `{callId,target,ok:false,error}`. It does not return a pending receipt. The authenticated calling agent's identity is used for peer grants. A read-only agent cannot request remote writes or execution. A local worker does not export an independent MCP workspace; target its hosting member to access the room's configured workspace. Paths are relative to that target's workspace, including when the caller runs on another machine. The VPS relay forwards encrypted payloads and does not read files.
+
+The default deadline is 130 seconds (optional `timeoutMs`, maximum 130000), allowing the target's 120-second approval wait. Abort, agent removal, room disconnect/leave, transport changes and plugin unload settle outstanding response waits. A matching callId alone is insufficient: results must come from the authenticated target member. Full result content is returned to the calling tool; room history displays a summary marker rather than copying entire files into every agent's transcript. As with other room payloads, members holding the room key can decrypt the result on the transport.
+
+`POST /api/collab/rooms/:id/mcp` with `target` now returns the completed remote result using the same mechanism. Without `target`, it runs on the local workspace. This is the plugin's MCP-over-room bridge, exposed as dsh model tools, rather than a standalone stdio MCP server.
+
+`scripts/dsh-mcp-test-host.mjs` boots a disposable real Web or official Desktop host (`DSH_PLUGIN_SOURCE`, `DSH_MCP_CONTROL`, `DEEPSEEK_API_KEY`; optionally `DSH_DESKTOP_APP`). `scripts/e2e-dsh-mcp-real.mjs` accepts `DSH_MCP_EXPORTER` and `DSH_MCP_CALLER` control files to test unpredictable remote file contents, all four read tools, agent-specific permission revocation, traversal and symlink denial. For SSH forwarding, `DSH_MCP_CALLER_BASE` changes the test controller's HTTP address and `DSH_MCP_CALLER_RELAY_HOST` rewrites the invite's forwarded relay host for the caller. No key is saved in either profile; control files contain authentication cookies and must be kept private and removed after testing. `scripts/verify-mcp-session.mjs SESSION_FILE EVIDENCE_JSON` (requires `zstd`) checks the persisted model tool events: successful results for all four read tools, exact fixture content, correct relative paths, three expected denials, and no native file/shell tool usage.
 
 ## Models and validation (0.3.4)
 

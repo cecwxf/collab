@@ -35,12 +35,12 @@ describe("dsh-room plugin module (dsh 0.2 shape)", () => {
     assert.ok(plugin.Config["~standard"].validate({ relayUrl: "http://x" }).issues);
   });
 
-  it("registers 12 tools with JSON-schema params + output contract, and unregisters on dispose", async () => {
+  it("registers 14 tools with JSON-schema params + output contract, and unregisters on dispose", async () => {
     const ctx = fakeCtx();
     const dir = await mkdtemp(join(tmpdir(), "collab-plugin-"));
     plugin.apply(ctx, plugin.normalizeConfig({ statePath: join(dir, "state.json"), identityPath: join(dir, "identity.json"), workspacePath: join(dir, "workspace") }));
     const names = [...ctx._tools.keys()].sort();
-    assert.deepEqual(names, ["collab_broadcast_status", "collab_claim_task", "collab_create_room", "collab_create_task", "collab_history", "collab_join", "collab_lock_files", "collab_peers", "collab_rooms", "collab_search_rooms", "collab_send", "collab_update_task"]);
+    assert.deepEqual(names, ["collab_broadcast_status", "collab_claim_task", "collab_create_room", "collab_create_task", "collab_history", "collab_join", "collab_lock_files", "collab_mcp_call", "collab_mcp_tools", "collab_peers", "collab_rooms", "collab_search_rooms", "collab_send", "collab_update_task"]);
     for (const t of ctx._tools.values()) {
       assert.equal(t.parameters.type, "object");
       assert.deepEqual(t.output.schema, {});

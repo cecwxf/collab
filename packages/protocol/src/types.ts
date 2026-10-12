@@ -285,6 +285,8 @@ export interface McpCallPayload extends PayloadBase {
   args: Record<string, unknown>;
   /** Target agent that hosts the MCP workspace. */
   target: AgentId;
+  /** Caller response deadline, also bounds target approval waits. */
+  timeoutMs?: number;
 }
 
 export interface McpResultPayload extends PayloadBase {

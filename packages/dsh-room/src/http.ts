@@ -205,7 +205,12 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
           const tool = str(b.tool);
           if (!tool) throw new HttpError(400, "tool required");
           if (str(b.target)) {
-            return sendJson(res, 200, await bridge.mcpCallPeer(roomId, str(b.target)!, tool, (b.args as Record<string, unknown>) || {}));
+            const controller = new AbortController();
+            const close = () => { if (!res.writableEnded) controller.abort(); };
+            res.on("close", close);
+            try {
+              return sendJson(res, 200, await bridge.mcpCallPeer(roomId, str(b.target)!, tool, (b.args as Record<string, unknown>) || {}, { signal: controller.signal, timeoutMs: b.timeoutMs as number | undefined }));
+            } finally { res.off("close", close); }
           }
           return sendJson(res, 200, { ok: true, result: await bridge.callLocalMcp(roomId, tool, (b.args as Record<string, unknown>) || {}) });
         }

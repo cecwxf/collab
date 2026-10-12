@@ -425,9 +425,9 @@ function actionFor(tool) {
   if (tool === "workspace_exec") return "shell.exec";
   return null;
 }
-function runCmd(command, args, cwd) {
+function runCmd(command, args, cwd, signal) {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { cwd, shell: false, env: { ...process.env, PATH: process.env.PATH } });
+    const child = spawn(command, args, { cwd, shell: false, signal, env: { ...process.env, PATH: process.env.PATH } });
     let stdout = "";
     let stderr = "";
     const cap = 64 * 1024;
@@ -504,7 +504,8 @@ var init_mcp_workspace = __esm({
           return resolve2(real, ...suffix);
         }
       }
-      async maybeApprove(tool, summary, detail, from) {
+      async maybeApprove(tool, summary, detail, from, signal) {
+        if (signal?.aborted) throw new Error("MCP call aborted");
         const action = actionFor(tool);
         let cap = null;
         if (tool === "workspace_read" || tool === "workspace_list" || tool === "workspace_stat" || tool === "workspace_search") cap = "read";
@@ -523,7 +524,8 @@ var init_mcp_workspace = __esm({
             summary: `MCP read: ${summary}`,
             detail,
             from,
-            timeoutMs: 12e4
+            timeoutMs: 12e4,
+            signal
           });
           if (decision2 !== "allow") throw new Error(`denied: read (${summary})`);
           return;
@@ -543,41 +545,44 @@ var init_mcp_workspace = __esm({
           summary,
           detail,
           from,
-          timeoutMs: 12e4
+          timeoutMs: 12e4,
+          signal
         });
         if (decision !== "allow") throw new Error(`denied: ${action} (${summary})`);
       }
-      async call(tool, args, from) {
+      async call(tool, args, from, signal) {
+        if (signal?.aborted) throw new Error("MCP call aborted");
         if (!this.cfg.mcpEnabled) throw new Error("MCP disabled for this member");
         await mkdir3(this.cfg.workspacePath, { recursive: true });
         switch (tool) {
           case "workspace_list": {
-            await this.maybeApprove(tool, `list ${args.path ?? "."}`, "", from);
+            await this.maybeApprove(tool, `list ${args.path ?? "."}`, "", from, signal);
             const dir = await this.resolveSafe(String(args.path ?? "."));
             const entries = await readdir(dir, { withFileTypes: true });
             return {
-              path: relative2(this.cfg.workspacePath, dir) || ".",
+              path: relative2(await realpath(this.cfg.workspacePath), dir) || ".",
               entries: entries.map((e) => ({ name: e.name, type: e.isDirectory() ? "dir" : "file" }))
             };
           }
           case "workspace_read": {
-            await this.maybeApprove(tool, `read ${args.path}`, "", from);
+            await this.maybeApprove(tool, `read ${args.path}`, "", from, signal);
             const file = await this.resolveSafe(String(args.path ?? ""));
             const buf = await readFile3(file);
             if (buf.length > 256 * 1024) throw new Error("file too large (>256KiB)");
             return { path: String(args.path), content: buf.toString("utf8") };
           }
           case "workspace_stat": {
-            await this.maybeApprove(tool, `stat ${args.path}`, "", from);
+            await this.maybeApprove(tool, `stat ${args.path}`, "", from, signal);
             const file = await this.resolveSafe(String(args.path ?? ""));
             const st = await stat2(file);
             return { path: String(args.path), size: st.size, mtimeMs: st.mtimeMs, isDirectory: st.isDirectory(), isFile: st.isFile() };
           }
           case "workspace_search": {
-            await this.maybeApprove(tool, `search ${args.path ?? "."}`, String(args.query ?? ""), from);
+            await this.maybeApprove(tool, `search ${args.path ?? "."}`, String(args.query ?? ""), from, signal);
             const q = String(args.query ?? "");
             if (!q) throw new Error("query required");
             const start = await this.resolveSafe(String(args.path ?? "."));
+            const root = await realpath(this.cfg.workspacePath);
             const hits = [];
             const walk = async (dir) => {
               if (hits.length >= 50) return;
@@ -596,7 +601,7 @@ var init_mcp_workspace = __esm({
                     const lines = text2.split(/\r?\n/);
                     for (let i = 0; i < lines.length; i++) {
                       if (lines[i].includes(q)) {
-                        hits.push({ path: relative2(this.cfg.workspacePath, p), line: i + 1, text: lines[i].slice(0, 200) });
+                        hits.push({ path: relative2(root, p), line: i + 1, text: lines[i].slice(0, 200) });
                         if (hits.length >= 50) return;
                       }
                     }
@@ -609,20 +614,20 @@ var init_mcp_workspace = __esm({
             return { query: q, hits };
           }
           case "workspace_write": {
-            await this.maybeApprove("workspace_write", `write ${args.path}`, String(args.content ?? "").slice(0, 200), from);
+            await this.maybeApprove("workspace_write", `write ${args.path}`, String(args.content ?? "").slice(0, 200), from, signal);
             const file = await this.resolveSafe(String(args.path ?? ""));
             await mkdir3(dirname2(file), { recursive: true });
             await writeFile2(file, String(args.content ?? ""), "utf8");
             return { ok: true, path: String(args.path) };
           }
           case "workspace_mkdir": {
-            await this.maybeApprove("workspace_mkdir", `mkdir ${args.path}`, "", from);
+            await this.maybeApprove("workspace_mkdir", `mkdir ${args.path}`, "", from, signal);
             const dir = await this.resolveSafe(String(args.path ?? ""));
             await mkdir3(dir, { recursive: true });
             return { ok: true, path: String(args.path) };
           }
           case "workspace_delete": {
-            await this.maybeApprove("workspace_delete", `delete ${args.path}`, "", from);
+            await this.maybeApprove("workspace_delete", `delete ${args.path}`, "", from, signal);
             const file = await this.resolveSafe(String(args.path ?? ""));
             await rm(file, { recursive: false, force: false });
             return { ok: true, path: String(args.path) };
@@ -631,10 +636,10 @@ var init_mcp_workspace = __esm({
             const command = String(args.command ?? "");
             if (!command) throw new Error("command required");
             const argv = Array.isArray(args.args) ? args.args.map(String) : [];
-            await this.maybeApprove("workspace_exec", `exec ${command} ${argv.join(" ")}`.trim(), "", from);
+            await this.maybeApprove("workspace_exec", `exec ${command} ${argv.join(" ")}`.trim(), "", from, signal);
             if (!this.cfg.permissions.autoNetwork) {
             }
-            return await runCmd(command, argv, this.cfg.workspacePath);
+            return await runCmd(command, argv, this.cfg.workspacePath, signal);
           }
           default:
             throw new Error(`unknown MCP tool: ${tool}`);
@@ -2994,6 +2999,8 @@ var RoomConn = class {
   constructor(meta) {
     this.meta = meta;
   }
+  mcpCalls = /* @__PURE__ */ new Map();
+  mcpServing = /* @__PURE__ */ new Map();
   client = null;
   status = "connecting";
   error;
@@ -3247,6 +3254,7 @@ var CollabBridge = class {
       } else {
         conn.status = "offline";
         conn.error = detail ?? "disconnected";
+        this.cancelMcp(conn, new Error("MCP room disconnected"));
       }
       this.emit({ type: "rooms" });
       this.log("info", `room ${roomId} connection ${status}${detail ? ` (${detail})` : ""}`);
@@ -3509,6 +3517,7 @@ var CollabBridge = class {
     const conn = this.rooms.get(roomId);
     if (!conn) return { ok: true, left: false };
     this.rooms.delete(roomId);
+    this.cancelMcp(conn, new Error("MCP room left"));
     if (conn.heartbeat) clearInterval(conn.heartbeat);
     if (conn.presenceTimer) clearInterval(conn.presenceTimer);
     if (conn.meta.owner && conn.meta.public) {
@@ -3736,46 +3745,81 @@ var CollabBridge = class {
     })();
     return mcp.call(tool, args ?? {}, from);
   }
-  async mcpCallPeer(roomId, target, tool, args) {
+  async mcpCallPeer(roomId, target, tool, args, options = {}) {
     const conn = this.room(roomId);
-    if (!conn.client) throw new Error("room offline");
+    if (!conn.client?.isJoined()) throw new Error("room offline");
+    if (!MCP_TOOL_NAMES.includes(tool)) throw new Error(`unknown MCP tool ${tool}`);
+    if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("MCP args must be an object");
+    const timeoutMs = options.timeoutMs ?? 13e4;
+    if (!Number.isFinite(timeoutMs) || timeoutMs < 1 || timeoutMs > 13e4) throw new Error("MCP timeoutMs must be between 1 and 130000");
+    if (options.signal?.aborted) throw new Error("MCP call aborted");
+    const caller = options.caller ?? this.identity.agentId;
+    const localAgent = conn.local.agents.find((a) => a.agentId === caller);
+    if (localAgent?.scope === "read" && /write|mkdir|delete|exec/.test(tool)) throw new Error("denied: read-only agent cannot request remote writes or execution");
     const callId = newMessageId();
-    await conn.client.publish({
-      kind: "mcp.call",
-      callId,
-      tool,
-      args: args ?? {},
-      target
+    if (target === this.identity.agentId && caller === target) {
+      return { callId, target, ok: true, result: await this.callLocalMcp(roomId, tool, args, caller) };
+    }
+    if (!conn.client.getPeers().some((p) => p.agentId === target)) throw new Error(`MCP target ${target} is not online in this room`);
+    return new Promise((resolve4, reject) => {
+      const finish = (result, error) => {
+        if (!conn.mcpCalls.delete(callId)) return;
+        clearTimeout(timer);
+        options.signal?.removeEventListener("abort", abort);
+        if (error) reject(error);
+        else resolve4({ callId, target, ok: result.ok, ...result.ok ? { result: result.result } : { error: result.error ?? "remote MCP failed" } });
+      };
+      const abort = () => finish(void 0, new Error("MCP call aborted"));
+      const timer = setTimeout(() => finish(void 0, new Error(`MCP ${tool} timed out after ${timeoutMs}ms`)), timeoutMs);
+      conn.mcpCalls.set(callId, { target, caller, settle: (result) => finish(result), cancel: (error) => finish(void 0, error) });
+      options.signal?.addEventListener("abort", abort, { once: true });
+      const payload = { kind: "mcp.call", callId, tool, args, target, timeoutMs };
+      const sent = caller === this.identity.agentId ? conn.client.publish(payload) : this.publishAs(roomId, caller, payload);
+      sent.catch((error) => finish(void 0, error instanceof Error ? error : new Error(String(error))));
     });
-    return { callId, pending: true };
+  }
+  cancelMcp(conn, error, caller) {
+    for (const call of conn.mcpCalls.values()) if (!caller || call.caller === caller) call.cancel(error);
+    if (!caller) for (const controller of conn.mcpServing.values()) controller.abort();
+  }
+  settleMcpResult(conn, p, from) {
+    const pending = conn.mcpCalls.get(p.callId);
+    if (pending?.target === from && !p.pendingApproval) pending.settle(p);
   }
   async handleMcpCall(conn, p, from, asAgent) {
     if (!asAgent && p.target !== this.identity?.agentId) return;
+    const key = `${from}:${p.callId}`;
+    if (conn.mcpServing.has(key)) return;
     const mcp = this.mcpByRoom.get(conn.meta.roomId);
     const client = asAgent ? conn.agents.get(asAgent.agentId) : conn.client;
     if (!mcp || !client) {
       await client?.publish({ kind: "mcp.result", callId: p.callId, ok: false, error: "MCP not available" });
       return;
     }
+    const controller = new AbortController();
+    conn.mcpServing.set(key, controller);
+    const timer = setTimeout(() => controller.abort(), Math.min(Math.max(p.timeoutMs ?? 13e4, 1), 13e4));
     try {
-      if (asAgent?.scope === "read" && /write|mkdir|delete|exec/.test(p.tool)) throw new Error(`denied: ${asAgent.agentId} is read-only`);
+      if (asAgent) throw new Error("MCP not enabled for this local agent; target its hosting member instead");
       const target = typeof p.args?.path === "string" ? p.args.path : void 0;
       if (target && conn.locks && /write|delete/.test(p.tool)) {
         const holder = conn.locks.holder(target);
         if (holder && holder !== from) throw new Error(`denied: ${target} is locked by ${holder}`);
       }
-      const result = await mcp.call(p.tool, p.args ?? {}, from);
+      const result = await mcp.call(p.tool, p.args ?? {}, from, controller.signal);
       await client.publish({ kind: "mcp.result", callId: p.callId, ok: true, result });
     } catch (e) {
       const msg = e.message;
-      const pending = msg.startsWith("denied:") ? false : /denied|approval/.test(msg);
       await client.publish({
         kind: "mcp.result",
         callId: p.callId,
         ok: false,
-        error: msg,
-        pendingApproval: /waiting|approval/.test(msg)
+        error: msg
+      }).catch(() => {
       });
+    } finally {
+      clearTimeout(timer);
+      conn.mcpServing.delete(key);
     }
   }
   // ── inbound: room → Session wake ─────────────────────────────────────────
@@ -3804,6 +3848,9 @@ var CollabBridge = class {
       return;
     }
     if (p.kind === "mcp.result" || p.kind === "approval.request" || p.kind === "approval.response") {
+      if (p.kind === "mcp.result") {
+        this.settleMcpResult(conn, p, from);
+      }
       const m2 = toMessage(p, this.identity.agentId, seq);
       if (m2 && conn.add(m2)) this.emit({ type: "message", roomId: conn.meta.roomId, message: m2 });
       this.emit({ type: "rooms" });
@@ -4012,6 +4059,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     });
     client.onPayload((p, meta) => {
       if (p.kind === "mcp.call" && p.target === a.agentId) void this.handleMcpCall(conn, p, meta.from, a);
+      if (p.kind === "mcp.result") this.settleMcpResult(conn, p, meta.from);
     });
     client.onPeers(() => this.emit({ type: "rooms" }));
     if (!active()) {
@@ -4133,6 +4181,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
   async removeLocalAgent(roomId, id) {
     const conn = this.room(roomId);
     const a = this.localAgent(conn, id);
+    this.cancelMcp(conn, new Error("MCP calling agent removed"), a.agentId);
     this.scheduler.stop(conn.meta.roomId, a.agentId);
     conn.local.agents = conn.local.agents.filter((x) => x !== a);
     conn.removedAgentIds.add(a.agentId);
@@ -4180,6 +4229,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     const wantLoopback = target === "local";
     if (wantLoopback === conn.local.loopback && target !== "lan") return { ...this.view(conn), invite: conn.meta.invite };
     await this.saveLocalHistory(conn);
+    this.cancelMcp(conn, new Error("MCP room transport changed"));
     await this.disconnectAgents(conn);
     await conn.client?.dispose().catch(() => {
     });
@@ -4304,6 +4354,8 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
   /** Stop every local agent run in the room (queued, waiting approval, and running turns). */
   stopLocal(roomId, agentId) {
     const conn = this.room(roomId);
+    if (agentId) this.cancelMcp(conn, new Error("MCP calling agent stopped"), agentId);
+    else for (const a of conn.local.agents) this.cancelMcp(conn, new Error("MCP calling agent stopped"), a.agentId);
     const n = this.scheduler.stop(conn.meta.roomId, agentId);
     for (const a of conn.local.agents) {
       if (agentId && a.agentId !== agentId) continue;
@@ -4733,6 +4785,7 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
     this.abort.abort();
     this.listeners.clear();
     for (const conn of this.rooms.values()) {
+      this.cancelMcp(conn, new Error("MCP plugin disposed"));
       if (conn.heartbeat) clearInterval(conn.heartbeat);
       if (conn.presenceTimer) clearInterval(conn.presenceTimer);
       clearTimeout(conn.announceTimer);
@@ -4757,7 +4810,7 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
       description,
       parameters,
       output: { schema: {}, render: jsonRender },
-      timeoutMs: 3e4,
+      timeoutMs: name2 === "collab_mcp_call" ? 14e4 : 3e4,
       async execute(args, exec) {
         const a = args && typeof args === "object" ? args : {};
         for (const key of parameters.required ?? []) {
@@ -4765,7 +4818,7 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
         }
         const who = bridge.callerAgent(exec);
         bridge.log("info", `tool ${name2} by ${who?.agent.agentId ?? "host"}`);
-        return JSON.parse(JSON.stringify(await run(a, who) ?? { ok: true }));
+        return JSON.parse(JSON.stringify(await run(a, who, exec) ?? { ok: true }));
       }
     });
     const str2 = (v) => typeof v === "string" && v ? v : void 0;
@@ -4782,7 +4835,16 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
       def("collab_rooms", "List the rooms you are in, with members and status.", obj({}), () => this.state()),
       def("collab_peers", "List the agentIds currently in a room, including yourself.", obj(roomArg), (a, who) => {
         const v = this.view(this.room(str2(a.roomId) ?? who?.conn.meta.roomId));
-        return { roomId: v.roomId, name: v.name, self: who?.agent.agentId ?? this.identity.agentId, peers: v.members.map((m) => ({ agentId: m.agentId, name: m.name, local: m.local, moderator: m.moderator || void 0 })) };
+        return { roomId: v.roomId, name: v.name, self: who?.agent.agentId ?? this.identity.agentId, peers: v.members.map((m) => {
+          const cfg = m.agentId === this.identity?.agentId ? publicMemberConfig(this.getMemberConfig(v.roomId)) : this.peerConfigs.get(v.roomId)?.get(m.agentId);
+          return { agentId: m.agentId, name: m.name, local: m.local, moderator: m.moderator || void 0, workspaceLabel: cfg?.workspaceLabel, mcpEnabled: cfg?.mcpEnabled ?? false, mcpTools: cfg?.mcpTools ?? [] };
+        }) };
+      }),
+      def("collab_mcp_tools", "List workspace MCP tools and schemas. Use collab_peers to find the target hosting member with mcpEnabled=true; local worker agents do not export a separate workspace.", obj(roomArg), () => ({ tools: MCP_TOOL_DEFS })),
+      def("collab_mcp_call", "Call a same-room member's workspace MCP and wait for the actual result. Use collab_peers to choose an mcpEnabled hosting member as target. Paths are relative to that member's workspace, not your local workspace. Reads respect peer grants; writes/exec may need approval on the target host. Never assume ok=true; report error on failure.", obj({ ...roomArg, target: s("agentId of the member exporting the workspace"), tool: { type: "string", enum: [...MCP_TOOL_NAMES] }, args: { type: "object", description: "Arguments from collab_mcp_tools schemas" }, timeoutMs: { type: "integer", minimum: 1, maximum: 13e4, description: "Response deadline; default 130000ms includes target approval time" } }, ["target", "tool", "args"]), (a, who, exec) => {
+        const conn = this.room(str2(a.roomId) ?? who?.conn.meta.roomId);
+        if (who && conn !== who.conn) throw new Error("denied: agent MCP call must stay in its own room");
+        return this.mcpCallPeer(conn.meta.roomId, str2(a.target), str2(a.tool), a.args, { caller: who?.agent.agentId, signal: exec.signal, timeoutMs: a.timeoutMs });
       }),
       def(
         "collab_send",
@@ -5263,7 +5325,16 @@ function createApiHandler(bridge, connection) {
           const tool = str(b.tool);
           if (!tool) throw new HttpError(400, "tool required");
           if (str(b.target)) {
-            return sendJson2(res, 200, await bridge.mcpCallPeer(roomId, str(b.target), tool, b.args || {}));
+            const controller = new AbortController();
+            const close = () => {
+              if (!res.writableEnded) controller.abort();
+            };
+            res.on("close", close);
+            try {
+              return sendJson2(res, 200, await bridge.mcpCallPeer(roomId, str(b.target), tool, b.args || {}, { signal: controller.signal, timeoutMs: b.timeoutMs }));
+            } finally {
+              res.off("close", close);
+            }
           }
           return sendJson2(res, 200, { ok: true, result: await bridge.callLocalMcp(roomId, tool, b.args || {}) });
         }

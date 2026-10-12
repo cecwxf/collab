@@ -18,6 +18,6 @@ export declare class WorkspaceMcp {
     }[];
     private resolveSafe;
     private maybeApprove;
-    call(tool: string, args: Record<string, unknown>, from: string): Promise<unknown>;
+    call(tool: string, args: Record<string, unknown>, from: string, signal?: AbortSignal): Promise<unknown>;
 }
 //# sourceMappingURL=mcp-workspace.d.ts.map

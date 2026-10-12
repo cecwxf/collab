@@ -31,18 +31,22 @@ Defaults: `autoRead=true`, `autoWrite=false`, `autoShell=false`, `autoNetwork=fa
 
 Same-room members only (admission = invite/room key). Tools over the encrypted room channel (`mcp.call` / `mcp.result`) and locally via `POST /api/collab/rooms/:id/mcp`.
 
+Since 0.3.7, Web/Desktop model agents use `collab_peers` (discover an exporting host), `collab_mcp_tools` (schemas), and `collab_mcp_call` (target, tool, args). Calls authenticate as the invoking agent and await the actual structured result; concurrent results are correlated by callId and authenticated target identity. Target workspace paths are relative to the hosting member's configured root. Relay servers remain opaque forwarders. Local worker members advertise MCP disabled; choose their hosting member instead.
+
 | Tool | Approval |
 |------|----------|
-| `workspace_list` | — |
-| `workspace_read` | if `!autoRead` |
-| `workspace_stat` | — |
-| `workspace_search` | — |
+| `workspace_list` | peer read grant; ask if not autoRead |
+| `workspace_read` | peer read grant; ask if not autoRead |
+| `workspace_stat` | peer read grant; ask if not autoRead |
+| `workspace_search` | peer read grant; ask if not autoRead |
 | `workspace_write` | unless `autoWrite` |
 | `workspace_mkdir` | unless `autoWrite` |
 | `workspace_delete` | unless `autoWrite` |
 | `workspace_exec` | unless `autoShell` |
 
 All paths sandboxed to the member's `workspacePath` (symlink escape rejected).
+
+Peer `deny` grants override auto flags. Defaults allow reads automatically and ask for writes, deletion and execution. `workspace_read` returns UTF-8 text up to 256 KiB. Tool and HTTP remote calls return `{callId,target,ok,result}` or `{callId,target,ok:false,error}`; the default response deadline is 130 seconds, including approval time. Lifecycle changes and cancellation release local response waits; receiver deadlines and disconnects cancel pending approval waits. Result contents remain encrypted room payloads visible to room-key holders, but history keeps only a summary marker.
 
 ## CF redeploy
 

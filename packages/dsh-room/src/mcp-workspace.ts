@@ -73,7 +73,8 @@ export class WorkspaceMcp {
     }
   }
 
-  private async maybeApprove(tool: string, summary: string, detail: string, from: string) {
+  private async maybeApprove(tool: string, summary: string, detail: string, from: string, signal?: AbortSignal) {
+    if (signal?.aborted) throw new Error("MCP call aborted");
     const action = actionFor(tool);
     // Peer grant ACL (what other members may do on *this* workspace via MCP)
     let cap: "read" | "write" | "exec" | "delete" | null = null;
@@ -96,6 +97,7 @@ export class WorkspaceMcp {
         detail,
         from,
         timeoutMs: 120_000,
+        signal,
       });
       if (decision !== "allow") throw new Error(`denied: read (${summary})`);
       return;
@@ -117,42 +119,45 @@ export class WorkspaceMcp {
       detail,
       from,
       timeoutMs: 120_000,
+      signal,
     });
     if (decision !== "allow") throw new Error(`denied: ${action} (${summary})`);
   }
 
-  async call(tool: string, args: Record<string, unknown>, from: string): Promise<unknown> {
+  async call(tool: string, args: Record<string, unknown>, from: string, signal?: AbortSignal): Promise<unknown> {
+    if (signal?.aborted) throw new Error("MCP call aborted");
     if (!this.cfg.mcpEnabled) throw new Error("MCP disabled for this member");
     await mkdir(this.cfg.workspacePath, { recursive: true });
 
     switch (tool as McpToolName) {
       case "workspace_list": {
-        await this.maybeApprove(tool, `list ${args.path ?? "."}`, "", from);
+        await this.maybeApprove(tool, `list ${args.path ?? "."}`, "", from, signal);
         const dir = await this.resolveSafe(String(args.path ?? "."));
         const entries = await readdir(dir, { withFileTypes: true });
         return {
-          path: relative(this.cfg.workspacePath, dir) || ".",
+          path: relative(await realpath(this.cfg.workspacePath), dir) || ".",
           entries: entries.map((e) => ({ name: e.name, type: e.isDirectory() ? "dir" : "file" })),
         };
       }
       case "workspace_read": {
-        await this.maybeApprove(tool, `read ${args.path}`, "", from);
+        await this.maybeApprove(tool, `read ${args.path}`, "", from, signal);
         const file = await this.resolveSafe(String(args.path ?? ""));
         const buf = await readFile(file);
         if (buf.length > 256 * 1024) throw new Error("file too large (>256KiB)");
         return { path: String(args.path), content: buf.toString("utf8") };
       }
       case "workspace_stat": {
-        await this.maybeApprove(tool, `stat ${args.path}`, "", from);
+        await this.maybeApprove(tool, `stat ${args.path}`, "", from, signal);
         const file = await this.resolveSafe(String(args.path ?? ""));
         const st = await stat(file);
         return { path: String(args.path), size: st.size, mtimeMs: st.mtimeMs, isDirectory: st.isDirectory(), isFile: st.isFile() };
       }
       case "workspace_search": {
-        await this.maybeApprove(tool, `search ${args.path ?? "."}`, String(args.query ?? ""), from);
+        await this.maybeApprove(tool, `search ${args.path ?? "."}`, String(args.query ?? ""), from, signal);
         const q = String(args.query ?? "");
         if (!q) throw new Error("query required");
         const start = await this.resolveSafe(String(args.path ?? "."));
+        const root = await realpath(this.cfg.workspacePath);
         const hits: { path: string; line: number; text: string }[] = [];
         const walk = async (dir: string) => {
           if (hits.length >= 50) return;
@@ -171,7 +176,7 @@ export class WorkspaceMcp {
                 const lines = text.split(/\r?\n/);
                 for (let i = 0; i < lines.length; i++) {
                   if (lines[i]!.includes(q)) {
-                    hits.push({ path: relative(this.cfg.workspacePath, p), line: i + 1, text: lines[i]!.slice(0, 200) });
+                    hits.push({ path: relative(root, p), line: i + 1, text: lines[i]!.slice(0, 200) });
                     if (hits.length >= 50) return;
                   }
                 }
@@ -185,20 +190,20 @@ export class WorkspaceMcp {
         return { query: q, hits };
       }
       case "workspace_write": {
-        await this.maybeApprove("workspace_write", `write ${args.path}`, String(args.content ?? "").slice(0, 200), from);
+        await this.maybeApprove("workspace_write", `write ${args.path}`, String(args.content ?? "").slice(0, 200), from, signal);
         const file = await this.resolveSafe(String(args.path ?? ""));
         await mkdir(dirname(file), { recursive: true });
         await writeFile(file, String(args.content ?? ""), "utf8");
         return { ok: true, path: String(args.path) };
       }
       case "workspace_mkdir": {
-        await this.maybeApprove("workspace_mkdir", `mkdir ${args.path}`, "", from);
+        await this.maybeApprove("workspace_mkdir", `mkdir ${args.path}`, "", from, signal);
         const dir = await this.resolveSafe(String(args.path ?? ""));
         await mkdir(dir, { recursive: true });
         return { ok: true, path: String(args.path) };
       }
       case "workspace_delete": {
-        await this.maybeApprove("workspace_delete", `delete ${args.path}`, "", from);
+        await this.maybeApprove("workspace_delete", `delete ${args.path}`, "", from, signal);
         const file = await this.resolveSafe(String(args.path ?? ""));
         await rm(file, { recursive: false, force: false });
         return { ok: true, path: String(args.path) };
@@ -207,11 +212,11 @@ export class WorkspaceMcp {
         const command = String(args.command ?? "");
         if (!command) throw new Error("command required");
         const argv = Array.isArray(args.args) ? args.args.map(String) : [];
-        await this.maybeApprove("workspace_exec", `exec ${command} ${argv.join(" ")}`.trim(), "", from);
+        await this.maybeApprove("workspace_exec", `exec ${command} ${argv.join(" ")}`.trim(), "", from, signal);
         if (!this.cfg.permissions.autoNetwork) {
           // Soft hint only — we don't intercept network at process level.
         }
-        return await runCmd(command, argv, this.cfg.workspacePath);
+        return await runCmd(command, argv, this.cfg.workspacePath, signal);
       }
       default:
         throw new Error(`unknown MCP tool: ${tool}`);
@@ -219,9 +224,9 @@ export class WorkspaceMcp {
   }
 }
 
-function runCmd(command: string, args: string[], cwd: string): Promise<{ code: number; stdout: string; stderr: string }> {
+function runCmd(command: string, args: string[], cwd: string, signal?: AbortSignal): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { cwd, shell: false, env: { ...process.env, PATH: process.env.PATH } });
+    const child = spawn(command, args, { cwd, shell: false, signal, env: { ...process.env, PATH: process.env.PATH } });
     let stdout = "";
     let stderr = "";
     const cap = 64 * 1024;
