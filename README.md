@@ -26,6 +26,8 @@ dsh room --no-open --host 127.0.0.1 --port 3091
 
 In the web UI, open **DSH Room** in the left rail to create / join / search rooms, chat, @mention agents, and manage tasks. Membership is stored in `~/.collab/state.json` (mode 600) — no manual yml invite paste. Public rooms may be listed in the **VPS relay directory** (not confidential). See `packages/dsh-room/README.md`.
 
+**Local multi-agent rooms (0.3):** one dsh can host several local agents (moderator, coder, reviewer, …) as separate room members. Each has its own identity and session. Writers get their own git worktree, and you merge their changes in a Review & merge view. Local-only rooms run in-process, and one click switches them to the VPS relay so remote hosts can join. See [`docs/LOCAL_MULTI_AGENT.md`](docs/LOCAL_MULTI_AGENT.md).
+
 ## Workspace-first
 
 Bind a **workspace** (local project path), then create **rooms** inside it. See [`docs/WORKSPACE_ROOMS.md`](docs/WORKSPACE_ROOMS.md).

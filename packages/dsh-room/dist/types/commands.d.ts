@@ -12,6 +12,7 @@ export type CollabCommand = {
     description?: string;
     tags: string[];
     public: boolean;
+    localOnly?: boolean;
 } | {
     op: "join";
     invite: string;
@@ -45,6 +46,21 @@ export type CollabCommand = {
     limit: number;
 } | {
     op: "leave";
+} | {
+    op: "agents";
+} | {
+    op: "agent-add";
+    preset?: string;
+    name?: string;
+} | {
+    op: "agent-rm";
+    agent: string;
+} | {
+    op: "stop";
+    agent?: string;
+} | {
+    op: "transport";
+    target: "local" | "relay" | "lan";
 } | {
     op: "error";
     message: string;

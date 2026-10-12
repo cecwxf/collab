@@ -41,3 +41,16 @@ test("parse search and say with mentions", () => {
 });
 
 test("help is non-empty", () => assert.match(HELP, /\/collab create/));
+
+test("parse local multi-agent commands", () => {
+  assert.deepEqual(parseCollabCommand("create local squad"), { op: "create", name: "squad", description: undefined, tags: [], public: false, localOnly: true });
+  assert.deepEqual(parseCollabCommand("agents"), { op: "agents" });
+  assert.deepEqual(parseCollabCommand("agent add Coder"), { op: "agent-add", preset: "coder" });
+  assert.deepEqual(parseCollabCommand("agent add Data Wrangler"), { op: "agent-add", name: "Data Wrangler" });
+  assert.deepEqual(parseCollabCommand("agent rm @coder"), { op: "agent-rm", agent: "coder" });
+  assert.equal(parseCollabCommand("agent").op, "error");
+  assert.deepEqual(parseCollabCommand("stop"), { op: "stop" });
+  assert.deepEqual(parseCollabCommand("stop @coder.k3f9"), { op: "stop", agent: "coder.k3f9" });
+  assert.deepEqual(parseCollabCommand("transport relay"), { op: "transport", target: "relay" });
+  assert.equal(parseCollabCommand("transport cloud").op, "error");
+});

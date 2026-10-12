@@ -35,6 +35,21 @@ If pnpm asks to allow a `prepare` / build script, approve it once (or write `all
 - **Model tools** (`collab_*`) so agents can create rooms, send, @mention, and manage tasks.
 - **Public directory** on the VPS relay for discoverable rooms (opt-in; public rooms are **not confidential**).
 
+## Local multi-agent rooms (0.3)
+
+One dsh can host **several local agents** (Moderator, Architect, Coder, Reviewer, or custom ones) as independent room members. Each has its own identity, its own dsh session under the room's workspace, and its own read or write scope.
+
+- **Local only** rooms use an in-process loopback (no network). One click switches to Relay (VPS) or LAN to invite remote hosts, and the local agents stay members.
+- `@agent` wakes only that agent. `@all` wakes all local agents in parallel.
+- An optional **moderator** splits work into tasks and summarizes the results.
+- A turn limit (default 6) applies per thread. A concurrency cap (default 2) comes with a visible run queue. **Stop** stops every local agent run.
+- Writing agents get their own **git worktree** (`room/<room>/<agent>`). Non-git workspaces fall back to advisory file locks.
+- **Review & merge** shows a per-agent diff, checks for conflicts, and asks you to confirm before it merges into or discards from the main workspace.
+
+Slash commands: `/collab create local <name>`, `/collab agents`, `/collab agent add <preset|name>`, `/collab agent rm <name>`, `/collab stop [@agent]`, `/collab transport <local|relay|lan>`.
+
+Full guide: [`docs/LOCAL_MULTI_AGENT.md`](../../docs/LOCAL_MULTI_AGENT.md).
+
 ## Optional config (profile `cordis.patch.yml`)
 
 ```yaml
@@ -46,6 +61,7 @@ If pnpm asks to allow a `prepare` / build script, approve it once (or write `all
     statePath: ~/.collab/state.json
     autoReply: mention-or-task
     permissionPreset: read-only
+    # localAgentRunner: mock   # deterministic local agents without a model (tests/demos); or env DSH_ROOM_MOCK_AGENTS=1
 ```
 
 Room membership is persisted at runtime into `statePath` (mode 600) — you do **not** need to paste invites into the yml.
@@ -64,7 +80,7 @@ Room membership is persisted at runtime into `statePath` (mode 600) — you do *
 
 ## Tools
 
-`collab_create_room`, `collab_join`, `collab_search_rooms`, `collab_rooms`, `collab_peers`, `collab_send`, `collab_broadcast_status`, `collab_create_task`, `collab_claim_task`, `collab_update_task`, `collab_history`.
+`collab_create_room`, `collab_join`, `collab_search_rooms`, `collab_rooms`, `collab_peers`, `collab_send`, `collab_broadcast_status`, `collab_create_task`, `collab_claim_task`, `collab_update_task`, `collab_history`, `collab_lock_files` (advisory locks for local writers in non-git workspaces).
 
 Wake rules: `@mention` or `task.create` (when `autoReply` is `mention-or-task`). Replies (`replyTo`) do not wake by default (loop guard). Max 6 wakes/minute/room.
 

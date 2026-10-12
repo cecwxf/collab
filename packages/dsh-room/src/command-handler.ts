@@ -41,7 +41,7 @@ export function collabCommand(bridge: CollabBridge): CommandDefinition {
             );
           }
           case "create": {
-            const r = await bridge.createRoom({ name: cmd.name, description: cmd.description, tags: cmd.tags, public: cmd.public }, inv.agent);
+            const r = await bridge.createRoom({ name: cmd.name, description: cmd.description, tags: cmd.tags, public: cmd.public, localOnly: cmd.localOnly }, inv.agent);
             return ok(
               `Created ${r.public ? "PUBLIC" : "private"} room "${r.name}" (${r.roomId}); this session now receives its @mentions and tasks.\n` +
                 (r.public ? (r.listed ? "Listed in the public directory — anyone can find, join and read it.\n" : "Directory listing failed; see logs (room still works by invite).\n") : "") +
@@ -101,6 +101,40 @@ export function collabCommand(bridge: CollabBridge): CommandDefinition {
           case "log": {
             const msgs = bridge.room().messages.slice(-cmd.limit);
             return ok(msgs.length ? msgs.map((m) => `${new Date(m.ts).toISOString().slice(11, 19)} ${m.self ? "you" : m.from}: ${m.text}`).join("\n") : "(no messages yet)");
+          }
+          case "agents": {
+            const r = bridge.view(bridge.room());
+            const agents = r.local?.agents ?? [];
+            if (!agents.length) return ok(`No local agents in "${r.name}". Add one with /collab agent add <moderator|architect|coder|reviewer|name>.`);
+            return ok(
+              `${r.name}: ${agents.length} local agent(s)\n` +
+                agents.map((a) => `● @${a.agentId}  ${a.name}${a.moderator ? " (moderator)" : ""} · ${a.scope}${a.approvalRequired ? " · approval" : ""}${a.persona ? ` — ${a.persona}` : ""}`).join("\n"),
+            );
+          }
+          case "agent-add": {
+            const conn = bridge.room();
+            const a = await bridge.addLocalAgent(conn.meta.roomId, cmd.preset ? { preset: cmd.preset } : { name: cmd.name, scope: "read" });
+            return ok(`Added local agent ${a.name} (@${a.agentId}, ${a.scope}). Mention it with @${a.agentId}.`);
+          }
+          case "agent-rm": {
+            const conn = bridge.room();
+            const q = cmd.agent.toLowerCase();
+            const a = conn.local.agents.find((x) => x.agentId.toLowerCase() === q || x.id === q || x.name.toLowerCase() === q);
+            if (!a) return fail(`no local agent ${cmd.agent}`);
+            await bridge.removeLocalAgent(conn.meta.roomId, a.id);
+            return ok(`Removed local agent ${a.name}.`);
+          }
+          case "stop": {
+            const conn = bridge.room();
+            const q = cmd.agent?.toLowerCase();
+            const a = q ? conn.local.agents.find((x) => x.agentId.toLowerCase() === q || x.id === q || x.name.toLowerCase() === q) : undefined;
+            if (q && !a) return fail(`no local agent ${cmd.agent}`);
+            const n = bridge.stopLocal(conn.meta.roomId, a?.agentId);
+            return ok(`Stopped ${n} local agent run(s).`);
+          }
+          case "transport": {
+            const r = await bridge.setTransport(bridge.room().meta.roomId, cmd.target);
+            return ok(`Transport → ${cmd.target}${cmd.target === "local" ? " (in-process, no network)" : `\nInvite for remote hosts:\n${r.invite}`}`);
           }
           case "leave": {
             const conn = bridge.room();

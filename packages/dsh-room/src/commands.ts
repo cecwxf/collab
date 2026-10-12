@@ -5,7 +5,7 @@
 export type CollabCommand =
   | { op: "help" }
   | { op: "status" }
-  | { op: "create"; name?: string; description?: string; tags: string[]; public: boolean }
+  | { op: "create"; name?: string; description?: string; tags: string[]; public: boolean; localOnly?: boolean }
   | { op: "join"; invite: string }
   | { op: "join-result"; index: number }
   | { op: "search"; query?: string; tag?: string }
@@ -17,6 +17,11 @@ export type CollabCommand =
   | { op: "task"; title: string; body?: string; assignee?: string }
   | { op: "log"; limit: number }
   | { op: "leave" }
+  | { op: "agents" }
+  | { op: "agent-add"; preset?: string; name?: string }
+  | { op: "agent-rm"; agent: string }
+  | { op: "stop"; agent?: string }
+  | { op: "transport"; target: "local" | "relay" | "lan" }
   | { op: "error"; message: string };
 
 const MENTION = /(^|\s)@([A-Za-z0-9][A-Za-z0-9._:-]*)/g;
@@ -41,6 +46,12 @@ export const HELP = [
   "  /collab task [@agent] <title> [-- details]   create a task (assignee is woken)",
   "  /collab log [n]             last n room messages (default 20)",
   "  /collab leave               leave the room and forget it on this machine",
+  "  /collab create local [name]   local-only room (in-process loopback, no network) for local agents",
+  "  /collab agents              local agents hosted by this dsh in the active room",
+  "  /collab agent add <moderator|architect|coder|reviewer|name>   add a local agent (preset or custom name)",
+  "  /collab agent rm <name>     remove a local agent",
+  "  /collab stop [@agent]       stop all (or one) local agent runs",
+  "  /collab transport <local|relay|lan>   switch transport (relay/lan lets remote hosts join)",
 ].join("\n");
 
 export function parseCollabCommand(rawInput: string): CollabCommand {
@@ -60,9 +71,11 @@ export function parseCollabCommand(rawInput: string): CollabCommand {
     case "new": {
       let t = rest;
       let isPublic = false;
-      const pm = /^(public|private)\b\s*/i.exec(t);
+      let localOnly = false;
+      const pm = /^(public|private|local)\b\s*/i.exec(t);
       if (pm) {
         isPublic = pm[1]!.toLowerCase() === "public";
+        localOnly = pm[1]!.toLowerCase() === "local";
         t = t.slice(pm[0].length);
       }
       const tags = [...t.matchAll(/(^|\s)#([A-Za-z0-9][A-Za-z0-9_-]*)/g)].map((m) => m[2]!.toLowerCase());
@@ -70,7 +83,7 @@ export function parseCollabCommand(rawInput: string): CollabCommand {
       const [name, ...desc] = t.split(/\s+--\s+|^--\s+/);
       const description = desc.join(" -- ").trim();
       if (isPublic && !name?.trim()) return { op: "error", message: "usage: /collab create public <name> [-- description] [#tag ...]" };
-      return { op: "create", name: name?.trim() || undefined, description: description || undefined, tags, public: isPublic };
+      return { op: "create", name: name?.trim() || undefined, description: description || undefined, tags, public: isPublic, ...(localOnly ? { localOnly } : {}) };
     }
     case "search":
     case "find":
@@ -125,6 +138,26 @@ export function parseCollabCommand(rawInput: string): CollabCommand {
     case "leave":
     case "quit":
       return { op: "leave" };
+    case "agents":
+      return { op: "agents" };
+    case "agent": {
+      const [verb, ...args] = rest.split(/\s+/).filter(Boolean);
+      const arg = args.join(" ").replace(/^@/, "");
+      if ((verb === "add" || verb === "new") && arg) {
+        const k = arg.toLowerCase();
+        return ["moderator", "architect", "coder", "reviewer"].includes(k) ? { op: "agent-add", preset: k } : { op: "agent-add", name: arg };
+      }
+      if ((verb === "rm" || verb === "remove" || verb === "del") && arg) return { op: "agent-rm", agent: arg };
+      return { op: "error", message: "usage: /collab agent add <preset|name>  |  /collab agent rm <name>" };
+    }
+    case "stop":
+    case "interrupt":
+      return { op: "stop", ...(rest ? { agent: rest.replace(/^@/, "") } : {}) };
+    case "transport": {
+      const t = rest.toLowerCase();
+      if (t === "local" || t === "relay" || t === "lan") return { op: "transport", target: t };
+      return { op: "error", message: "usage: /collab transport <local|relay|lan>" };
+    }
     default:
       // `/collab @agent hi` or `/collab hello` → say
       if (input.startsWith("@")) return { op: "say", text: input, mentions: extractMentions(input) };

@@ -2626,7 +2626,13 @@ var HELP = [
   "  /collab say <text>          send to the room; @agentId wakes that agent; @all wakes everyone",
   "  /collab task [@agent] <title> [-- details]   create a task (assignee is woken)",
   "  /collab log [n]             last n room messages (default 20)",
-  "  /collab leave               leave the room and forget it on this machine"
+  "  /collab leave               leave the room and forget it on this machine",
+  "  /collab create local [name]   local-only room (in-process loopback, no network) for local agents",
+  "  /collab agents              local agents hosted by this dsh in the active room",
+  "  /collab agent add <moderator|architect|coder|reviewer|name>   add a local agent (preset or custom name)",
+  "  /collab agent rm <name>     remove a local agent",
+  "  /collab stop [@agent]       stop all (or one) local agent runs",
+  "  /collab transport <local|relay|lan>   switch transport (relay/lan lets remote hosts join)"
 ].join("\n");
 function parseCollabCommand(rawInput) {
   const input = rawInput.trim();
@@ -2645,9 +2651,11 @@ function parseCollabCommand(rawInput) {
     case "new": {
       let t = rest;
       let isPublic = false;
-      const pm = /^(public|private)\b\s*/i.exec(t);
+      let localOnly = false;
+      const pm = /^(public|private|local)\b\s*/i.exec(t);
       if (pm) {
         isPublic = pm[1].toLowerCase() === "public";
+        localOnly = pm[1].toLowerCase() === "local";
         t = t.slice(pm[0].length);
       }
       const tags = [...t.matchAll(/(^|\s)#([A-Za-z0-9][A-Za-z0-9_-]*)/g)].map((m) => m[2].toLowerCase());
@@ -2655,7 +2663,7 @@ function parseCollabCommand(rawInput) {
       const [name2, ...desc] = t.split(/\s+--\s+|^--\s+/);
       const description = desc.join(" -- ").trim();
       if (isPublic && !name2?.trim()) return { op: "error", message: "usage: /collab create public <name> [-- description] [#tag ...]" };
-      return { op: "create", name: name2?.trim() || void 0, description: description || void 0, tags, public: isPublic };
+      return { op: "create", name: name2?.trim() || void 0, description: description || void 0, tags, public: isPublic, ...localOnly ? { localOnly } : {} };
     }
     case "search":
     case "find":
@@ -2710,6 +2718,26 @@ function parseCollabCommand(rawInput) {
     case "leave":
     case "quit":
       return { op: "leave" };
+    case "agents":
+      return { op: "agents" };
+    case "agent": {
+      const [verb, ...args] = rest.split(/\s+/).filter(Boolean);
+      const arg = args.join(" ").replace(/^@/, "");
+      if ((verb === "add" || verb === "new") && arg) {
+        const k = arg.toLowerCase();
+        return ["moderator", "architect", "coder", "reviewer"].includes(k) ? { op: "agent-add", preset: k } : { op: "agent-add", name: arg };
+      }
+      if ((verb === "rm" || verb === "remove" || verb === "del") && arg) return { op: "agent-rm", agent: arg };
+      return { op: "error", message: "usage: /collab agent add <preset|name>  |  /collab agent rm <name>" };
+    }
+    case "stop":
+    case "interrupt":
+      return { op: "stop", ...rest ? { agent: rest.replace(/^@/, "") } : {} };
+    case "transport": {
+      const t = rest.toLowerCase();
+      if (t === "local" || t === "relay" || t === "lan") return { op: "transport", target: t };
+      return { op: "error", message: "usage: /collab transport <local|relay|lan>" };
+    }
     default:
       if (input.startsWith("@")) return { op: "say", text: input, mentions: extractMentions(input) };
       return { op: "error", message: `unknown subcommand "${sub}"
@@ -4559,7 +4587,7 @@ ${st.rooms.filter((x) => x.roomId !== r.roomId).map((x) => roomLine(x, false)).j
             );
           }
           case "create": {
-            const r = await bridge.createRoom({ name: cmd.name, description: cmd.description, tags: cmd.tags, public: cmd.public }, inv.agent);
+            const r = await bridge.createRoom({ name: cmd.name, description: cmd.description, tags: cmd.tags, public: cmd.public, localOnly: cmd.localOnly }, inv.agent);
             return ok(
               `Created ${r.public ? "PUBLIC" : "private"} room "${r.name}" (${r.roomId}); this session now receives its @mentions and tasks.
 ` + (r.public ? r.listed ? "Listed in the public directory \u2014 anyone can find, join and read it.\n" : "Directory listing failed; see logs (room still works by invite).\n" : "") + `
@@ -4622,6 +4650,42 @@ ${r.members.map((m) => `\u25CF ${m.agentId}${m.self ? " (you)" : ""}`).join("\n"
           case "log": {
             const msgs = bridge.room().messages.slice(-cmd.limit);
             return ok(msgs.length ? msgs.map((m) => `${new Date(m.ts).toISOString().slice(11, 19)} ${m.self ? "you" : m.from}: ${m.text}`).join("\n") : "(no messages yet)");
+          }
+          case "agents": {
+            const r = bridge.view(bridge.room());
+            const agents = r.local?.agents ?? [];
+            if (!agents.length) return ok(`No local agents in "${r.name}". Add one with /collab agent add <moderator|architect|coder|reviewer|name>.`);
+            return ok(
+              `${r.name}: ${agents.length} local agent(s)
+` + agents.map((a) => `\u25CF @${a.agentId}  ${a.name}${a.moderator ? " (moderator)" : ""} \xB7 ${a.scope}${a.approvalRequired ? " \xB7 approval" : ""}${a.persona ? ` \u2014 ${a.persona}` : ""}`).join("\n")
+            );
+          }
+          case "agent-add": {
+            const conn = bridge.room();
+            const a = await bridge.addLocalAgent(conn.meta.roomId, cmd.preset ? { preset: cmd.preset } : { name: cmd.name, scope: "read" });
+            return ok(`Added local agent ${a.name} (@${a.agentId}, ${a.scope}). Mention it with @${a.agentId}.`);
+          }
+          case "agent-rm": {
+            const conn = bridge.room();
+            const q = cmd.agent.toLowerCase();
+            const a = conn.local.agents.find((x) => x.agentId.toLowerCase() === q || x.id === q || x.name.toLowerCase() === q);
+            if (!a) return fail(`no local agent ${cmd.agent}`);
+            await bridge.removeLocalAgent(conn.meta.roomId, a.id);
+            return ok(`Removed local agent ${a.name}.`);
+          }
+          case "stop": {
+            const conn = bridge.room();
+            const q = cmd.agent?.toLowerCase();
+            const a = q ? conn.local.agents.find((x) => x.agentId.toLowerCase() === q || x.id === q || x.name.toLowerCase() === q) : void 0;
+            if (q && !a) return fail(`no local agent ${cmd.agent}`);
+            const n = bridge.stopLocal(conn.meta.roomId, a?.agentId);
+            return ok(`Stopped ${n} local agent run(s).`);
+          }
+          case "transport": {
+            const r = await bridge.setTransport(bridge.room().meta.roomId, cmd.target);
+            return ok(`Transport \u2192 ${cmd.target}${cmd.target === "local" ? " (in-process, no network)" : `
+Invite for remote hosts:
+${r.invite}`}`);
           }
           case "leave": {
             const conn = bridge.room();
