@@ -2791,6 +2791,7 @@ var RoomConn = class {
   locks;
   git;
   historyTimer;
+  announceTimer;
   normalized;
   /** Normalized once; the same object afterwards so `conn.local.x = …` always sticks. */
   get local() {
@@ -2951,6 +2952,16 @@ var CollabBridge = class {
       for (const peer of peers) conn.lastSeenPeers.set(peer.agentId, now2);
       if (ev?.type === "joined") conn.lastSeenPeers.set(ev.agentId, now2);
       if (ev) this.log("info", `room ${roomId}: peer ${ev.type} ${ev.agentId} (${peers.length} in room)`);
+      if (ev?.type === "joined" && ev.agentId !== this.identity?.agentId && !conn.local.agents.some((a) => a.agentId === ev.agentId)) {
+        clearTimeout(conn.announceTimer);
+        conn.announceTimer = setTimeout(() => {
+          void this.announceMemberConfig(conn).catch(() => {
+          });
+          for (const a of conn.local.agents) void this.announceAgentConfig(conn, a).catch(() => {
+          });
+        }, 800);
+        conn.announceTimer.unref?.();
+      }
       this.emit({ type: "rooms" });
     });
     client.onStatus((status, detail) => {
@@ -2985,7 +2996,7 @@ var CollabBridge = class {
       conn.presenceTimer.unref?.();
     }
     this.log("info", `joined room ${roomId} as ${identity.agentId} via ${loopback ? "in-process loopback" : wsUrl} (${loopback ? "local" : parsed.mode})`);
-    if (loopback) await this.loadLocalHistory(conn);
+    if (loopback || conn.local.agents.length) await this.loadLocalHistory(conn);
     try {
       for (const p of await client.history(0)) {
         const m = toMessage(p, identity.agentId);
@@ -3795,7 +3806,7 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     }
     const wantLoopback = target === "local";
     if (wantLoopback === conn.local.loopback && target !== "lan") return { ...this.view(conn), invite: conn.meta.invite };
-    if (wantLoopback) await this.saveLocalHistory(conn);
+    await this.saveLocalHistory(conn);
     await this.disconnectAgents(conn);
     await conn.client?.dispose().catch(() => {
     });

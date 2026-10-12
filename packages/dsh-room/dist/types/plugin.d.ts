@@ -136,6 +136,7 @@ declare class RoomConn {
     locks?: FileLocks;
     git?: boolean | null;
     historyTimer?: ReturnType<typeof setTimeout>;
+    announceTimer?: ReturnType<typeof setTimeout>;
     constructor(meta: RoomMeta);
     private normalized?;
     /** Normalized once; the same object afterwards so `conn.local.x = …` always sticks. */

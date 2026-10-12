@@ -201,6 +201,7 @@ class RoomConn {
   locks?: FileLocks;
   git?: boolean | null;
   historyTimer?: ReturnType<typeof setTimeout>;
+  announceTimer?: ReturnType<typeof setTimeout>;
   constructor(public meta: RoomMeta) {}
   private normalized?: RoomLocalSettings;
   /** Normalized once; the same object afterwards so `conn.local.x = …` always sticks. */
@@ -400,6 +401,15 @@ export class CollabBridge {
       if (ev?.type === "joined") conn.lastSeenPeers.set(ev.agentId, now);
       // On "left", do NOT delete immediately — grace window in view() keeps them online briefly.
       if (ev) this.log("info", `room ${roomId}: peer ${ev.type} ${ev.agentId} (${peers.length} in room)`);
+      // A newly joined remote peer missed earlier member.config: re-announce ours + our local agents (debounced).
+      if (ev?.type === "joined" && ev.agentId !== this.identity?.agentId && !conn.local.agents.some((a) => a.agentId === ev.agentId)) {
+        clearTimeout(conn.announceTimer);
+        conn.announceTimer = setTimeout(() => {
+          void this.announceMemberConfig(conn).catch(() => {});
+          for (const a of conn.local.agents) void this.announceAgentConfig(conn, a).catch(() => {});
+        }, 800);
+        (conn.announceTimer as { unref?: () => void }).unref?.();
+      }
       this.emit({ type: "rooms" });
     });
     client.onStatus((status, detail) => {
@@ -435,7 +445,8 @@ export class CollabBridge {
       (conn.presenceTimer as { unref?: () => void }).unref?.();
     }
     this.log("info", `joined room ${roomId} as ${identity.agentId} via ${loopback ? "in-process loopback" : wsUrl} (${loopback ? "local" : parsed.mode})`);
-    if (loopback) await this.loadLocalHistory(conn);
+    // Loopback history lives on disk; it is also kept after a switch to Relay/LAN (the relay ring only has newer messages).
+    if (loopback || conn.local.agents.length) await this.loadLocalHistory(conn);
     try {
       for (const p of await client.history(0)) {
         const m = toMessage(p, identity.agentId);
@@ -1294,7 +1305,7 @@ export class CollabBridge {
     }
     const wantLoopback = target === "local";
     if (wantLoopback === conn.local.loopback && target !== "lan") return { ...this.view(conn), invite: conn.meta.invite };
-    if (wantLoopback) await this.saveLocalHistory(conn);
+    await this.saveLocalHistory(conn);
     await this.disconnectAgents(conn);
     await conn.client?.dispose().catch(() => {});
     conn.client = null;
