@@ -1,3 +1,7 @@
+## 0.3.15
+
+- **Readable self bubbles**: Stop using `--dsw-alias-label-primary` as the outgoing message fill. That token is near-black text; `MarkdownText` also forces `label-primary` on descendants, so light UI showed solid black bars. Self bubbles now use `--dsw-specific-bubble` with `--rm-label` text (works in light and dark).
+
 ## 0.3.14
 
 - **Sidebar rooms under workspace**: Persist native `hostWorkspaceId` on create/join and match sidebar rows by that id (not only path), so created rooms stay under the correct workspace as session siblings.

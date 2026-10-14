@@ -116,7 +116,11 @@
 .rm-msg-time { font-size: 11px; color: var(--rm-quiet); }
 .rm-msg-body { font-size: 13.5px; line-height: 1.55; word-break: break-word; min-width: 0; }
 .rm-msg-self .rm-msg-body {
-  background: var(--dsw-alias-label-primary); color: var(--dsw-alias-label-primary-foreground);
+  /* Soft chat bubble — NOT label-primary as fill. MarkdownText forces
+     color: label-primary on descendants; a near-black fill + near-black
+     markdown text rendered as solid black bars in light UI. */
+  background: var(--dsw-specific-bubble, color-mix(in srgb, var(--rm-accent) 16%, var(--rm-panel)));
+  color: var(--rm-label);
   padding: 8px 12px; border-radius: 12px 12px 4px 12px; width: fit-content; margin-left: auto;
 }
 .rm-msg-event {
@@ -124,7 +128,7 @@
   padding: 8px 12px; border: .5px solid var(--rm-border); border-radius: 10px; background: var(--rm-panel);
 }
 .rm-mention { color: var(--rm-accent); font-weight: 500; }
-.rm-msg-self .rm-mention { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.rm-msg-self .rm-mention { color: var(--rm-accent); font-weight: 500; }
 .rm-task-card { display: flex; flex-direction: column; gap: 4px; }
 .rm-task-head { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--rm-muted); }
 .rm-task-title { font-weight: 600; font-size: 13.5px; }

@@ -184,6 +184,8 @@ export interface CreateRoomOptions {
     workspacePath?: string;
     /** Display name of that native workspace. */
     workspaceName?: string;
+    /** Native dsh workspace id (sidebar data-row-key); pins the room under that workspace row. */
+    hostWorkspaceId?: string;
     /** Start as a local-only room: in-process loopback transport, no network (switch to relay/LAN later). */
     localOnly?: boolean;
     /** Preset keys and/or full agent drafts to add right away. */
@@ -312,6 +314,7 @@ export declare class CollabBridge {
         tags: string[];
         joinedAt: number;
         workspaceId?: string | undefined;
+        hostWorkspaceId?: string | undefined;
         agentSessions?: Record<string, string> | undefined;
         agentNoEffort?: string[] | undefined;
     }>;
@@ -380,13 +383,14 @@ export declare class CollabBridge {
         tags: string[];
         joinedAt: number;
         workspaceId?: string | undefined;
+        hostWorkspaceId?: string | undefined;
         agentSessions?: Record<string, string> | undefined;
         agentNoEffort?: string[] | undefined;
     }>;
     /** Background: host join + local agent joins + optional directory publish. Never awaited by HTTP create. */
     private finishCreateConnect;
     /** Join by invite. `info` carries directory metadata when joining from search results. */
-    joinInvite(invite: string, info?: Partial<Pick<RoomMeta, "name" | "description" | "tags" | "public" | "workspaceId">> & {
+    joinInvite(invite: string, info?: Partial<Pick<RoomMeta, "name" | "description" | "tags" | "public" | "workspaceId" | "hostWorkspaceId">> & {
         workspacePath?: string;
         workspaceName?: string;
     }, bindTo?: AgentLike): Promise<{
@@ -437,6 +441,7 @@ export declare class CollabBridge {
         tags: string[];
         joinedAt: number;
         workspaceId?: string | undefined;
+        hostWorkspaceId?: string | undefined;
         agentSessions?: Record<string, string> | undefined;
         agentNoEffort?: string[] | undefined;
     }>;
@@ -663,6 +668,7 @@ export declare class CollabBridge {
         tags: string[];
         joinedAt: number;
         workspaceId?: string | undefined;
+        hostWorkspaceId?: string | undefined;
         agentSessions?: Record<string, string> | undefined;
         agentNoEffort?: string[] | undefined;
     }>;
