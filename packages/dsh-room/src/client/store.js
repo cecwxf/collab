@@ -121,7 +121,7 @@ export function createRoomsStore() {
       const signal = (opts && opts.signal) || ac.signal;
       const timer = ac ? setTimeout(() => ac.abort(), (opts && opts.timeoutMs) || 12_000) : null;
       try {
-        const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? undefined : (form.workspaceId || snap.activeWorkspaceId) }, { signal });
+        const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? undefined : (form.workspaceId || snap.activeWorkspaceId), hostWorkspaceId: form.hostWorkspaceId || (form.workspacePath ? form.workspaceId : undefined) }, { signal });
         try { api.onRoomOpened && api.onRoomOpened(); } catch { /* layout busy */ }
         // Upsert before SSE so RoomsMain does not flash EmptyMain (selected set, room not yet in list).
         set((s) => {

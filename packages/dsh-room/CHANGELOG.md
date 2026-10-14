@@ -1,3 +1,10 @@
+## 0.3.14
+
+- **Sidebar rooms under workspace**: Persist native `hostWorkspaceId` on create/join and match sidebar rows by that id (not only path), so created rooms stay under the correct workspace as session siblings.
+- **Collapsed workspace**: Keep the room group visible while its room is selected (create/open no longer hides rooms under a collapsed header).
+- **Path normalize**: Treat `/private/tmp` like `/tmp` (with existing `/private/var` ↔ `/var`).
+- **Re-inject backup**: 1s poll alongside MutationObserver so React groupSection reconciles cannot leave rooms missing.
+
 ## 0.3.13
 
 - **Workspace picker**: Create/Join select any native workspace (path-normalized match); welcome no longer hard-binds the first workspace.

@@ -1,5 +1,8 @@
 export function normalizeWorkspacePath(path) {
-  return (path || '').replace(/\\/g, '/').replace(/^\/private\/var(?=\/)/, '/var').replace(/\/+$/, '');
+  return (path || '')
+    .replace(/\\/g, '/')
+    .replace(/^\/private\/(?=var\/|tmp\/)/, '/')
+    .replace(/\/+$/, '');
 }
 
 export function sameWorkspacePath(a, b) {
@@ -23,5 +26,5 @@ export function inlineFile(value) {
 export function fileCandidates(text) {
   const values = [...text.matchAll(/`([^`\n]{1,4096})`/g)].map(m => inlineFile(m[1]).path);
   const images = [...text.matchAll(/!\[[^\]]*\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g)].map(m => m[1]);
-  return { paths: [...new Set([...values, ...images].filter(p => !/^[a-z]+:\/\//i.test(p) && /[./\\]/.test(p)))].slice(0, 50), images };
+  return { paths: [...new Set([...values, ...images].filter(p => !/^[a-z]+:\/\//i.test(p) && /[.\/\\]/.test(p)))].slice(0, 50), images };
 }

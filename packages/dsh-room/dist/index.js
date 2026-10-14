@@ -1258,25 +1258,29 @@ var MockTransport = class {
 // ../sdk/dist/ws-transport.js
 var WsTransport = class {
   url;
+  Socket;
   ws = null;
   frameHandlers = [];
   closeHandlers = [];
   buf = "";
   _connected = false;
   generation = 0;
-  constructor(url) {
+  cancelConnect;
+  constructor(url, Socket = globalThis.WebSocket) {
     this.url = url;
+    this.Socket = Socket;
   }
   get connected() {
     return this._connected;
   }
   async connect(timeoutMs = 8e3) {
-    if (this._connected && this.ws?.readyState === WebSocket.OPEN)
+    if (this._connected && this.ws?.readyState === this.Socket.OPEN)
       return;
-    this.teardownSocket();
+    this.cancelConnect?.("replaced");
     const gen = ++this.generation;
+    this.teardownSocket();
     await new Promise((resolve5, reject) => {
-      const ws = new WebSocket(this.url);
+      const ws = new this.Socket(this.url);
       this.ws = ws;
       let settled = false;
       const finish = (err) => {
@@ -1284,6 +1288,8 @@ var WsTransport = class {
           return;
         settled = true;
         clearTimeout(timer);
+        if (this.cancelConnect === cancel)
+          this.cancelConnect = void 0;
         if (err) {
           try {
             ws.close(1e3, "connect-failed");
@@ -1299,6 +1305,16 @@ var WsTransport = class {
           resolve5();
         }
       };
+      const cancel = (reason) => {
+        if (settled)
+          return;
+        settled = true;
+        clearTimeout(timer);
+        if (this.cancelConnect === cancel)
+          this.cancelConnect = void 0;
+        reject(new Error(`WebSocket connection ${reason}`));
+      };
+      this.cancelConnect = cancel;
       const timer = setTimeout(() => finish(new Error(`WebSocket connect timeout (${timeoutMs}ms) to ${this.url}`)), timeoutMs);
       ws.addEventListener("open", () => {
         if (gen !== this.generation) {
@@ -1366,6 +1382,7 @@ var WsTransport = class {
     this.closeHandlers.push(handler);
   }
   close(_reason = "closed") {
+    this.cancelConnect?.("closed");
     this.generation++;
     this.teardownSocket();
   }
@@ -1386,12 +1403,15 @@ var CollabClient = class _CollabClient {
   statusHandlers = [];
   waiters = [];
   joined = false;
+  hasJoined = false;
+  reconnecting;
   disposed = false;
   capabilities;
   reconnect;
   cursor;
   seenIds = /* @__PURE__ */ new Set();
   pingTimer;
+  retryDelay;
   constructor(opts) {
     this.identity = opts.identity;
     this.roomId = opts.roomId;
@@ -1406,10 +1426,13 @@ var CollabClient = class _CollabClient {
     this.transport.onFrame((f) => this.onFrame(f));
     this.transport.onClose(() => {
       this.joined = false;
+      this.stopPing();
       this.setConnStatus("disconnected", "ws_closed");
-      if (this.reconnect && !this.disposed) {
+      if (this.reconnect && !this.disposed && !this.reconnecting) {
         this.setConnStatus("connecting", "reconnect");
-        void this.reconnectLoop();
+        this.reconnecting = this.reconnectLoop().finally(() => {
+          this.reconnecting = void 0;
+        });
       }
     });
   }
@@ -1487,7 +1510,15 @@ var CollabClient = class _CollabClient {
     await this.transport.connect();
   }
   async join(timeoutMs = 1e4) {
+    if (this.disposed)
+      throw new Error("disposed");
+    if (this.joined)
+      return;
+    const catchUp = this.hasJoined || !!this.cursor;
+    const since = this.cursor?.get() ?? this.seq;
     await this.connect();
+    if (this.disposed)
+      throw new Error("disposed");
     const challengeP = this.waitFor((f) => f.type === "ctrl" && (f.method === "challenge" || f.method === "error"), timeoutMs);
     this.transport.send({
       v: 1,
@@ -1527,14 +1558,15 @@ var CollabClient = class _CollabClient {
       throw new Error("expected joined");
     }
     this.joined = true;
-    this.peers = joined.peers;
-    this.seq = joined.seq;
+    this.hasJoined = true;
+    this.seq = Math.max(this.seq, joined.seq);
     this.setConnStatus("connected");
     for (const h of this.peerHandlers)
       h(this.peers);
-    const since = this.cursor?.get() ?? 0;
-    if (since > 0 && since < this.seq) {
-      await this.poll(since);
+    if (catchUp && since < joined.seq) {
+      const missed = await this.pollFrames(since);
+      for (const frame of missed.frames)
+        await this.handleFwd(frame);
     }
     this.startPing();
   }
@@ -1557,6 +1589,11 @@ var CollabClient = class _CollabClient {
   async dispose() {
     this.disposed = true;
     this.reconnect = false;
+    if (this.retryDelay) {
+      clearTimeout(this.retryDelay.timer);
+      this.retryDelay.resolve();
+      this.retryDelay = void 0;
+    }
     await this.leave();
     this.transport.close("dispose");
     this.stopPing();
@@ -1629,6 +1666,18 @@ var CollabClient = class _CollabClient {
   }
   async poll(sinceSeq) {
     const since = sinceSeq ?? this.cursor?.get() ?? 0;
+    const res = await this.pollFrames(since);
+    const out = [];
+    for (const fwd of res.frames) {
+      const p = await this.decryptFwd(fwd);
+      if (p)
+        out.push(p);
+    }
+    this.seq = Math.max(this.seq, res.seq);
+    this.cursor?.set(this.seq);
+    return out;
+  }
+  async pollFrames(since) {
     const resP = this.waitFor((f) => f.type === "ctrl" && f.method === "poll_result", 5e3);
     this.transport.send({
       v: 1,
@@ -1640,22 +1689,18 @@ var CollabClient = class _CollabClient {
     });
     const res = await resP;
     if (res.type !== "ctrl" || res.method !== "poll_result")
-      return [];
-    const out = [];
-    for (const fwd of res.frames) {
-      const p = await this.decryptFwd(fwd);
-      if (p)
-        out.push(p);
-    }
-    this.seq = Math.max(this.seq, res.seq);
-    this.cursor?.set(this.seq);
-    return out;
+      throw new Error("expected poll_result");
+    return res;
   }
   async history(sinceSeq = 0) {
     return this.poll(sinceSeq);
   }
   // --- internals ---
   onFrame(frame) {
+    if (frame.type === "ctrl" && frame.method === "joined") {
+      this.peers = frame.peers;
+      this.seq = Math.max(this.seq, frame.seq);
+    }
     const remaining = [];
     for (const w of this.waiters) {
       if (w.pred(frame)) {
@@ -1697,9 +1742,12 @@ var CollabClient = class _CollabClient {
   }
   async decryptFwd(frame) {
     try {
+      if (frame.roomId !== this.roomId)
+        return null;
       const aad = new TextEncoder().encode(`${frame.roomId}:${frame.from}`);
       const plain = await decrypt(this.roomKey, frame.nonce, frame.ciphertext, aad);
-      return decodePayload(plain);
+      const payload = decodePayload(plain);
+      return payload.sender === frame.from ? payload : null;
     } catch {
       return null;
     }
@@ -1738,26 +1786,26 @@ var CollabClient = class _CollabClient {
   }
   async reconnectLoop() {
     let delay = 1e3;
-    let attempts = 0;
     while (!this.disposed && !this.joined) {
       try {
         this.setConnStatus("connecting", "reconnect");
         const jitter = Math.floor(Math.random() * Math.min(500, delay / 4));
-        await sleep(delay + jitter);
+        await new Promise((resolve5) => {
+          this.retryDelay = { timer: setTimeout(resolve5, delay + jitter), resolve: resolve5 };
+        });
+        this.retryDelay = void 0;
+        if (this.disposed)
+          return;
         await this.join();
-        attempts = 0;
         try {
           await this.publish({ kind: "presence", state: "online" });
         } catch {
         }
         return;
-      } catch {
-        attempts++;
+      } catch (error) {
         delay = Math.min(delay * 2, 3e4);
-        if (attempts > 50) {
-          this.setConnStatus("disconnected", "reconnect_gave_up");
-          return;
-        }
+        if (!this.disposed)
+          this.setConnStatus("connecting", error.message);
       }
     }
   }
@@ -2001,7 +2049,7 @@ import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 
 // ../lan-relay/dist/room.js
-import { WebSocket as WebSocket2 } from "ws";
+import { WebSocket } from "ws";
 var RING = 1e3;
 var RATE = 40;
 var LanRoom = class {
@@ -2024,7 +2072,7 @@ var LanRoom = class {
     return [...this.socks].filter((s) => s.joined && s.agentId && s.publicKey).map((s) => ({ agentId: s.agentId, publicKey: s.publicKey, capabilities: s.capabilities }));
   }
   send(ws, frame) {
-    if (ws.readyState === WebSocket2.OPEN)
+    if (ws.readyState === WebSocket.OPEN)
       ws.send(JSON.stringify(frame) + "\n");
   }
   broadcast(frame, except) {
@@ -2636,7 +2684,7 @@ import { chmod, mkdir as mkdir4, readFile as readFile4, rename, rm as rm2, write
 import { dirname as dirname3, resolve as resolve3 } from "node:path";
 import { randomUUID as randomUUID2 } from "node:crypto";
 function normalizeWorkspacePath(path) {
-  return (path || "").replace(/\\/g, "/").replace(/^\/private\/var(?=\/)/, "/var").replace(/\/+$/, "");
+  return (path || "").replace(/\\/g, "/").replace(/^\/private\/(?=var\/|tmp\/)/, "/").replace(/\/+$/, "");
 }
 function sameWorkspacePath(a, b) {
   const na = normalizeWorkspacePath(a);
@@ -3470,6 +3518,7 @@ var CollabBridge = class {
       joinedAt: Date.now(),
       transport: mode,
       workspaceId: (opts.workspaceId && this.workspaces.has(opts.workspaceId) ? opts.workspaceId : this.activeWorkspaceId) ?? void 0,
+      hostWorkspaceId: typeof opts.hostWorkspaceId === "string" && opts.hostWorkspaceId.trim() ? opts.hostWorkspaceId.trim() : void 0,
       memberConfig: (() => {
         const wsId = (opts.workspaceId && this.workspaces.has(opts.workspaceId) ? opts.workspaceId : this.activeWorkspaceId) ?? void 0;
         const ws = wsId ? this.workspaces.get(wsId) : void 0;
@@ -3561,6 +3610,7 @@ var CollabBridge = class {
         owner: false,
         joinedAt: Date.now(),
         workspaceId: wsId,
+        hostWorkspaceId: typeof info.hostWorkspaceId === "string" && info.hostWorkspaceId.trim() ? info.hostWorkspaceId.trim() : void 0,
         memberConfig
       });
     } else if (conn.status === "offline") {
@@ -5380,14 +5430,14 @@ function createApiHandler(bridge, connection) {
       if (method === "GET" && path === "/directory") return sendJson2(res, 200, { rooms: await bridge.search(str(url.searchParams.get("q")), str(url.searchParams.get("tag"))) });
       if (method === "POST" && path === "/rooms") {
         const b = await readJson2(req);
-        return sendJson2(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "relay" ? "relay" : "lan", lanHostPort: typeof b.lanHostPort === "string" ? b.lanHostPort.trim() : void 0, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName), localOnly: b.localOnly === true, agents: Array.isArray(b.agents) ? b.agents : void 0, turnLimit: typeof b.turnLimit === "number" ? b.turnLimit : void 0, concurrency: typeof b.concurrency === "number" ? b.concurrency : void 0, isolation: typeof b.isolation === "string" ? b.isolation : void 0 }));
+        return sendJson2(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "relay" ? "relay" : "lan", lanHostPort: typeof b.lanHostPort === "string" ? b.lanHostPort.trim() : void 0, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName), hostWorkspaceId: str(b.hostWorkspaceId), localOnly: b.localOnly === true, agents: Array.isArray(b.agents) ? b.agents : void 0, turnLimit: typeof b.turnLimit === "number" ? b.turnLimit : void 0, concurrency: typeof b.concurrency === "number" ? b.concurrency : void 0, isolation: typeof b.isolation === "string" ? b.isolation : void 0 }));
       }
       if (method === "GET" && path === "/presets") return sendJson2(res, 200, { presets: bridge.presets() });
       if (method === "POST" && path === "/join") {
         const b = await readJson2(req);
         const invite = str(b.invite);
         if (!invite || !/^collab:\/\/(join|lan|relay)\//.test(invite) || !/#\S+$/.test(invite)) throw new HttpError(400, "invite must be collab://join/\u2026, collab://lan/\u2026, or collab://relay/\u2026 with #key");
-        return sendJson2(res, 200, await bridge.joinInvite(invite, { name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName) }));
+        return sendJson2(res, 200, await bridge.joinInvite(invite, { name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName), hostWorkspaceId: str(b.hostWorkspaceId) }));
       }
       const m = /^\/rooms\/([^/]+)\/(messages|invite|leave|delete|send|task|active)$/.exec(path);
       if (m) {

@@ -280,6 +280,8 @@ export interface CreateRoomOptions {
   workspacePath?: string;
   /** Display name of that native workspace. */
   workspaceName?: string;
+  /** Native dsh workspace id (sidebar data-row-key); pins the room under that workspace row. */
+  hostWorkspaceId?: string;
   /** Start as a local-only room: in-process loopback transport, no network (switch to relay/LAN later). */
   localOnly?: boolean;
   /** Preset keys and/or full agent drafts to add right away. */
@@ -757,6 +759,7 @@ export class CollabBridge {
       joinedAt: Date.now(),
       transport: mode,
       workspaceId: (opts.workspaceId && this.workspaces.has(opts.workspaceId) ? opts.workspaceId : this.activeWorkspaceId) ?? undefined,
+      hostWorkspaceId: typeof opts.hostWorkspaceId === "string" && opts.hostWorkspaceId.trim() ? opts.hostWorkspaceId.trim() : undefined,
       memberConfig: (() => {
         const wsId = (opts.workspaceId && this.workspaces.has(opts.workspaceId) ? opts.workspaceId : this.activeWorkspaceId) ?? undefined;
         const ws = wsId ? this.workspaces.get(wsId) : undefined;
@@ -824,7 +827,7 @@ export class CollabBridge {
   }
 
   /** Join by invite. `info` carries directory metadata when joining from search results. */
-  async joinInvite(invite: string, info: Partial<Pick<RoomMeta, "name" | "description" | "tags" | "public" | "workspaceId">> & { workspacePath?: string; workspaceName?: string } = {}, bindTo?: AgentLike) {
+  async joinInvite(invite: string, info: Partial<Pick<RoomMeta, "name" | "description" | "tags" | "public" | "workspaceId" | "hostWorkspaceId">> & { workspacePath?: string; workspaceName?: string } = {}, bindTo?: AgentLike) {
     const { roomId } = CollabClient.parseInvite(invite.trim());
     if (info.workspacePath?.trim() && !this.rooms.has(roomId)) {
       const ws = await this.ensureWorkspace({ path: info.workspacePath.trim(), name: info.workspaceName });
@@ -846,6 +849,7 @@ export class CollabBridge {
         owner: false,
         joinedAt: Date.now(),
         workspaceId: wsId,
+        hostWorkspaceId: typeof info.hostWorkspaceId === "string" && info.hostWorkspaceId.trim() ? info.hostWorkspaceId.trim() : undefined,
         memberConfig,
       });
     } else if (conn.status === "offline") {

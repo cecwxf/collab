@@ -10,7 +10,7 @@ The same package supports **dsh web** and the official **DeepSeek Harness Deskto
 ### Web
 
 ```sh
-dsh plugin --profile web add @cecwxf/dsh-room@0.3.13
+dsh plugin --profile web add @cecwxf/dsh-room@0.3.14
 dsh web
 ```
 
@@ -18,12 +18,12 @@ Open the printed URL and select **DSH Room** in the sidebar.
 
 ### Desktop
 
-Install `@cecwxf/dsh-room@0.3.13` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
+Install `@cecwxf/dsh-room@0.3.14` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
 
 The npm-installed `dsh` command rejects `--profile desktop` with `profile "desktop" is managed exclusively by the Electron application`. For a command-line installation, launch Desktop once, fully quit it, and use **its bundled command**, not the npm CLI. For a macOS app in `/Applications`:
 
 ```sh
-"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.13
+"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.14
 ```
 
 Reopen Desktop and select **DSH Room**. **Manage dsh Command…** in Desktop's application menu can register that bundled command on PATH.
@@ -194,4 +194,4 @@ Room rows provide an **⋯** menu with **Edit room** and **Delete room**. Deleti
 
 Version 0.3.11 also settles cancelled WebSocket connect promises and drains the old host join before changing transports, so an in-flight relay connection cannot block a switch to Local only.
 
-Version 0.3.13 fixes workspace binding (any native workspace, path-normalized), keeps newly created rooms visible in the UI before SSE catch-up, and re-anchors sidebar rooms as first-level peers of sessions under each workspace. It also keeps configured local agents connected while idle, retries failed initial member joins automatically with bounded exponential backoff, and shows connecting during socket recovery. Rejoined members reannounce their configuration and clear stale errors. SDK reconnects continue until disposal rather than giving up after 51 failures. Removing a member, deleting its room, or switching transports cancels the owned retry timers. Model sessions stay deferred until a task wakes the agent; idle connectivity does not consume model turns.
+Version 0.3.14 fixes native hostWorkspaceId pinning so created rooms stay under the correct workspace row (path-normalized fallback remains). 0.3.13 fixed workspace binding (any native workspace, path-normalized), keeps newly created rooms visible in the UI before SSE catch-up, and re-anchors sidebar rooms as first-level peers of sessions under each workspace. It also keeps configured local agents connected while idle, retries failed initial member joins automatically with bounded exponential backoff, and shows connecting during socket recovery. Rejoined members reannounce their configuration and clear stale errors. SDK reconnects continue until disposal rather than giving up after 51 failures. Removing a member, deleting its room, or switching transports cancels the owned retry timers. Model sessions stay deferred until a task wakes the agent; idle connectivity does not consume model turns.

@@ -91,14 +91,14 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
       if (method === "GET" && path === "/directory") return sendJson(res, 200, { rooms: await bridge.search(str(url.searchParams.get("q")), str(url.searchParams.get("tag"))) });
       if (method === "POST" && path === "/rooms") {
         const b = await readJson(req);
-        return sendJson(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "relay" ? "relay" : "lan", lanHostPort: typeof b.lanHostPort === "string" ? b.lanHostPort.trim() : undefined, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName), localOnly: b.localOnly === true, agents: Array.isArray(b.agents) ? b.agents as never : undefined, turnLimit: typeof b.turnLimit === "number" ? b.turnLimit : undefined, concurrency: typeof b.concurrency === "number" ? b.concurrency : undefined, isolation: typeof b.isolation === "string" ? b.isolation as never : undefined }));
+        return sendJson(res, 200, await bridge.createRoom({ name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, mode: b.mode === "relay" ? "relay" : "lan", lanHostPort: typeof b.lanHostPort === "string" ? b.lanHostPort.trim() : undefined, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName), hostWorkspaceId: str(b.hostWorkspaceId), localOnly: b.localOnly === true, agents: Array.isArray(b.agents) ? b.agents as never : undefined, turnLimit: typeof b.turnLimit === "number" ? b.turnLimit : undefined, concurrency: typeof b.concurrency === "number" ? b.concurrency : undefined, isolation: typeof b.isolation === "string" ? b.isolation as never : undefined }));
       }
       if (method === "GET" && path === "/presets") return sendJson(res, 200, { presets: bridge.presets() });
       if (method === "POST" && path === "/join") {
         const b = await readJson(req);
         const invite = str(b.invite);
         if (!invite || !/^collab:\/\/(join|lan|relay)\//.test(invite) || !/#\S+$/.test(invite)) throw new HttpError(400, "invite must be collab://join/…, collab://lan/…, or collab://relay/… with #key");
-        return sendJson(res, 200, await bridge.joinInvite(invite, { name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName) }));
+        return sendJson(res, 200, await bridge.joinInvite(invite, { name: str(b.name), description: str(b.description), tags: strs(b.tags), public: b.public === true, workspaceId: str(b.workspaceId), workspacePath: str(b.workspacePath), workspaceName: str(b.workspaceName), hostWorkspaceId: str(b.hostWorkspaceId) }));
       }
       const m = /^\/rooms\/([^/]+)\/(messages|invite|leave|delete|send|task|active)$/.exec(path);
       if (m) {

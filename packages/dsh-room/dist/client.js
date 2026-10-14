@@ -41,7 +41,7 @@ var rooms_default = '/* Collab Rooms UI \u2014 original surface inside the dsh s
 
 // src/client/files.js
 function normalizeWorkspacePath(path) {
-  return (path || "").replace(/\\/g, "/").replace(/^\/private\/var(?=\/)/, "/var").replace(/\/+$/, "");
+  return (path || "").replace(/\\/g, "/").replace(/^\/private\/(?=var\/|tmp\/)/, "/").replace(/\/+$/, "");
 }
 function sameWorkspacePath(a, b) {
   const na = normalizeWorkspacePath(a);
@@ -60,7 +60,7 @@ function inlineFile(value) {
 function fileCandidates(text) {
   const values = [...text.matchAll(/`([^`\n]{1,4096})`/g)].map((m) => inlineFile(m[1]).path);
   const images = [...text.matchAll(/!\[[^\]]*\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g)].map((m) => m[1]);
-  return { paths: [...new Set([...values, ...images].filter((p) => !/^[a-z]+:\/\//i.test(p) && /[./\\]/.test(p)))].slice(0, 50), images };
+  return { paths: [...new Set([...values, ...images].filter((p) => !/^[a-z]+:\/\//i.test(p) && /[.\/\\]/.test(p)))].slice(0, 50), images };
 }
 
 // src/client/store.js
@@ -216,7 +216,7 @@ function createRoomsStore() {
       const signal = opts && opts.signal || ac.signal;
       const timer = ac ? setTimeout(() => ac.abort(), opts && opts.timeoutMs || 12e3) : null;
       try {
-        const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? void 0 : form.workspaceId || snap.activeWorkspaceId }, { signal });
+        const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? void 0 : form.workspaceId || snap.activeWorkspaceId, hostWorkspaceId: form.hostWorkspaceId || (form.workspacePath ? form.workspaceId : void 0) }, { signal });
         try {
           api.onRoomOpened && api.onRoomOpened();
         } catch {
@@ -423,6 +423,12 @@ function createRoomsStore() {
 // src/client/workspace-rooms.js
 var ROOM_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="2"/><path d="M5.5 6.5h5M5.5 9.5h3.5"/></svg>';
 var AGENT_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" aria-hidden="true"><rect x="3" y="5" width="10" height="7.5" rx="2"/><path d="M8 2.5V5M6 8.5h.01M10 8.5h.01"/></svg>';
+function roomsForWorkspace(rooms, workspaceId, workspacePath) {
+  return (rooms || []).filter((r) => {
+    if (workspaceId && r.hostWorkspaceId && r.hostWorkspaceId === workspaceId) return true;
+    return sameWorkspacePath(r.memberConfig?.workspacePath, workspacePath);
+  });
+}
 function installRoomGroups(store, native, layout, sessions) {
   if (typeof document === "undefined" || typeof native?.list?.getSnapshot !== "function") return () => {
   };
@@ -462,12 +468,12 @@ function installRoomGroups(store, native, layout, sessions) {
     for (const row of document.querySelectorAll('[data-row-key^="workspace:"]')) {
       const key = row.getAttribute("data-row-key").slice("workspace:".length);
       const ws = workspaces.find((w) => w.workspaceId === key);
-      const rooms = ws ? (state.rooms || []).filter((r) => sameWorkspacePath(r.memberConfig?.workspacePath, ws.path)) : [];
+      const rooms = roomsForWorkspace(state.rooms, key, ws?.path);
       const anchor = row.parentElement?.tagName === "SPAN" ? row.parentElement : row;
       const parent = anchor.parentElement;
       if (!parent) continue;
       let group = [...parent.children].find((e) => e.getAttribute("data-rm-workspace-rooms") === key);
-      if (!ws) {
+      if (!ws && !rooms.length) {
         group?.remove();
         continue;
       }
@@ -482,8 +488,11 @@ function installRoomGroups(store, native, layout, sessions) {
         parent.insertBefore(group, anchor.nextSibling);
       }
       decorated.add(group);
-      group.hidden = row.getAttribute("aria-expanded") === "false";
-      const signature = JSON.stringify([ws.title, ws.path, panelActive, state.selected, current, rooms.map((r) => [r.roomId, r.name, r.status, r.sessionId, r.local?.agents.map((a) => [a.agentId, a.name, a.sessionId, a.state, a.online]), state.expandedRooms[r.roomId] !== false])]);
+      const selectedHere = rooms.some((r) => r.roomId === state.selected);
+      group.hidden = row.getAttribute("aria-expanded") === "false" && !selectedHere;
+      const title = ws?.title || ws?.path?.split("/").filter(Boolean).at(-1) || rooms[0]?.memberConfig?.workspaceLabel || key;
+      const path = ws?.path || rooms[0]?.memberConfig?.workspacePath || "";
+      const signature = JSON.stringify([title, path, panelActive, state.selected, current, rooms.map((r) => [r.roomId, r.name, r.status, r.sessionId, r.local?.agents.map((a) => [a.agentId, a.name, a.sessionId, a.state, a.online]), state.expandedRooms[r.roomId] !== false])]);
       if (group.getAttribute("data-rm-signature") !== signature) {
         group.setAttribute("data-rm-signature", signature);
         group.replaceChildren();
@@ -491,13 +500,13 @@ function installRoomGroups(store, native, layout, sessions) {
         create.type = "button";
         create.className = "rm-native-row rm-native-create-room";
         create.setAttribute("data-rm-new-room-shortcut", key);
-        create.setAttribute("aria-label", `New room in ${ws.title || ws.path.split("/").filter(Boolean).at(-1) || "workspace"}`);
+        create.setAttribute("aria-label", `New room in ${title}`);
         const createIcon = document.createElement("span");
         createIcon.innerHTML = ROOM_ICON;
         const createLabel = document.createElement("span");
         createLabel.textContent = "New room";
         create.append(createIcon, createLabel);
-        create.onclick = () => store.actions.openDialog({ kind: "create", workspace: { id: ws.workspaceId, path: ws.path, title: ws.title || ws.path.split("/").filter(Boolean).at(-1) } });
+        create.onclick = () => store.actions.openDialog({ kind: "create", workspace: { id: key, path, title } });
         group.append(create);
         for (const room of rooms) {
           const expanded = state.expandedRooms[room.roomId] !== false;
@@ -550,11 +559,11 @@ function installRoomGroups(store, native, layout, sessions) {
             menu.className = "rm-root rm-room-menu";
             menu.setAttribute("role", "menu");
             menu.setAttribute("data-rm-room-menu", room.roomId);
-            for (const [label2, kind] of [["Edit room", "room-settings"], ["Delete room", "delete-room"]]) {
+            for (const [lab, kind] of [["Edit room", "room-settings"], ["Delete room", "delete-room"]]) {
               const item = document.createElement("button");
               item.type = "button";
               item.setAttribute("role", "menuitem");
-              item.textContent = label2;
+              item.textContent = lab;
               if (kind === "delete-room") item.className = "rm-danger";
               item.onclick = (event) => {
                 event.stopPropagation();
@@ -593,10 +602,10 @@ function installRoomGroups(store, native, layout, sessions) {
             button.title = `${agent.name} \xB7 native dsh session`;
             const glyph = document.createElement("span");
             glyph.innerHTML = AGENT_ICON;
-            const title = document.createElement("span");
-            title.className = "rm-native-row-label";
-            title.textContent = agent.name;
-            button.append(glyph, title);
+            const agTitle = document.createElement("span");
+            agTitle.className = "rm-native-row-label";
+            agTitle.textContent = agent.name;
+            button.append(glyph, agTitle);
             if (agent.state && agent.state !== "idle") {
               const status = document.createElement("span");
               status.className = "rm-native-row-count";
@@ -636,10 +645,12 @@ function installRoomGroups(store, native, layout, sessions) {
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-expanded"] });
   const unsubscribers = [store, native.list, panelInfo, sessionList].filter((source) => typeof source?.subscribe === "function").map((source) => source.subscribe(schedule)).filter((off) => typeof off === "function");
+  const poll = typeof globalThis.setInterval === "function" ? globalThis.setInterval(schedule, 1e3) : null;
   schedule();
   return () => {
     alive = false;
     observer.disconnect();
+    if (poll && typeof globalThis.clearInterval === "function") globalThis.clearInterval(poll);
     closeMenus();
     document.removeEventListener("click", closeOutside);
     document.removeEventListener("keydown", closeEscape);
@@ -736,8 +747,9 @@ function groupRooms(rooms, workspaces) {
   const groups = workspaces.map((w) => ({ ws: w, rooms: [] }));
   const other = [];
   for (const r of rooms) {
+    const byHost = r.hostWorkspaceId && groups.find((x) => x.ws.workspaceId === r.hostWorkspaceId);
     const path = r.memberConfig && r.memberConfig.workspacePath;
-    const g = groups.find((x) => samePath(x.ws.path, path));
+    const g = byHost || groups.find((x) => samePath(x.ws.path, path));
     if (g) g.rooms.push(r);
     else other.push(r);
   }
@@ -1982,6 +1994,7 @@ function CreateDialog({ store, d }) {
         lanHostPort,
         workspacePath: ws.path,
         workspaceName: ws.title,
+        hostWorkspaceId: ws.id,
         localOnly,
         turnLimit: f.turnLimit,
         concurrency: f.concurrency,
@@ -2154,7 +2167,7 @@ function JoinDialog({ store }) {
     setBusy(true);
     setErr(null);
     try {
-      await a.join(invite.trim(), ws ? { workspacePath: ws.path, workspaceName: ws.title } : void 0);
+      await a.join(invite.trim(), ws ? { workspacePath: ws.path, workspaceName: ws.title, hostWorkspaceId: ws.id } : void 0);
     } catch (e) {
       setErr(e.message);
       setBusy(false);
@@ -2732,7 +2745,7 @@ var rooms_default = '/* Collab Rooms UI \u2014 original surface inside the dsh s
 
 // src/client/files.js
 function normalizeWorkspacePath(path) {
-  return (path || "").replace(/\\/g, "/").replace(/^\/private\/var(?=\/)/, "/var").replace(/\/+$/, "");
+  return (path || "").replace(/\\/g, "/").replace(/^\/private\/(?=var\/|tmp\/)/, "/").replace(/\/+$/, "");
 }
 function sameWorkspacePath(a, b) {
   const na = normalizeWorkspacePath(a);
@@ -2751,7 +2764,7 @@ function inlineFile(value) {
 function fileCandidates(text) {
   const values = [...text.matchAll(/`([^`\n]{1,4096})`/g)].map((m) => inlineFile(m[1]).path);
   const images = [...text.matchAll(/!\[[^\]]*\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g)].map((m) => m[1]);
-  return { paths: [...new Set([...values, ...images].filter((p) => !/^[a-z]+:\/\//i.test(p) && /[./\\]/.test(p)))].slice(0, 50), images };
+  return { paths: [...new Set([...values, ...images].filter((p) => !/^[a-z]+:\/\//i.test(p) && /[.\/\\]/.test(p)))].slice(0, 50), images };
 }
 
 // src/client/store.js
@@ -2907,7 +2920,7 @@ function createRoomsStore() {
       const signal = opts && opts.signal || ac.signal;
       const timer = ac ? setTimeout(() => ac.abort(), opts && opts.timeoutMs || 12e3) : null;
       try {
-        const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? void 0 : form.workspaceId || snap.activeWorkspaceId }, { signal });
+        const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? void 0 : form.workspaceId || snap.activeWorkspaceId, hostWorkspaceId: form.hostWorkspaceId || (form.workspacePath ? form.workspaceId : void 0) }, { signal });
         try {
           api.onRoomOpened && api.onRoomOpened();
         } catch {
@@ -3114,6 +3127,12 @@ function createRoomsStore() {
 // src/client/workspace-rooms.js
 var ROOM_ICON = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="2"/><path d="M5.5 6.5h5M5.5 9.5h3.5"/></svg>';
 var AGENT_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.15" aria-hidden="true"><rect x="3" y="5" width="10" height="7.5" rx="2"/><path d="M8 2.5V5M6 8.5h.01M10 8.5h.01"/></svg>';
+function roomsForWorkspace(rooms, workspaceId, workspacePath) {
+  return (rooms || []).filter((r) => {
+    if (workspaceId && r.hostWorkspaceId && r.hostWorkspaceId === workspaceId) return true;
+    return sameWorkspacePath(r.memberConfig?.workspacePath, workspacePath);
+  });
+}
 function installRoomGroups(store, native, layout, sessions) {
   if (typeof document === "undefined" || typeof native?.list?.getSnapshot !== "function") return () => {
   };
@@ -3153,12 +3172,12 @@ function installRoomGroups(store, native, layout, sessions) {
     for (const row of document.querySelectorAll('[data-row-key^="workspace:"]')) {
       const key = row.getAttribute("data-row-key").slice("workspace:".length);
       const ws = workspaces.find((w) => w.workspaceId === key);
-      const rooms = ws ? (state.rooms || []).filter((r) => sameWorkspacePath(r.memberConfig?.workspacePath, ws.path)) : [];
+      const rooms = roomsForWorkspace(state.rooms, key, ws?.path);
       const anchor = row.parentElement?.tagName === "SPAN" ? row.parentElement : row;
       const parent = anchor.parentElement;
       if (!parent) continue;
       let group = [...parent.children].find((e) => e.getAttribute("data-rm-workspace-rooms") === key);
-      if (!ws) {
+      if (!ws && !rooms.length) {
         group?.remove();
         continue;
       }
@@ -3173,8 +3192,11 @@ function installRoomGroups(store, native, layout, sessions) {
         parent.insertBefore(group, anchor.nextSibling);
       }
       decorated.add(group);
-      group.hidden = row.getAttribute("aria-expanded") === "false";
-      const signature = JSON.stringify([ws.title, ws.path, panelActive, state.selected, current, rooms.map((r) => [r.roomId, r.name, r.status, r.sessionId, r.local?.agents.map((a) => [a.agentId, a.name, a.sessionId, a.state, a.online]), state.expandedRooms[r.roomId] !== false])]);
+      const selectedHere = rooms.some((r) => r.roomId === state.selected);
+      group.hidden = row.getAttribute("aria-expanded") === "false" && !selectedHere;
+      const title = ws?.title || ws?.path?.split("/").filter(Boolean).at(-1) || rooms[0]?.memberConfig?.workspaceLabel || key;
+      const path = ws?.path || rooms[0]?.memberConfig?.workspacePath || "";
+      const signature = JSON.stringify([title, path, panelActive, state.selected, current, rooms.map((r) => [r.roomId, r.name, r.status, r.sessionId, r.local?.agents.map((a) => [a.agentId, a.name, a.sessionId, a.state, a.online]), state.expandedRooms[r.roomId] !== false])]);
       if (group.getAttribute("data-rm-signature") !== signature) {
         group.setAttribute("data-rm-signature", signature);
         group.replaceChildren();
@@ -3182,13 +3204,13 @@ function installRoomGroups(store, native, layout, sessions) {
         create.type = "button";
         create.className = "rm-native-row rm-native-create-room";
         create.setAttribute("data-rm-new-room-shortcut", key);
-        create.setAttribute("aria-label", `New room in ${ws.title || ws.path.split("/").filter(Boolean).at(-1) || "workspace"}`);
+        create.setAttribute("aria-label", `New room in ${title}`);
         const createIcon = document.createElement("span");
         createIcon.innerHTML = ROOM_ICON;
         const createLabel = document.createElement("span");
         createLabel.textContent = "New room";
         create.append(createIcon, createLabel);
-        create.onclick = () => store.actions.openDialog({ kind: "create", workspace: { id: ws.workspaceId, path: ws.path, title: ws.title || ws.path.split("/").filter(Boolean).at(-1) } });
+        create.onclick = () => store.actions.openDialog({ kind: "create", workspace: { id: key, path, title } });
         group.append(create);
         for (const room of rooms) {
           const expanded = state.expandedRooms[room.roomId] !== false;
@@ -3241,11 +3263,11 @@ function installRoomGroups(store, native, layout, sessions) {
             menu.className = "rm-root rm-room-menu";
             menu.setAttribute("role", "menu");
             menu.setAttribute("data-rm-room-menu", room.roomId);
-            for (const [label2, kind] of [["Edit room", "room-settings"], ["Delete room", "delete-room"]]) {
+            for (const [lab, kind] of [["Edit room", "room-settings"], ["Delete room", "delete-room"]]) {
               const item = document.createElement("button");
               item.type = "button";
               item.setAttribute("role", "menuitem");
-              item.textContent = label2;
+              item.textContent = lab;
               if (kind === "delete-room") item.className = "rm-danger";
               item.onclick = (event) => {
                 event.stopPropagation();
@@ -3284,10 +3306,10 @@ function installRoomGroups(store, native, layout, sessions) {
             button.title = `${agent.name} \xB7 native dsh session`;
             const glyph = document.createElement("span");
             glyph.innerHTML = AGENT_ICON;
-            const title = document.createElement("span");
-            title.className = "rm-native-row-label";
-            title.textContent = agent.name;
-            button.append(glyph, title);
+            const agTitle = document.createElement("span");
+            agTitle.className = "rm-native-row-label";
+            agTitle.textContent = agent.name;
+            button.append(glyph, agTitle);
             if (agent.state && agent.state !== "idle") {
               const status = document.createElement("span");
               status.className = "rm-native-row-count";
@@ -3327,10 +3349,12 @@ function installRoomGroups(store, native, layout, sessions) {
   const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-expanded"] });
   const unsubscribers = [store, native.list, panelInfo, sessionList].filter((source) => typeof source?.subscribe === "function").map((source) => source.subscribe(schedule)).filter((off) => typeof off === "function");
+  const poll = typeof globalThis.setInterval === "function" ? globalThis.setInterval(schedule, 1e3) : null;
   schedule();
   return () => {
     alive = false;
     observer.disconnect();
+    if (poll && typeof globalThis.clearInterval === "function") globalThis.clearInterval(poll);
     closeMenus();
     document.removeEventListener("click", closeOutside);
     document.removeEventListener("keydown", closeEscape);
@@ -3427,8 +3451,9 @@ function groupRooms(rooms, workspaces) {
   const groups = workspaces.map((w) => ({ ws: w, rooms: [] }));
   const other = [];
   for (const r of rooms) {
+    const byHost = r.hostWorkspaceId && groups.find((x) => x.ws.workspaceId === r.hostWorkspaceId);
     const path = r.memberConfig && r.memberConfig.workspacePath;
-    const g = groups.find((x) => samePath(x.ws.path, path));
+    const g = byHost || groups.find((x) => samePath(x.ws.path, path));
     if (g) g.rooms.push(r);
     else other.push(r);
   }
@@ -4673,6 +4698,7 @@ function CreateDialog({ store, d }) {
         lanHostPort,
         workspacePath: ws.path,
         workspaceName: ws.title,
+        hostWorkspaceId: ws.id,
         localOnly,
         turnLimit: f.turnLimit,
         concurrency: f.concurrency,
@@ -4845,7 +4871,7 @@ function JoinDialog({ store }) {
     setBusy(true);
     setErr(null);
     try {
-      await a.join(invite.trim(), ws ? { workspacePath: ws.path, workspaceName: ws.title } : void 0);
+      await a.join(invite.trim(), ws ? { workspacePath: ws.path, workspaceName: ws.title, hostWorkspaceId: ws.id } : void 0);
     } catch (e) {
       setErr(e.message);
       setBusy(false);

@@ -4,9 +4,9 @@ import { randomUUID } from "node:crypto";
 import type { RoomMemberConfig } from "./member-config.js";
 import type { RoomLocalSettings } from "./local-agents.js";
 
-/** Normalize workspace paths for equality (macOS /private/var, trailing slashes, backslashes). */
+/** Normalize workspace paths for equality (macOS /private/var|/private/tmp, trailing slashes, backslashes). */
 export function normalizeWorkspacePath(path: string | undefined | null): string {
-  return (path || "").replace(/\\/g, "/").replace(/^\/private\/var(?=\/)/, "/var").replace(/\/+$/, "");
+  return (path || "").replace(/\\/g, "/").replace(/^\/private\/(?=var\/|tmp\/)/, "/").replace(/\/+$/, "");
 }
 
 export function sameWorkspacePath(a: string | undefined | null, b: string | undefined | null): boolean {
@@ -46,6 +46,8 @@ export interface RoomMeta {
   memberConfig?: RoomMemberConfig;
   /** Workspace this room belongs to (required for new rooms). */
   workspaceId?: string;
+  /** Native dsh sidebar workspace id (data-row-key workspace:…); used to pin the room under that row. */
+  hostWorkspaceId?: string;
   /** Local multi-agent settings (agents hosted by this dsh, turn limit, concurrency, loopback). */
   local?: RoomLocalSettings;
   /** local agentId → dsh session id it runs in. */

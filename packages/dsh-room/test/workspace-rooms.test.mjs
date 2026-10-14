@@ -39,7 +39,7 @@ async function exerciseGroups(sessions, overrides = {}) {
     // React can replace only its native anchor; the plugin must not remove, duplicate or reparent it.
     const replacement=original.cloneNode(true);original.replaceWith(replacement);await tick();
     assert.ok(replacement.hasAttribute('data-rm-grouped-session'));assert.equal(document.querySelectorAll('[data-rm-room-group]').length,1);
-    document.querySelector('[data-row-key="workspace:w"]').setAttribute('aria-expanded','false');await tick();assert.equal(document.querySelector('[data-rm-workspace-rooms]').hidden,true);
+    document.querySelector('[data-row-key="workspace:w"]').setAttribute('aria-expanded','false');await tick();assert.equal(document.querySelector('[data-rm-workspace-rooms]').hidden,false,'selected room keeps group visible when collapsed');state.selected=null;for(const f of callbacks)f();await tick();assert.equal(document.querySelector('[data-rm-workspace-rooms]').hidden,true,'collapses once selection leaves');
     document.querySelector('[data-row-key="workspace:w"]').parentElement.remove();await tick();
     assert.equal(document.querySelector('[data-rm-workspace-rooms]'),null,'flat/sidebar rerenders remove orphan shortcuts');
     assert.ok(!replacement.hasAttribute('data-rm-grouped-session'));

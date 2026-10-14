@@ -74,8 +74,9 @@ function groupRooms(rooms, workspaces) {
   const groups = workspaces.map((w) => ({ ws: w, rooms: [] }));
   const other = [];
   for (const r of rooms) {
+    const byHost = r.hostWorkspaceId && groups.find((x) => x.ws.workspaceId === r.hostWorkspaceId);
     const path = r.memberConfig && r.memberConfig.workspacePath;
-    const g = groups.find((x) => samePath(x.ws.path, path));
+    const g = byHost || groups.find((x) => samePath(x.ws.path, path));
     if (g) g.rooms.push(r); else other.push(r);
   }
   return { groups, other };
@@ -1087,7 +1088,7 @@ function CreateDialog({ store, d }) {
         name: f.name.trim(), description: f.description.trim(), tags: f.tags,
         public: localOnly ? false : f.public, mode,
         lanHostPort,
-        workspacePath: ws.path, workspaceName: ws.title,
+        workspacePath: ws.path, workspaceName: ws.title, hostWorkspaceId: ws.id,
         localOnly,
         turnLimit: f.turnLimit, concurrency: f.concurrency, isolation: f.isolation,
         agents: f.agents.map((ag) => ag.key
@@ -1286,7 +1287,7 @@ function JoinDialog({ store }) {
   const submit = async () => {
     if (!valid || busy) return;
     setBusy(true); setErr(null);
-    try { await a.join(invite.trim(), ws ? { workspacePath: ws.path, workspaceName: ws.title } : undefined); }
+    try { await a.join(invite.trim(), ws ? { workspacePath: ws.path, workspaceName: ws.title, hostWorkspaceId: ws.id } : undefined); }
     catch (e) { setErr(e.message); setBusy(false); }
   };
   return (
