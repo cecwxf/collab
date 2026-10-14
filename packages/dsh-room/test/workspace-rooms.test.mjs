@@ -63,3 +63,41 @@ test('native session observable updates the active grouped agent and unsubscribe
     assert.equal(document.querySelector('[data-rm-open-agent]').getAttribute('aria-current'),'false');
   }});assert.equal(callbacks.size,0);
 });
+
+test('room group is re-anchored as first sibling under the workspace after React inserts sessions', async () => {
+  const dom = new JSDOM('<body><section><span><div data-row-key="workspace:w" aria-expanded="true">Workspace</div></span><span id="original"><div data-row-key="session:s">Native session</div></span></section></body>', { pretendToBeVisual: true });
+  const saved = {};
+  for (const key of ['document', 'MutationObserver', 'requestAnimationFrame', 'cancelAnimationFrame', 'CSS']) saved[key] = globalThis[key];
+  Object.assign(globalThis, { document: dom.window.document, MutationObserver: dom.window.MutationObserver, requestAnimationFrame: dom.window.requestAnimationFrame.bind(dom.window), cancelAnimationFrame: dom.window.cancelAnimationFrame.bind(dom.window), CSS: { escape: s => s } });
+  const callbacks = new Set();
+  const sub = fn => { callbacks.add(fn); return () => callbacks.delete(fn); };
+  const tick = () => new Promise(r => setTimeout(r, 40));
+  const state = { rooms: [{ roomId: 'r', name: 'Research room', status: 'online', sessionId: 's', memberConfig: { workspacePath: '/var/project' }, local: { agents: [] } }], expandedRooms: {}, selected: 'r' };
+  const store = { getSnapshot: () => state, subscribe: sub, actions: { openDialog() {}, select() {}, toggleRoom() {}, async openSession() {} } };
+  const native = { list: { getSnapshot: () => ({ items: [{ workspaceId: 'w', path: '/private/var/project' }] }), subscribe: sub } };
+  const layout = { panelInfo: { getSnapshot: () => ({ activePanelId: 'collab' }), subscribe: sub } };
+  let dispose;
+  try {
+    dispose = installRoomGroups(store, native, layout, {});
+    await tick();
+    const section = document.querySelector('section');
+    const group = document.querySelector('[data-rm-workspace-rooms]');
+    const ws = document.querySelector('[data-row-key="workspace:w"]').parentElement;
+    assert.equal(group.previousElementSibling, ws);
+    // Simulate React inserting a new session between workspace and room group.
+    const injected = document.createElement('span');
+    injected.innerHTML = '<div data-row-key="session:new">Injected</div>';
+    section.insertBefore(injected, group);
+    assert.notEqual(group.previousElementSibling, ws);
+    for (const cb of callbacks) cb();
+    await tick();
+    assert.equal(document.querySelector('[data-rm-workspace-rooms]').previousElementSibling, ws, 'group must move back under the workspace header');
+  } finally {
+    dispose?.();
+    dom.window.close();
+    for (const key of Object.keys(saved)) {
+      if (saved[key] === undefined) delete globalThis[key];
+      else globalThis[key] = saved[key];
+    }
+  }
+});

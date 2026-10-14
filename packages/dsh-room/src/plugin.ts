@@ -48,7 +48,7 @@ import type {
   ToolDefinition,
   UserMessage,
 } from "./adapter.js";
-import { loadState, saveState, createWorkspaceMeta, type RoomMeta, type WorkspaceMeta } from "./state.js";
+import { loadState, saveState, createWorkspaceMeta, sameWorkspacePath, type RoomMeta, type WorkspaceMeta } from "./state.js";
 import { extractMentions } from "./commands.js";
 import { createRequire } from "node:module";
 import { resolveRoomFile } from "./artifacts.js";
@@ -653,7 +653,7 @@ export class CollabBridge {
     }
     const path = (opts.path ?? this.config.workspacePath).trim();
     if (!path.startsWith("/") && !/^[A-Za-z]:[\\/]/.test(path)) throw new Error("workspace path must be absolute");
-    const existing = [...this.workspaces.values()].find((w) => w.path === path);
+    const existing = [...this.workspaces.values()].find((w) => sameWorkspacePath(w.path, path));
     if (existing) {
       this.activeWorkspaceId = existing.id;
       if (opts.name?.trim()) existing.name = opts.name.trim().slice(0, 60);

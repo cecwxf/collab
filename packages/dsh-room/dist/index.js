@@ -1258,29 +1258,25 @@ var MockTransport = class {
 // ../sdk/dist/ws-transport.js
 var WsTransport = class {
   url;
-  Socket;
   ws = null;
   frameHandlers = [];
   closeHandlers = [];
   buf = "";
   _connected = false;
   generation = 0;
-  cancelConnect;
-  constructor(url, Socket = globalThis.WebSocket) {
+  constructor(url) {
     this.url = url;
-    this.Socket = Socket;
   }
   get connected() {
     return this._connected;
   }
   async connect(timeoutMs = 8e3) {
-    if (this._connected && this.ws?.readyState === this.Socket.OPEN)
+    if (this._connected && this.ws?.readyState === WebSocket.OPEN)
       return;
-    this.cancelConnect?.("replaced");
-    const gen = ++this.generation;
     this.teardownSocket();
+    const gen = ++this.generation;
     await new Promise((resolve5, reject) => {
-      const ws = new this.Socket(this.url);
+      const ws = new WebSocket(this.url);
       this.ws = ws;
       let settled = false;
       const finish = (err) => {
@@ -1288,8 +1284,6 @@ var WsTransport = class {
           return;
         settled = true;
         clearTimeout(timer);
-        if (this.cancelConnect === cancel)
-          this.cancelConnect = void 0;
         if (err) {
           try {
             ws.close(1e3, "connect-failed");
@@ -1305,16 +1299,6 @@ var WsTransport = class {
           resolve5();
         }
       };
-      const cancel = (reason) => {
-        if (settled)
-          return;
-        settled = true;
-        clearTimeout(timer);
-        if (this.cancelConnect === cancel)
-          this.cancelConnect = void 0;
-        reject(new Error(`WebSocket connection ${reason}`));
-      };
-      this.cancelConnect = cancel;
       const timer = setTimeout(() => finish(new Error(`WebSocket connect timeout (${timeoutMs}ms) to ${this.url}`)), timeoutMs);
       ws.addEventListener("open", () => {
         if (gen !== this.generation) {
@@ -1382,7 +1366,6 @@ var WsTransport = class {
     this.closeHandlers.push(handler);
   }
   close(_reason = "closed") {
-    this.cancelConnect?.("closed");
     this.generation++;
     this.teardownSocket();
   }
@@ -1403,15 +1386,12 @@ var CollabClient = class _CollabClient {
   statusHandlers = [];
   waiters = [];
   joined = false;
-  hasJoined = false;
-  reconnecting;
   disposed = false;
   capabilities;
   reconnect;
   cursor;
   seenIds = /* @__PURE__ */ new Set();
   pingTimer;
-  retryDelay;
   constructor(opts) {
     this.identity = opts.identity;
     this.roomId = opts.roomId;
@@ -1426,13 +1406,10 @@ var CollabClient = class _CollabClient {
     this.transport.onFrame((f) => this.onFrame(f));
     this.transport.onClose(() => {
       this.joined = false;
-      this.stopPing();
       this.setConnStatus("disconnected", "ws_closed");
-      if (this.reconnect && !this.disposed && !this.reconnecting) {
+      if (this.reconnect && !this.disposed) {
         this.setConnStatus("connecting", "reconnect");
-        this.reconnecting = this.reconnectLoop().finally(() => {
-          this.reconnecting = void 0;
-        });
+        void this.reconnectLoop();
       }
     });
   }
@@ -1510,15 +1487,7 @@ var CollabClient = class _CollabClient {
     await this.transport.connect();
   }
   async join(timeoutMs = 1e4) {
-    if (this.disposed)
-      throw new Error("disposed");
-    if (this.joined)
-      return;
-    const catchUp = this.hasJoined || !!this.cursor;
-    const since = this.cursor?.get() ?? this.seq;
     await this.connect();
-    if (this.disposed)
-      throw new Error("disposed");
     const challengeP = this.waitFor((f) => f.type === "ctrl" && (f.method === "challenge" || f.method === "error"), timeoutMs);
     this.transport.send({
       v: 1,
@@ -1558,15 +1527,14 @@ var CollabClient = class _CollabClient {
       throw new Error("expected joined");
     }
     this.joined = true;
-    this.hasJoined = true;
-    this.seq = Math.max(this.seq, joined.seq);
+    this.peers = joined.peers;
+    this.seq = joined.seq;
     this.setConnStatus("connected");
     for (const h of this.peerHandlers)
       h(this.peers);
-    if (catchUp && since < joined.seq) {
-      const missed = await this.pollFrames(since);
-      for (const frame of missed.frames)
-        await this.handleFwd(frame);
+    const since = this.cursor?.get() ?? 0;
+    if (since > 0 && since < this.seq) {
+      await this.poll(since);
     }
     this.startPing();
   }
@@ -1589,11 +1557,6 @@ var CollabClient = class _CollabClient {
   async dispose() {
     this.disposed = true;
     this.reconnect = false;
-    if (this.retryDelay) {
-      clearTimeout(this.retryDelay.timer);
-      this.retryDelay.resolve();
-      this.retryDelay = void 0;
-    }
     await this.leave();
     this.transport.close("dispose");
     this.stopPing();
@@ -1666,18 +1629,6 @@ var CollabClient = class _CollabClient {
   }
   async poll(sinceSeq) {
     const since = sinceSeq ?? this.cursor?.get() ?? 0;
-    const res = await this.pollFrames(since);
-    const out = [];
-    for (const fwd of res.frames) {
-      const p = await this.decryptFwd(fwd);
-      if (p)
-        out.push(p);
-    }
-    this.seq = Math.max(this.seq, res.seq);
-    this.cursor?.set(this.seq);
-    return out;
-  }
-  async pollFrames(since) {
     const resP = this.waitFor((f) => f.type === "ctrl" && f.method === "poll_result", 5e3);
     this.transport.send({
       v: 1,
@@ -1689,18 +1640,22 @@ var CollabClient = class _CollabClient {
     });
     const res = await resP;
     if (res.type !== "ctrl" || res.method !== "poll_result")
-      throw new Error("expected poll_result");
-    return res;
+      return [];
+    const out = [];
+    for (const fwd of res.frames) {
+      const p = await this.decryptFwd(fwd);
+      if (p)
+        out.push(p);
+    }
+    this.seq = Math.max(this.seq, res.seq);
+    this.cursor?.set(this.seq);
+    return out;
   }
   async history(sinceSeq = 0) {
     return this.poll(sinceSeq);
   }
   // --- internals ---
   onFrame(frame) {
-    if (frame.type === "ctrl" && frame.method === "joined") {
-      this.peers = frame.peers;
-      this.seq = Math.max(this.seq, frame.seq);
-    }
     const remaining = [];
     for (const w of this.waiters) {
       if (w.pred(frame)) {
@@ -1742,12 +1697,9 @@ var CollabClient = class _CollabClient {
   }
   async decryptFwd(frame) {
     try {
-      if (frame.roomId !== this.roomId)
-        return null;
       const aad = new TextEncoder().encode(`${frame.roomId}:${frame.from}`);
       const plain = await decrypt(this.roomKey, frame.nonce, frame.ciphertext, aad);
-      const payload = decodePayload(plain);
-      return payload.sender === frame.from ? payload : null;
+      return decodePayload(plain);
     } catch {
       return null;
     }
@@ -1786,26 +1738,26 @@ var CollabClient = class _CollabClient {
   }
   async reconnectLoop() {
     let delay = 1e3;
+    let attempts = 0;
     while (!this.disposed && !this.joined) {
       try {
         this.setConnStatus("connecting", "reconnect");
         const jitter = Math.floor(Math.random() * Math.min(500, delay / 4));
-        await new Promise((resolve5) => {
-          this.retryDelay = { timer: setTimeout(resolve5, delay + jitter), resolve: resolve5 };
-        });
-        this.retryDelay = void 0;
-        if (this.disposed)
-          return;
+        await sleep(delay + jitter);
         await this.join();
+        attempts = 0;
         try {
           await this.publish({ kind: "presence", state: "online" });
         } catch {
         }
         return;
-      } catch (error) {
+      } catch {
+        attempts++;
         delay = Math.min(delay * 2, 3e4);
-        if (!this.disposed)
-          this.setConnStatus("connecting", error.message);
+        if (attempts > 50) {
+          this.setConnStatus("disconnected", "reconnect_gave_up");
+          return;
+        }
       }
     }
   }
@@ -2049,26 +2001,22 @@ import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 
 // ../lan-relay/dist/room.js
-import { WebSocket } from "ws";
+import { WebSocket as WebSocket2 } from "ws";
 var RING = 1e3;
 var RATE = 40;
-var MAX_CIPHERTEXT = 256 * 1024;
 var LanRoom = class {
   roomId;
   socks = /* @__PURE__ */ new Set();
   seq = 0;
   ring = [];
   roomRate = [];
-  identities = /* @__PURE__ */ new Map();
   constructor(roomId) {
     this.roomId = roomId;
   }
   attach(ws) {
-    const s = { ws, joined: false, stamps: [], processing: Promise.resolve() };
+    const s = { ws, joined: false, stamps: [] };
     this.socks.add(s);
-    ws.on("message", (data) => {
-      s.processing = s.processing.then(() => this.onMessage(s, data.toString())).catch(() => this.error(s, "bad_frame", "invalid frame"));
-    });
+    ws.on("message", (data) => void this.onMessage(s, data.toString()));
     ws.on("close", () => this.onClose(s));
     ws.on("error", () => this.onClose(s));
   }
@@ -2076,7 +2024,7 @@ var LanRoom = class {
     return [...this.socks].filter((s) => s.joined && s.agentId && s.publicKey).map((s) => ({ agentId: s.agentId, publicKey: s.publicKey, capabilities: s.capabilities }));
   }
   send(ws, frame) {
-    if (ws.readyState === WebSocket.OPEN)
+    if (ws.readyState === WebSocket2.OPEN)
       ws.send(JSON.stringify(frame) + "\n");
   }
   broadcast(frame, except) {
@@ -2084,9 +2032,6 @@ var LanRoom = class {
       if (s.ws !== except && s.joined)
         this.send(s.ws, frame);
     }
-  }
-  error(s, code, message) {
-    this.send(s.ws, { v: 1, type: "ctrl", method: "error", code, message, roomId: this.roomId });
   }
   rateOk(stamps, now, limit) {
     const recent = stamps.filter((t) => now - t < 1e3);
@@ -2096,26 +2041,22 @@ var LanRoom = class {
     return { ok: true, next: recent };
   }
   async onMessage(s, text2) {
+    const now = Date.now();
+    const rr = this.rateOk(this.roomRate, now, 200);
+    this.roomRate = rr.next;
+    if (!rr.ok)
+      return;
+    const sr = this.rateOk(s.stamps, now, RATE);
+    s.stamps = sr.next;
+    if (!sr.ok)
+      return;
     for (const line of text2.split("\n")) {
-      if (!this.socks.has(s))
-        return;
       if (!line.trim())
         continue;
-      const now = Date.now();
-      const rr = this.rateOk(this.roomRate, now, 200);
-      this.roomRate = rr.next;
-      const sr = this.rateOk(s.stamps, now, RATE);
-      s.stamps = sr.next;
-      if (!rr.ok || !sr.ok)
-        return this.error(s, "rate_limit", "too many frames");
       let frame;
       try {
-        const parsed = JSON.parse(line);
-        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-          throw new Error("not an object");
-        frame = parsed;
+        frame = JSON.parse(line);
       } catch {
-        this.error(s, "bad_json", "frame must be a JSON object");
         continue;
       }
       if (frame.v !== 1)
@@ -2136,19 +2077,11 @@ var LanRoom = class {
       }
       if (frame.type === "ctrl" && frame.method === "poll") {
         const since = frame.sinceSeq ?? 0;
-        if (!Number.isSafeInteger(since) || since < 0) {
-          this.error(s, "bad_poll", "invalid sinceSeq");
-          continue;
-        }
         const frames = this.ring.filter((f) => f.seq > since);
         this.send(s.ws, { v: 1, type: "ctrl", method: "poll_result", roomId: this.roomId, frames, seq: this.seq });
         continue;
       }
       if (frame.type === "fwd") {
-        if (frame.roomId !== this.roomId || frame.from !== s.agentId || typeof frame.ciphertext !== "string" || !frame.ciphertext || frame.ciphertext.length > MAX_CIPHERTEXT || typeof frame.nonce !== "string" || !/^[A-Za-z0-9_-]{16}$/.test(frame.nonce)) {
-          this.error(s, "bad_frame", "invalid encrypted frame");
-          continue;
-        }
         this.seq += 1;
         const fwd = { ...frame, seq: this.seq, roomId: this.roomId, from: s.agentId };
         this.ring.push(fwd);
@@ -2163,44 +2096,23 @@ var LanRoom = class {
       this.send(s.ws, { v: 1, type: "ctrl", method: "error", code: "bad_room", message: "room mismatch", roomId: this.roomId });
       return;
     }
-    if (typeof frame.agentId !== "string" || !frame.agentId || frame.agentId.length > 128 || typeof frame.publicKey !== "string" || !frame.publicKey || frame.publicKey.length > 256 || typeof frame.challengeResp !== "string" || frame.challengeResp.length > 256 || frame.capabilities !== void 0 && (!Array.isArray(frame.capabilities) || frame.capabilities.length > 32 || frame.capabilities.some((c) => typeof c !== "string" || c.length > 128))) {
-      return this.error(s, "bad_join", "invalid identity or capabilities");
-    }
-    const knownKey = this.identities.get(frame.agentId);
-    if (knownKey && knownKey !== frame.publicKey)
-      return this.error(s, "identity_conflict", "agentId belongs to another public key in this room");
-    if (s.joined) {
-      if (frame.agentId !== s.agentId || frame.publicKey !== s.publicKey)
-        return this.error(s, "identity_locked", "joined socket identity cannot change");
-      this.send(s.ws, { v: 1, type: "ctrl", method: "joined", roomId: this.roomId, agentId: s.agentId, peers: this.members(), seq: this.seq });
+    if (!s.challenge || !frame.challengeResp) {
+      s.challenge = b64uEncode(randomBytes(32));
+      s.publicKey = frame.publicKey;
+      this.send(s.ws, { v: 1, type: "ctrl", method: "challenge", roomId: this.roomId, challenge: s.challenge });
+      s.agentId = frame.agentId;
+      s.capabilities = frame.capabilities;
       return;
     }
-    if (!s.pending || !frame.challengeResp || s.pending.agentId !== frame.agentId || s.pending.publicKey !== frame.publicKey) {
-      s.pending = { challenge: b64uEncode(randomBytes(32)), agentId: frame.agentId, publicKey: frame.publicKey };
-      this.send(s.ws, { v: 1, type: "ctrl", method: "challenge", roomId: this.roomId, challenge: s.pending.challenge });
-      return;
-    }
-    const pending = s.pending;
-    s.pending = void 0;
-    const ok2 = await verifyChallenge(frame.publicKey, pending.challenge, frame.challengeResp).catch(() => false);
-    if (!this.socks.has(s))
-      return;
+    const ok2 = await verifyChallenge(frame.publicKey, s.challenge, frame.challengeResp);
     if (!ok2) {
       this.send(s.ws, { v: 1, type: "ctrl", method: "error", code: "bad_sig", message: "challenge failed", roomId: this.roomId });
       return;
     }
-    const verifiedKey = this.identities.get(frame.agentId);
-    if (verifiedKey && verifiedKey !== frame.publicKey)
-      return this.error(s, "identity_conflict", "agentId belongs to another public key in this room");
-    this.identities.set(frame.agentId, frame.publicKey);
     s.agentId = frame.agentId;
     s.publicKey = frame.publicKey;
     s.capabilities = frame.capabilities;
     s.joined = true;
-    for (const old of [...this.socks]) {
-      if (old !== s && old.joined && old.agentId === s.agentId)
-        this.onClose(old);
-    }
     const peers = this.members();
     this.send(s.ws, { v: 1, type: "ctrl", method: "joined", roomId: this.roomId, agentId: s.agentId, peers, seq: this.seq });
     this.broadcast({ v: 1, type: "ctrl", method: "peer_update", roomId: this.roomId, peers, event: "joined", agentId: s.agentId }, s.ws);
@@ -2628,33 +2540,19 @@ var LanRelayServer = class {
       res.writeHead(200, { "content-type": "text/plain" });
       res.end("Collab LAN / VPS Relay\nWS: /ws/:roomId\nDirectory: GET|POST /directory/rooms, DELETE /directory/rooms/:roomId\nHealth: /health\nmDNS: _collab._tcp.local\n");
     });
-    this.wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024 });
+    this.wss = new WebSocketServer({ noServer: true });
     this.http.on("upgrade", (req, socket, head) => {
-      const m = /^\/ws\/([^/?#]+)\/?(?:\?[^#]*)?$/.exec(req.url ?? "");
+      const m = /^\/ws\/([^/?#]+)/.exec(req.url ?? "");
       if (!m) {
         socket.destroy();
         return;
       }
-      let roomId;
-      try {
-        roomId = decodeURIComponent(m[1]);
-        if (!/^[A-Za-z0-9_-]{1,128}$/.test(roomId))
-          throw new Error("invalid roomId");
-      } catch {
-        socket.end("HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
-        return;
-      }
+      const roomId = decodeURIComponent(m[1]);
       this.wss.handleUpgrade(req, socket, head, (ws) => {
         this.room(roomId).attach(ws);
       });
     });
-    await new Promise((resolve5, reject) => {
-      this.http.once("error", reject);
-      this.http.listen(port, host, () => {
-        this.http.off("error", reject);
-        resolve5();
-      });
-    });
+    await new Promise((resolve5) => this.http.listen(port, host, resolve5));
     const addr = this.http.address();
     this.port = typeof addr === "object" && addr ? addr.port : port;
     if (this.opts.mdns !== false) {
@@ -2664,12 +2562,8 @@ var LanRelayServer = class {
   }
   async close() {
     this.stopMdns?.();
-    for (const ws of this.wss?.clients ?? [])
-      ws.terminate();
-    if (this.wss)
-      await new Promise((resolve5) => this.wss.close(() => resolve5()));
-    if (this.http)
-      await new Promise((resolve5) => this.http.close(() => resolve5()));
+    await new Promise((resolve5) => this.wss?.close(() => resolve5()));
+    await new Promise((resolve5) => this.http?.close(() => resolve5()));
   }
 };
 
@@ -2741,6 +2635,14 @@ init_member_config();
 import { chmod, mkdir as mkdir4, readFile as readFile4, rename, rm as rm2, writeFile as writeFile3 } from "node:fs/promises";
 import { dirname as dirname3, resolve as resolve3 } from "node:path";
 import { randomUUID as randomUUID2 } from "node:crypto";
+function normalizeWorkspacePath(path) {
+  return (path || "").replace(/\\/g, "/").replace(/^\/private\/var(?=\/)/, "/var").replace(/\/+$/, "");
+}
+function sameWorkspacePath(a, b) {
+  const na = normalizeWorkspacePath(a);
+  const nb = normalizeWorkspacePath(b);
+  return !!na && !!nb && na === nb;
+}
 function newId(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -3468,7 +3370,7 @@ var CollabBridge = class {
     }
     const path = (opts.path ?? this.config.workspacePath).trim();
     if (!path.startsWith("/") && !/^[A-Za-z]:[\\/]/.test(path)) throw new Error("workspace path must be absolute");
-    const existing = [...this.workspaces.values()].find((w) => w.path === path);
+    const existing = [...this.workspaces.values()].find((w) => sameWorkspacePath(w.path, path));
     if (existing) {
       this.activeWorkspaceId = existing.id;
       if (opts.name?.trim()) existing.name = opts.name.trim().slice(0, 60);

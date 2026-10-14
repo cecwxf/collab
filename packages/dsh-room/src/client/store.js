@@ -40,8 +40,14 @@ export function createRoomsStore() {
     es.addEventListener("rooms", (e) => {
       const st = JSON.parse(e.data);
       set((s) => {
-        const selected = s.selected && st.rooms.some((r) => r.roomId === s.selected) ? s.selected : st.activeRoomId || (st.rooms[0] && st.rooms[0].roomId) || null;
-        return { ...st, connected: true, selected };
+        let rooms = Array.isArray(st.rooms) ? st.rooms : [];
+        // Keep an optimistic create/join entry until the server list catches up.
+        if (s.selected && !rooms.some((r) => r.roomId === s.selected)) {
+          const pending = s.rooms.find((r) => r.roomId === s.selected);
+          if (pending) rooms = [pending, ...rooms];
+        }
+        const selected = s.selected && rooms.some((r) => r.roomId === s.selected) ? s.selected : st.activeRoomId || (rooms[0] && rooms[0].roomId) || null;
+        return { ...st, rooms, connected: true, selected };
       });
       const sel = snap.selected;
       if (sel && !snap.messages[sel]) void loadMessages(sel);
@@ -117,7 +123,14 @@ export function createRoomsStore() {
       try {
         const r = await post("/rooms", { ...form, workspaceId: form.workspacePath ? undefined : (form.workspaceId || snap.activeWorkspaceId) }, { signal });
         try { api.onRoomOpened && api.onRoomOpened(); } catch { /* layout busy */ }
-        set({ selected: r.roomId, dialog: { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } });
+        // Upsert before SSE so RoomsMain does not flash EmptyMain (selected set, room not yet in list).
+        set((s) => {
+          const room = { ...r };
+          delete room.invite;
+          delete room.listed;
+          const rooms = s.rooms.some((x) => x.roomId === r.roomId) ? s.rooms.map((x) => (x.roomId === r.roomId ? { ...x, ...room } : x)) : [room, ...s.rooms];
+          return { rooms, selected: r.roomId, activeRoomId: r.roomId, dialog: { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } };
+        });
         void loadMessages(r.roomId);
         return r;
       } finally {
@@ -127,7 +140,12 @@ export function createRoomsStore() {
     async join(invite, info) {
       const r = await post("/join", { invite, ...(info && info.workspacePath ? {} : { workspaceId: snap.activeWorkspaceId }), ...(info || {}) });
       try { api.onRoomOpened && api.onRoomOpened(); } catch { /* layout busy */ }
-      set((s) => ({ selected: r.roomId, dialog: null, search: { ...s.search, results: s.search.results.map((x) => (x.roomId === r.roomId ? { ...x, joined: true } : x)) } }));
+      set((s) => {
+        const room = { ...r };
+        delete room.invite;
+        const rooms = s.rooms.some((x) => x.roomId === r.roomId) ? s.rooms.map((x) => (x.roomId === r.roomId ? { ...x, ...room } : x)) : [room, ...s.rooms];
+        return { rooms, selected: r.roomId, activeRoomId: r.roomId, dialog: null, search: { ...s.search, results: s.search.results.map((x) => (x.roomId === r.roomId ? { ...x, joined: true } : x)) } };
+      });
       void loadMessages(r.roomId);
       toast(`Joined ${r.name}`);
       return r;

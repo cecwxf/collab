@@ -4,6 +4,18 @@ import { randomUUID } from "node:crypto";
 import type { RoomMemberConfig } from "./member-config.js";
 import type { RoomLocalSettings } from "./local-agents.js";
 
+/** Normalize workspace paths for equality (macOS /private/var, trailing slashes, backslashes). */
+export function normalizeWorkspacePath(path: string | undefined | null): string {
+  return (path || "").replace(/\\/g, "/").replace(/^\/private\/var(?=\/)/, "/var").replace(/\/+$/, "");
+}
+
+export function sameWorkspacePath(a: string | undefined | null, b: string | undefined | null): boolean {
+  const na = normalizeWorkspacePath(a);
+  const nb = normalizeWorkspacePath(b);
+  return !!na && !!nb && na === nb;
+}
+
+
 /** A local workspace that owns one or more Collab rooms. */
 export interface WorkspaceMeta {
   id: string;

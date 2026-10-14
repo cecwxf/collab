@@ -159,10 +159,28 @@ function RoomSessionMark({ store, sessionId }) {
 /** Workspace selector for create/join/browse dialogs (native workspaces). */
 function WorkspaceSelect({ store, value, onChange, id }) {
   const workspaces = useNativeWorkspaces(store);
-  useEffect(() => { if (!value && workspaces[0]) onChange({ id: workspaces[0].workspaceId, path: workspaces[0].path, title: wsTitle(workspaces[0]) }); }, [workspaces.length]);
+  const pathsKey = workspaces.map((w) => w.workspaceId + ":" + w.path).join("|");
+  // Default only when empty; never force the first workspace over a user/dialog choice.
+  useEffect(() => {
+    if (value || !workspaces.length) return;
+    const w = workspaces[0];
+    onChange({ id: w.workspaceId, path: w.path, title: wsTitle(w) });
+  }, [pathsKey]);
+  // Re-sync path spelling (e.g. /private/var vs /var) onto the native entry without changing workspace.
+  useEffect(() => {
+    if (!value || !value.path || !workspaces.length) return;
+    const w = workspaces.find((x) => sameWorkspacePath(x.path, value.path));
+    if (w && (w.path !== value.path || w.workspaceId !== value.id)) onChange({ id: w.workspaceId, path: w.path, title: wsTitle(w) });
+  }, [pathsKey, value && value.path, value && value.id]);
   if (!workspaces.length) return <div className="rm-field-hint">No dsh workspace yet — add one in the left sidebar (Add workspace).</div>;
+  const matched = workspaces.find((x) => sameWorkspacePath(x.path, value && value.path));
+  const selectedPath = matched ? matched.path : "";
   return (
-    <select id={id} className="rm-input" value={value ? value.path : ""} onChange={(e) => { const w = workspaces.find((x) => x.path === e.target.value); if (w) onChange({ id: w.workspaceId, path: w.path, title: wsTitle(w) }); }}>
+    <select id={id} className="rm-input" value={selectedPath} onChange={(e) => {
+      const w = workspaces.find((x) => x.path === e.target.value || sameWorkspacePath(x.path, e.target.value));
+      if (w) onChange({ id: w.workspaceId, path: w.path, title: wsTitle(w) });
+    }}>
+      {!selectedPath ? <option value="">Select a workspace…</option> : null}
       {workspaces.map((w) => <option key={w.workspaceId} value={w.path}>{wsTitle(w)} — {w.path}</option>)}
     </select>
   );
@@ -937,7 +955,7 @@ function MergeDialog({ store, d }) {
 function EmptyMain({ store }) {
   const a = store.actions;
   const workspaces = useNativeWorkspaces(store);
-  const first = workspaces[0];
+  const hasWs = workspaces.length > 0;
   return (
     <div className="rm-welcome-wrap">
       <div className="rm-welcome">
@@ -945,8 +963,8 @@ function EmptyMain({ store }) {
         <h1>Rooms live in your workspaces</h1>
         <p>Your dsh workspaces stay in the left sidebar as usual. Hover a workspace there and click the room icon (next to “New session”), or use its “…” menu → New room. Peers join and point their agent at the same project; @mention or tasks wake agents.</p>
         <div className="rm-welcome-actions">
-          <button type="button" className="rm-welcome-action" disabled={!first} onClick={() => first && a.openDialog({ kind: "create", workspace: { id: first.workspaceId, path: first.path, title: wsTitle(first) } })}>
-            <PlusIcon /><span><b>New room</b><span>{first ? `In ${wsTitle(first)} · default relay 62.234.113.56:80` : "Add a workspace in the left sidebar first"}</span></span>
+          <button type="button" className="rm-welcome-action" disabled={!hasWs} onClick={() => a.openDialog({ kind: "create" })}>
+            <PlusIcon /><span><b>New room</b><span>{hasWs ? `Pick any of ${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"} · default relay 62.234.113.56:80` : "Add a workspace in the left sidebar first"}</span></span>
           </button>
           <button type="button" className="rm-welcome-action" onClick={() => a.openDialog({ kind: "join" })}>
             <LinkIcon /><span><b>Join by invite</b><span>Paste a collab://… invite</span></span>

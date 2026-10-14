@@ -31,7 +31,12 @@ export function installRoomGroups(store, native, layout, sessions) {
       if(!parent)continue;
       let group=[...parent.children].find(e=>e.getAttribute('data-rm-workspace-rooms')===key);
       if(!ws){group?.remove();continue;}
-      if(!group){group=document.createElement('div');group.className='rm-root rm-native-rooms';group.setAttribute('data-rm-workspace-rooms',key);group.setAttribute('role','group');parent.insertBefore(group,anchor.nextSibling);wrappers.add(group);}
+      if(!group){group=document.createElement('div');group.className='rm-root rm-native-rooms';group.setAttribute('data-rm-workspace-rooms',key);group.setAttribute('role','group');wrappers.add(group);}
+      // Room is a first-level peer of sessions under the workspace: keep the group
+      // immediately after the workspace header even after React reorders children.
+      if(group.parentElement!==parent || group.previousElementSibling!==anchor){
+        parent.insertBefore(group,anchor.nextSibling);
+      }
       decorated.add(group);
       group.hidden=row.getAttribute('aria-expanded')==='false';
       const signature=JSON.stringify([ws.title,ws.path,panelActive,state.selected,current,rooms.map(r=>[r.roomId,r.name,r.status,r.sessionId,r.local?.agents.map(a=>[a.agentId,a.name,a.sessionId,a.state,a.online]),state.expandedRooms[r.roomId]!==false])]);

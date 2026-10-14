@@ -1,5 +1,8 @@
 import type { RoomMemberConfig } from "./member-config.js";
 import type { RoomLocalSettings } from "./local-agents.js";
+/** Normalize workspace paths for equality (macOS /private/var, trailing slashes, backslashes). */
+export declare function normalizeWorkspacePath(path: string | undefined | null): string;
+export declare function sameWorkspacePath(a: string | undefined | null, b: string | undefined | null): boolean;
 /** A local workspace that owns one or more Collab rooms. */
 export interface WorkspaceMeta {
     id: string;

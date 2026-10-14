@@ -1,6 +1,11 @@
+export function normalizeWorkspacePath(path) {
+  return (path || '').replace(/\\/g, '/').replace(/^\/private\/var(?=\/)/, '/var').replace(/\/+$/, '');
+}
+
 export function sameWorkspacePath(a, b) {
-  const normal = p => (p || '').replace(/\\/g, '/').replace(/^\/private\/var(?=\/)/, '/var').replace(/\/+$/, '');
-  return !!a && !!b && normal(a) === normal(b);
+  const na = normalizeWorkspacePath(a);
+  const nb = normalizeWorkspacePath(b);
+  return !!na && !!nb && na === nb;
 }
 
 export function sessionFileAddress(sessionId, path) {

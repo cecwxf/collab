@@ -1,3 +1,10 @@
+## 0.3.13
+
+- **Workspace picker**: Create/Join select any native workspace (path-normalized match); welcome no longer hard-binds the first workspace.
+- **Room persist in UI**: Create/Join upsert the room into the client list immediately so the chat does not flash EmptyMain before SSE.
+- **Sidebar rooms**: Re-anchor the workspace room group as the first sibling under the workspace header after React reorders sessions (rooms stay first-level peers of sessions).
+- **ensureWorkspace**: Match existing plugin workspaces with normalized paths (`/private/var` ↔ `/var`).
+
 ## 0.3.3
 
 - **Create never blocks**: Local/relay create persists room + agents and returns immediately; host/agent joins run in the background. Create dialog can no longer stick on "Creating…".
