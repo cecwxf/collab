@@ -1,6 +1,10 @@
-## 0.3.15
+## 0.3.16
 
 - **Readable self bubbles**: Stop using `--dsw-alias-label-primary` as the outgoing message fill. That token is near-black text; `MarkdownText` also forces `label-primary` on descendants, so light UI showed solid black bars. Self bubbles now use `--dsw-specific-bubble` with `--rm-label` text (works in light and dark).
+
+## 0.3.15
+
+- npm `@cecwxf/dsh-room@0.3.15` ships the **0.3.14 workspace pin** work (`gitHead` `8391db1`). The light self-bubble CSS fix landed in git labeled 0.3.15 but was not published under that version — use **0.3.16** for the bubble fix.
 
 ## 0.3.14
 
