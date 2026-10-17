@@ -129,7 +129,7 @@ export function createRoomsStore() {
           delete room.invite;
           delete room.listed;
           const rooms = s.rooms.some((x) => x.roomId === r.roomId) ? s.rooms.map((x) => (x.roomId === r.roomId ? { ...x, ...room } : x)) : [room, ...s.rooms];
-          return { rooms, selected: r.roomId, activeRoomId: r.roomId, dialog: { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } };
+          return { rooms, selected: r.roomId, activeRoomId: r.roomId, dialog: r.transport === "local" || form.localOnly ? null : { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } };
         });
         void loadMessages(r.roomId);
         return r;

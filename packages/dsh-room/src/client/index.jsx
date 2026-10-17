@@ -566,15 +566,15 @@ function RoomDetail({ room, messages, store, mention, assign }) {
         <p className="rm-note">{room.public
           ? "Public: listed in the relay directory with its key. Anyone can find, join, and read this room."
           : "Private: only agents holding the invite can join. The invite contains the room key — share it only with agents you trust."}</p>
-        {room.transport === "local" ? <p className="rm-note">Local-only room: switch Transport to Relay or LAN before inviting remote hosts.</p> : null}
-        <div className="rm-actions"><Button size="sm" variant="outline" onClick={copyInvite} icon={<LinkIcon />}>Copy invite</Button></div>
+        {room.transport === "local" ? <p className="rm-note">Local room: switch to Relay before inviting remote hosts.</p> : null}
+        <div className="rm-actions"><Button size="sm" variant="outline" disabled={room.transport === "local"} onClick={copyInvite} icon={<LinkIcon />}>Copy invite</Button></div>
       </div>
       <TransportSection room={room} store={store} />
       <div className="rm-detail-section">
         <div className="rm-detail-h">About</div>
         <dl className="rm-about">
           <dt>Visibility</dt><dd>{room.public ? <><GlobeIcon /> Public</> : <><LockIcon /> Private</>}</dd>
-          <dt>Transport</dt><dd>{room.transport === "local" ? "Local only (in-process loopback)" : room.transport === "lan" ? "LAN / VPS (Node relay)" : "Relay"}</dd>
+          <dt>Transport</dt><dd>{room.transport === "local" ? "Local" : "Relay"}</dd>
           {room.memberConfig?.workspaceLabel ? <><dt>Workspace</dt><dd>{room.memberConfig.workspaceLabel}</dd></> : null}
           {room.description ? <><dt>Description</dt><dd>{room.description}</dd></> : null}
           {room.tags?.length ? <><dt>Tags</dt><dd>{room.tags.map((t) => "#" + t).join(" ")}</dd></> : null}
@@ -720,12 +720,12 @@ const localOffline = room => room.local?.agents.some(a => !a.online);
 function TransportSection({ room, store }) {
   const a = store.actions;
   const [busy, setBusy] = useState(null);
-  const cur = room.transport === "local" ? "local" : room.transport === "lan" ? "relay" : "relay";
+  const cur = room.transport === "local" ? "local" : "relay";
   const go = async (target) => {
     setBusy(target);
     try {
       await a.setTransport(room.roomId, target);
-      a.toast(target === "local" ? "Local only — in-process, no network" : target === "lan" ? "Now on this machine's LAN relay — invite remote hosts" : "Now on the relay — invite remote hosts");
+      a.toast(target === "local" ? "Local — room messages stay on this dsh instance" : "Relay — ready to invite remote hosts");
     } catch (e) { a.toast(e.message); }
     finally { setBusy(null); }
   };
@@ -734,11 +734,10 @@ function TransportSection({ room, store }) {
       <div className="rm-detail-h">Transport</div>
       {room.status === "online" && localOffline(room) ? <button type="button" className="rm-mini" onClick={() => a.reconnect(room.roomId).catch(e => a.toast(e.message))}>Retry offline agents</button> : null}
       <div className="rm-mode-row">
-        <button type="button" disabled={!!busy || room.public} className={"rm-mode-btn" + (cur === "local" ? " is-on" : "")} onClick={() => go("local")} title={room.public ? "Public rooms need a relay" : "In-process loopback: no network"}>{busy === "local" ? "…" : "Local only"}</button>
-        <button type="button" disabled={!!busy} className={"rm-mode-btn" + (cur === "relay" && room.transport !== "local" ? " is-on" : "")} onClick={() => go("relay")}>{busy === "relay" ? "…" : "Relay (VPS)"}</button>
-        <button type="button" disabled={!!busy} className="rm-mode-btn" onClick={() => go("lan")} title="Embedded LAN relay on this machine (mDNS)">{busy === "lan" ? "…" : "LAN"}</button>
+        <button type="button" disabled={!!busy || room.public} className={"rm-mode-btn" + (cur === "local" ? " is-on" : "")} onClick={() => go("local")} title={room.public ? "Public rooms need a relay" : "Room members collaborate on this dsh instance"}>{busy === "local" ? "…" : "Local"}</button>
+        <button type="button" disabled={!!busy} className={"rm-mode-btn" + (cur === "relay" && room.transport !== "local" ? " is-on" : "")} onClick={() => go("relay")}>{busy === "relay" ? "…" : "Relay"}</button>
       </div>
-      <p className="rm-note">{room.transport === "local" ? "All members are on this dsh — nothing leaves the process. Switch to Relay or LAN to invite remote hosts; local agents stay members." : "Local agents connect as separate members over this transport, alongside remote hosts."}</p>
+      <p className="rm-note">{room.transport === "local" ? "Room messages stay on this dsh instance. Switch to Relay to invite remote hosts; local agents stay members. Model requests use your configured provider." : "Local agents connect as separate members over this transport, alongside remote hosts."}</p>
     </div>
   );
 }
@@ -931,13 +930,13 @@ function EmptyMain({ store }) {
         <p>Your dsh workspaces stay in the left sidebar as usual. Hover a workspace there and click the room icon (next to “New session”), or use its “…” menu → New room. Peers join and point their agent at the same project; @mention or tasks wake agents.</p>
         <div className="rm-welcome-actions">
           <button type="button" className="rm-welcome-action" disabled={!hasWs} onClick={() => a.openDialog({ kind: "create" })}>
-            <PlusIcon /><span><b>New room</b><span>{hasWs ? `Pick any of ${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"} · default relay 62.234.113.56:80` : "Add a workspace in the left sidebar first"}</span></span>
+            <PlusIcon /><span><b>New room</b><span>{hasWs ? `Pick any of ${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"}` : "Add a workspace in the left sidebar first"}</span></span>
           </button>
           <button type="button" className="rm-welcome-action" onClick={() => a.openDialog({ kind: "join" })}>
             <LinkIcon /><span><b>Join by invite</b><span>Paste a collab://… invite</span></span>
           </button>
           <button type="button" className="rm-welcome-action" onClick={() => a.openDialog({ kind: "browse" })}>
-            <SearchIcon /><span><b>Browse public rooms</b><span>Search the VPS directory by name or #tag</span></span>
+            <SearchIcon /><span><b>Browse public rooms</b><span>Search public rooms by name or #tag</span></span>
           </button>
         </div>
       </div>
@@ -980,7 +979,7 @@ function RoomsMain({ store }) {
                 </button>
               );
             })()}
-            {room.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}{room.transport === "local" ? <span className="rm-badge rm-badge-local">Local only</span> : room.transport === "lan" ? <span className="rm-badge">LAN/VPS</span> : null}
+            {room.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}{room.transport === "local" ? <span className="rm-badge rm-badge-local">Local</span> : <span className="rm-badge">Relay</span>}
             <StateDot state={room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error"} size={8} />
             <button type="button" className="rm-icon-btn" aria-label="Room members and settings" aria-expanded={s.detailsOpen} title="Room members and settings" data-rm-details-toggle="" onClick={store.actions.toggleDetails}><PeopleIcon /></button>
           </header>
@@ -1006,8 +1005,7 @@ function CreateDialog({ store, d }) {
   const [tab, setTab] = useState("room"); // room | agents | limits
   const [f, setF] = useState({
     name: "", description: "", tags: "", public: false,
-    transport: "relay", // local | relay | lan | cloudflare
-    lanHostPort: "62.234.113.56:80",
+    transport: "local", // local | relay; relay deployment belongs to host configuration
     turnLimit: 6, concurrency: 2, isolation: "auto",
     agents: [], // draft agents: { key?, name, persona, systemPrompt, scope, moderator, reasoningEffort, approvalRequired, model }
   });
@@ -1015,7 +1013,6 @@ function CreateDialog({ store, d }) {
   const [showCustom, setShowCustom] = useState(false);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [lanPeers, setLanPeers] = useState([]);
   const [presets, setPresets] = useState([]);
   const ok = f.name.trim() && !busy;
   const [ws, setWs] = useState(d && d.workspace ? d.workspace : null);
@@ -1046,13 +1043,12 @@ function CreateDialog({ store, d }) {
     setBusy(true); setErr(null);
     const transport = f.transport;
     const localOnly = transport === "local";
-    const mode = transport === "cloudflare" ? "relay" : "lan";
-    const lanHostPort = transport === "relay" ? (f.lanHostPort.trim() || "62.234.113.56:80") : transport === "lan" ? "" : undefined;
+    // Both modes retain the configured relay invite, so Local can switch to Relay later.
+    const mode = "relay";
     try {
       await a.create({
         name: f.name.trim(), description: f.description.trim(), tags: f.tags,
         public: localOnly ? false : f.public, mode,
-        lanHostPort,
         workspacePath: ws.path, workspaceName: ws.title, hostWorkspaceId: ws.id,
         localOnly,
         turnLimit: f.turnLimit, concurrency: f.concurrency, isolation: f.isolation,
@@ -1064,14 +1060,11 @@ function CreateDialog({ store, d }) {
     } catch (e) {
       const msg = (e && e.message) || "Create failed";
       setErr(/timed out|timeout|abort/i.test(msg)
-        ? `${msg}. Check transport (try Local only), relay host, and network — agent joins continue in the background after a successful create.`
+        ? `${msg}. Check the connection (try Local) and network — agent joins continue in the background after a successful create.`
         : msg);
     } finally {
       setBusy(false);
     }
-  };
-  const browseLan = async () => {
-    try { const r = await a.browseLan(); setLanPeers(r.peers || []); } catch (e) { setErr(e.message); }
   };
   const tabs = [
     { id: "room", label: "Room" },
@@ -1081,7 +1074,7 @@ function CreateDialog({ store, d }) {
   return (
     <Modal open onClose={a.closeDialog} title="Create room" closeLabel="Close" className="rm-modal-wide rm-modal-create rm-modal-scrollable"
       contentClassName="rm-modal-scroll"
-      description={(ws ? `Workspace “${ws.title}” · ` : "") + `dsh-room ${s.version || "?"} · default VPS 62.234.113.56:80 · E2EE. Create returns immediately; agents join in the background.`}
+      description={(ws ? `Workspace “${ws.title}” · ` : "") + `dsh-room ${s.version || "?"} · Members join in the background.`}
       footer={<><Button variant="outline" onClick={a.closeDialog}>Cancel</Button><Button variant="primary" disabled={!ok} onClick={submit}>{busy ? "Creating…" : "Create"}</Button></>}>
       <div className="rm-root rm-create" data-rm-create="" onKeyDown={(e) => e.key === "Enter" && e.target.tagName === "INPUT" && tab === "room" && submit()}>
         <div className="rm-tabs" role="tablist" aria-label="Create room sections">
@@ -1098,33 +1091,13 @@ function CreateDialog({ store, d }) {
               <div className="rm-name-row"><Avatar name={f.name || "room"} size={36} /><Input id="rm-create-name" autoFocus placeholder="e.g. release-crew" maxLength={60} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
             </Field>
             <div className="rm-span-2">
-              <Field label="Transport" hint="Local only = in-process (no network). Relay / LAN / Cloudflare for remote hosts.">
+              <Field label="Transport" hint="Local: collaborate on this dsh instance. Relay: invite members from other machines.">
                 <div className="rm-mode-row rm-mode-wrap">
-                  <button type="button" className={"rm-mode-btn" + (f.transport === "local" ? " is-on" : "")} onClick={() => setF({ ...f, transport: "local", public: false })}>Local only</button>
-                  <button type="button" className={"rm-mode-btn" + (f.transport === "relay" ? " is-on" : "")} onClick={() => setF({ ...f, transport: "relay", lanHostPort: f.lanHostPort || "62.234.113.56:80" })}>Relay (VPS)</button>
-                  <button type="button" className={"rm-mode-btn" + (f.transport === "lan" ? " is-on" : "")} onClick={() => setF({ ...f, transport: "lan" })}>LAN (this machine)</button>
-                  <button type="button" className={"rm-mode-btn" + (f.transport === "cloudflare" ? " is-on" : "")} onClick={() => setF({ ...f, transport: "cloudflare" })}>Cloudflare</button>
+                  <button type="button" className={"rm-mode-btn" + (f.transport === "local" ? " is-on" : "")} aria-pressed={f.transport === "local"} onClick={() => setF({ ...f, transport: "local", public: false })}>Local</button>
+                  <button type="button" className={"rm-mode-btn" + (f.transport === "relay" ? " is-on" : "")} aria-pressed={f.transport === "relay"} onClick={() => setF({ ...f, transport: "relay" })}>Relay</button>
                 </div>
               </Field>
             </div>
-            {f.transport === "relay" ? (
-              <div className="rm-span-2">
-                <Field label="Relay host:port" htmlFor="rm-lan-hp" hint="Default 62.234.113.56:80 (public directory).">
-                  <Input id="rm-lan-hp" placeholder="62.234.113.56:80" value={f.lanHostPort} onChange={(e) => setF({ ...f, lanHostPort: e.target.value })} />
-                </Field>
-              </div>
-            ) : null}
-            {f.transport === "lan" ? (
-              <div className="rm-span-2">
-                <Field label="LAN relay" hint="Blank host embeds a relay on this machine and advertises it over mDNS.">
-                  <div className="rm-lan-browse"><Button size="sm" variant="outline" onClick={browseLan}>Browse mDNS</Button>
-                    {lanPeers.map((p) => (
-                      <button key={p.hostPort} type="button" className="rm-lan-peer" onClick={() => setF({ ...f, transport: "relay", lanHostPort: p.hostPort })}>{p.hostPort}{p.name ? ` · ${p.name}` : ""}</button>
-                    ))}
-                  </div>
-                </Field>
-              </div>
-            ) : null}
             <Field label="Description" htmlFor="rm-create-desc" hint="Shown to members and in public search.">
               <Input id="rm-create-desc" placeholder="e.g. Agents that review and ship releases" maxLength={280} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
             </Field>
@@ -1134,9 +1107,9 @@ function CreateDialog({ store, d }) {
             <div className="rm-span-2 rm-switch-row">
               <div>
                 <div className="rm-field-label">List in public directory</div>
-                <div className="rm-field-hint">{f.transport === "local" ? "Local-only rooms stay private (no network)." : f.public ? "Anyone can find and join — key is published with the listing." : "Private: invite only."}</div>
+                <div className="rm-field-hint">{f.transport === "local" ? "Local rooms stay private." : f.public ? "Anyone can find and join — key is published with the listing." : "Private: invite only."}</div>
               </div>
-              <Switch checked={f.public && f.transport !== "local"} onChange={(v) => setF({ ...f, public: v })} label="List in public directory" disabled={f.transport === "local"} title={f.transport === "local" ? "Local-only rooms stay private" : undefined} />
+              <Switch checked={f.public && f.transport !== "local"} onChange={(v) => setF({ ...f, public: v })} label="List in public directory" disabled={f.transport === "local"} title={f.transport === "local" ? "Local rooms stay private" : undefined} />
             </div>
           </div>
         ) : null}
@@ -1457,7 +1430,7 @@ function BrowseDialog({ store }) {
   };
   return (
     <Modal open onClose={a.closeDialog} title="Browse public rooms" closeLabel="Close" className="rm-modal-wide"
-      description="Directory on VPS 62.234.113.56:80. Search by name or #tag; joined rooms attach to the workspace below."
+      description="Search by name or #tag; joined rooms attach to the workspace below."
       footer={<Button variant="outline" onClick={a.closeDialog}>Close</Button>}>
       <div className="rm-root rm-browse">
         <WorkspaceSelect store={store} value={activeWs} onChange={setActiveWs} />

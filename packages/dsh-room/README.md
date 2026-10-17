@@ -10,7 +10,7 @@ The same package supports **dsh web** and the official **DeepSeek Harness Deskto
 ### Web
 
 ```sh
-dsh plugin --profile web add @cecwxf/dsh-room@0.3.19
+dsh plugin --profile web add @cecwxf/dsh-room@0.3.20
 dsh web
 ```
 
@@ -18,12 +18,12 @@ Open the printed URL. Under your workspace, use **New room** or select an existi
 
 ### Desktop
 
-Install `@cecwxf/dsh-room@0.3.19` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
+Install `@cecwxf/dsh-room@0.3.20` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
 
 The npm-installed `dsh` command rejects `--profile desktop` with `profile "desktop" is managed exclusively by the Electron application`. For a command-line installation, launch Desktop once, fully quit it, and use **its bundled command**, not the npm CLI. For a macOS app in `/Applications`:
 
 ```sh
-"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.19
+"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.20
 ```
 
 Reopen Desktop and select a room beneath its workspace, or use **New room** there. **Manage dsh Command…** in Desktop's application menu can register that bundled command on PATH.
@@ -62,7 +62,7 @@ The same sources work with Desktop's bundled CLI and `--profile desktop`. Defaul
 One dsh can host **several local agents** (Moderator, Architect, Coder, Reviewer, or custom ones) as independent room members. Each has its own identity, its own dsh session under the room's workspace, and its own read or write scope.
 
 - **Create room** is a wide, tabbed dialog (Room / Agents / Limits) so transport, visibility, presets, custom agents, concurrency and turn limits are all reachable without clipping.
-- **Local only** rooms use an in-process loopback (no network). One click switches to Relay (VPS) or LAN to invite remote hosts, and the local agents stay members.
+- **Local** rooms keep collaboration messages in an in-process loopback. Model requests still use the configured provider. One click switches to Relay to invite remote hosts, and the local agents stay members.
 - `@agent` wakes only that agent. `@all` wakes all local agents in parallel.
 - After create, **Add agent** opens a free-form form (name, persona, system prompt, model, effort, scope, approval, moderator). Presets only fill the form.
 - An optional **moderator** splits work into tasks and summarizes the results.
@@ -70,7 +70,7 @@ One dsh can host **several local agents** (Moderator, Architect, Coder, Reviewer
 - Writing agents get their own **git worktree** (`room/<room>/<agent>`). Non-git workspaces fall back to advisory file locks.
 - **Review & merge** shows a per-agent diff, checks for conflicts, and asks you to confirm before it merges into or discards from the main workspace.
 
-Slash commands: `/collab create local <name>`, `/collab agents`, `/collab agent add <preset|name>`, `/collab agent rm <name>`, `/collab stop [@agent]`, `/collab transport <local|relay|lan>`.
+Slash commands: `/collab create local <name>`, `/collab agents`, `/collab agent add <preset|name>`, `/collab agent rm <name>`, `/collab stop [@agent]`, `/collab transport <local|relay>`.
 
 Full guide: [`docs/LOCAL_MULTI_AGENT.md`](../../docs/LOCAL_MULTI_AGENT.md).
 
@@ -118,7 +118,7 @@ Wake rules: `@mention` or `task.create` (when `autoReply` is `mention-or-task`).
 
 Display name: **dsh room** / **DSH Room**. Package id: `@cecwxf/dsh-room`.
 
-Create room → defaults to **LAN / VPS** with `62.234.113.56:80` (public directory supported). Blank host embeds `collab-lan-relay` + mDNS. Cloudflare is an advanced option. See `docs/VPS_RELAY.md`.
+Create room defaults to **Local**. The UI offers only **Local** and **Relay**, without deployment names or server addresses. Relay uses the host’s `relayUrl` configuration; Node/VPS and Cloudflare are deployment choices, not room modes. Existing LAN invitations and the legacy `transport lan` command remain compatible. See `docs/VPS_RELAY.md` for deployment.
 
 **Rooms live in your dsh workspaces** (0.2+): the native left-sidebar workspace list is untouched. Hover a workspace and click the room icon next to "New session", or open its "…" menu → **New room** (the menu also has **New session**). The wide Create room dialog opens with that workspace preset; the room's member config workspace, MCP sandbox and woken agent session all use that path, and the room's agent session nests under the workspace natively (marked with the room icon). The native sidebar groups rooms beneath their workspaces and local agent sessions beneath each room. The **DSH Room** panel shows the selected room; its Rooms switcher also offers Join by invite and Browse public rooms.
 

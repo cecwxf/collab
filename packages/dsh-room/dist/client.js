@@ -226,7 +226,7 @@ function createRoomsStore() {
           delete room.invite;
           delete room.listed;
           const rooms = s.rooms.some((x) => x.roomId === r.roomId) ? s.rooms.map((x) => x.roomId === r.roomId ? { ...x, ...room } : x) : [room, ...s.rooms];
-          return { rooms, selected: r.roomId, activeRoomId: r.roomId, dialog: { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } };
+          return { rooms, selected: r.roomId, activeRoomId: r.roomId, dialog: r.transport === "local" || form.localOnly ? null : { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } };
         });
         void loadMessages(r.roomId);
         return r;
@@ -1338,8 +1338,8 @@ function RoomDetail({ room, messages, store, mention, assign }) {
         "Invite"
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "rm-note", children: room.public ? "Public: listed in the relay directory with its key. Anyone can find, join, and read this room." : "Private: only agents holding the invite can join. The invite contains the room key \u2014 share it only with agents you trust." }),
-      room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "rm-note", children: "Local-only room: switch Transport to Relay or LAN before inviting remote hosts." }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-actions", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "outline", onClick: copyInvite, icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LinkIcon, {}), children: "Copy invite" }) })
+      room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "rm-note", children: "Local room: switch to Relay before inviting remote hosts." }) : null,
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-actions", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "outline", disabled: room.transport === "local", onClick: copyInvite, icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LinkIcon, {}), children: "Copy invite" }) })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TransportSection, { room, store }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-detail-section", children: [
@@ -1354,7 +1354,7 @@ function RoomDetail({ room, messages, store, mention, assign }) {
           " Private"
         ] }) }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { children: "Transport" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { children: room.transport === "local" ? "Local only (in-process loopback)" : room.transport === "lan" ? "LAN / VPS (Node relay)" : "Relay" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { children: room.transport === "local" ? "Local" : "Relay" }),
         room.memberConfig?.workspaceLabel ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { children: "Workspace" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { children: room.memberConfig.workspaceLabel })
@@ -1525,12 +1525,12 @@ var localOffline = (room) => room.local?.agents.some((a) => !a.online);
 function TransportSection({ room, store }) {
   const a = store.actions;
   const [busy, setBusy] = (0, import_react.useState)(null);
-  const cur = room.transport === "local" ? "local" : room.transport === "lan" ? "relay" : "relay";
+  const cur = room.transport === "local" ? "local" : "relay";
   const go = async (target) => {
     setBusy(target);
     try {
       await a.setTransport(room.roomId, target);
-      a.toast(target === "local" ? "Local only \u2014 in-process, no network" : target === "lan" ? "Now on this machine's LAN relay \u2014 invite remote hosts" : "Now on the relay \u2014 invite remote hosts");
+      a.toast(target === "local" ? "Local \u2014 room messages stay on this dsh instance" : "Relay \u2014 ready to invite remote hosts");
     } catch (e) {
       a.toast(e.message);
     } finally {
@@ -1541,11 +1541,10 @@ function TransportSection({ room, store }) {
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-detail-h", children: "Transport" }),
     room.status === "online" && localOffline(room) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mini", onClick: () => a.reconnect(room.roomId).catch((e) => a.toast(e.message)), children: "Retry offline agents" }) : null,
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-mode-row", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", disabled: !!busy || room.public, className: "rm-mode-btn" + (cur === "local" ? " is-on" : ""), onClick: () => go("local"), title: room.public ? "Public rooms need a relay" : "In-process loopback: no network", children: busy === "local" ? "\u2026" : "Local only" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", disabled: !!busy, className: "rm-mode-btn" + (cur === "relay" && room.transport !== "local" ? " is-on" : ""), onClick: () => go("relay"), children: busy === "relay" ? "\u2026" : "Relay (VPS)" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", disabled: !!busy, className: "rm-mode-btn", onClick: () => go("lan"), title: "Embedded LAN relay on this machine (mDNS)", children: busy === "lan" ? "\u2026" : "LAN" })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", disabled: !!busy || room.public, className: "rm-mode-btn" + (cur === "local" ? " is-on" : ""), onClick: () => go("local"), title: room.public ? "Public rooms need a relay" : "Room members collaborate on this dsh instance", children: busy === "local" ? "\u2026" : "Local" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", disabled: !!busy, className: "rm-mode-btn" + (cur === "relay" && room.transport !== "local" ? " is-on" : ""), onClick: () => go("relay"), children: busy === "relay" ? "\u2026" : "Relay" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "rm-note", children: room.transport === "local" ? "All members are on this dsh \u2014 nothing leaves the process. Switch to Relay or LAN to invite remote hosts; local agents stay members." : "Local agents connect as separate members over this transport, alongside remote hosts." })
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "rm-note", children: room.transport === "local" ? "Room messages stay on this dsh instance. Switch to Relay to invite remote hosts; local agents stay members. Model requests use your configured provider." : "Local agents connect as separate members over this transport, alongside remote hosts." })
   ] });
 }
 function AgentDialog({ store, d }) {
@@ -1796,7 +1795,7 @@ function EmptyMain({ store }) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlusIcon, {}),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "New room" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: hasWs ? `Pick any of ${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"} \xB7 default relay 62.234.113.56:80` : "Add a workspace in the left sidebar first" })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: hasWs ? `Pick any of ${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"}` : "Add a workspace in the left sidebar first" })
         ] })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-welcome-action", onClick: () => a.openDialog({ kind: "join" }), children: [
@@ -1810,7 +1809,7 @@ function EmptyMain({ store }) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "Browse public rooms" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Search the VPS directory by name or #tag" })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Search public rooms by name or #tag" })
         ] })
       ] })
     ] })
@@ -1866,7 +1865,7 @@ function RoomsMain({ store }) {
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LockIcon, {}),
             "Private"
           ] }),
-          room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge rm-badge-local", children: "Local only" }) : room.transport === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge", children: "LAN/VPS" }) : null,
+          room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge rm-badge-local", children: "Local" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge", children: "Relay" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.StateDot, { state: room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error", size: 8 }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", "aria-label": "Room members and settings", "aria-expanded": s.detailsOpen, title: "Room members and settings", "data-rm-details-toggle": "", onClick: store.actions.toggleDetails, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PeopleIcon, {}) })
         ] }),
@@ -1905,9 +1904,8 @@ function CreateDialog({ store, d }) {
     description: "",
     tags: "",
     public: false,
-    transport: "relay",
-    // local | relay | lan | cloudflare
-    lanHostPort: "62.234.113.56:80",
+    transport: "local",
+    // local | relay; relay deployment belongs to host configuration
     turnLimit: 6,
     concurrency: 2,
     isolation: "auto",
@@ -1918,7 +1916,6 @@ function CreateDialog({ store, d }) {
   const [showCustom, setShowCustom] = (0, import_react.useState)(false);
   const [err, setErr] = (0, import_react.useState)(null);
   const [busy, setBusy] = (0, import_react.useState)(false);
-  const [lanPeers, setLanPeers] = (0, import_react.useState)([]);
   const [presets, setPresets] = (0, import_react.useState)([]);
   const ok = f.name.trim() && !busy;
   const [ws, setWs] = (0, import_react.useState)(d && d.workspace ? d.workspace : null);
@@ -1959,8 +1956,7 @@ function CreateDialog({ store, d }) {
     setErr(null);
     const transport = f.transport;
     const localOnly = transport === "local";
-    const mode = transport === "cloudflare" ? "relay" : "lan";
-    const lanHostPort = transport === "relay" ? f.lanHostPort.trim() || "62.234.113.56:80" : transport === "lan" ? "" : void 0;
+    const mode = "relay";
     try {
       await a.create({
         name: f.name.trim(),
@@ -1968,7 +1964,6 @@ function CreateDialog({ store, d }) {
         tags: f.tags,
         public: localOnly ? false : f.public,
         mode,
-        lanHostPort,
         workspacePath: ws.path,
         workspaceName: ws.title,
         hostWorkspaceId: ws.id,
@@ -1980,17 +1975,9 @@ function CreateDialog({ store, d }) {
       }, { timeoutMs: 12e3 });
     } catch (e) {
       const msg = e && e.message || "Create failed";
-      setErr(/timed out|timeout|abort/i.test(msg) ? `${msg}. Check transport (try Local only), relay host, and network \u2014 agent joins continue in the background after a successful create.` : msg);
+      setErr(/timed out|timeout|abort/i.test(msg) ? `${msg}. Check the connection (try Local) and network \u2014 agent joins continue in the background after a successful create.` : msg);
     } finally {
       setBusy(false);
-    }
-  };
-  const browseLan = async () => {
-    try {
-      const r = await a.browseLan();
-      setLanPeers(r.peers || []);
-    } catch (e) {
-      setErr(e.message);
     }
   };
   const tabs = [
@@ -2007,7 +1994,7 @@ function CreateDialog({ store, d }) {
       closeLabel: "Close",
       className: "rm-modal-wide rm-modal-create rm-modal-scrollable",
       contentClassName: "rm-modal-scroll",
-      description: (ws ? `Workspace \u201C${ws.title}\u201D \xB7 ` : "") + `dsh-room ${s.version || "?"} \xB7 default VPS 62.234.113.56:80 \xB7 E2EE. Create returns immediately; agents join in the background.`,
+      description: (ws ? `Workspace \u201C${ws.title}\u201D \xB7 ` : "") + `dsh-room ${s.version || "?"} \xB7 Members join in the background.`,
       footer: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: a.closeDialog, children: "Cancel" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "primary", disabled: !ok, onClick: submit, children: busy ? "Creating\u2026" : "Create" })
@@ -2020,28 +2007,18 @@ function CreateDialog({ store, d }) {
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: f.name || "room", size: 36 }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-name", autoFocus: true, placeholder: "e.g. release-crew", maxLength: 60, value: f.name, onChange: (e) => setF({ ...f, name: e.target.value }) })
           ] }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-span-2", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Transport", hint: "Local only = in-process (no network). Relay / LAN / Cloudflare for remote hosts.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-mode-row rm-mode-wrap", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.transport === "local" ? " is-on" : ""), onClick: () => setF({ ...f, transport: "local", public: false }), children: "Local only" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.transport === "relay" ? " is-on" : ""), onClick: () => setF({ ...f, transport: "relay", lanHostPort: f.lanHostPort || "62.234.113.56:80" }), children: "Relay (VPS)" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.transport === "lan" ? " is-on" : ""), onClick: () => setF({ ...f, transport: "lan" }), children: "LAN (this machine)" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.transport === "cloudflare" ? " is-on" : ""), onClick: () => setF({ ...f, transport: "cloudflare" }), children: "Cloudflare" })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-span-2", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Transport", hint: "Local: collaborate on this dsh instance. Relay: invite members from other machines.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-mode-row rm-mode-wrap", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.transport === "local" ? " is-on" : ""), "aria-pressed": f.transport === "local", onClick: () => setF({ ...f, transport: "local", public: false }), children: "Local" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.transport === "relay" ? " is-on" : ""), "aria-pressed": f.transport === "relay", onClick: () => setF({ ...f, transport: "relay" }), children: "Relay" })
           ] }) }) }),
-          f.transport === "relay" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-span-2", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Relay host:port", htmlFor: "rm-lan-hp", hint: "Default 62.234.113.56:80 (public directory).", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-lan-hp", placeholder: "62.234.113.56:80", value: f.lanHostPort, onChange: (e) => setF({ ...f, lanHostPort: e.target.value }) }) }) }) : null,
-          f.transport === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-span-2", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "LAN relay", hint: "Blank host embeds a relay on this machine and advertises it over mDNS.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-lan-browse", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "outline", onClick: browseLan, children: "Browse mDNS" }),
-            lanPeers.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-lan-peer", onClick: () => setF({ ...f, transport: "relay", lanHostPort: p.hostPort }), children: [
-              p.hostPort,
-              p.name ? ` \xB7 ${p.name}` : ""
-            ] }, p.hostPort))
-          ] }) }) }) : null,
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Description", htmlFor: "rm-create-desc", hint: "Shown to members and in public search.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-desc", placeholder: "e.g. Agents that review and ship releases", maxLength: 280, value: f.description, onChange: (e) => setF({ ...f, description: e.target.value }) }) }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Tags", htmlFor: "rm-create-tags", hint: "Spaces or commas, up to 8.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-tags", placeholder: "e.g. review rust", value: f.tags, onChange: (e) => setF({ ...f, tags: e.target.value }) }) }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-span-2 rm-switch-row", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-field-label", children: "List in public directory" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-field-hint", children: f.transport === "local" ? "Local-only rooms stay private (no network)." : f.public ? "Anyone can find and join \u2014 key is published with the listing." : "Private: invite only." })
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-field-hint", children: f.transport === "local" ? "Local rooms stay private." : f.public ? "Anyone can find and join \u2014 key is published with the listing." : "Private: invite only." })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Switch, { checked: f.public && f.transport !== "local", onChange: (v) => setF({ ...f, public: v }), label: "List in public directory", disabled: f.transport === "local", title: f.transport === "local" ? "Local-only rooms stay private" : void 0 })
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Switch, { checked: f.public && f.transport !== "local", onChange: (v) => setF({ ...f, public: v }), label: "List in public directory", disabled: f.transport === "local", title: f.transport === "local" ? "Local rooms stay private" : void 0 })
           ] })
         ] }) : null,
         tab === "agents" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-create-pane", role: "tabpanel", children: [
@@ -2452,7 +2429,7 @@ function BrowseDialog({ store }) {
       title: "Browse public rooms",
       closeLabel: "Close",
       className: "rm-modal-wide",
-      description: "Directory on VPS 62.234.113.56:80. Search by name or #tag; joined rooms attach to the workspace below.",
+      description: "Search by name or #tag; joined rooms attach to the workspace below.",
       footer: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: a.closeDialog, children: "Close" }),
       children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-browse", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WorkspaceSelect, { store, value: activeWs, onChange: setActiveWs }),
@@ -2911,7 +2888,7 @@ function createRoomsStore() {
           delete room.invite;
           delete room.listed;
           const rooms = s.rooms.some((x) => x.roomId === r.roomId) ? s.rooms.map((x) => x.roomId === r.roomId ? { ...x, ...room } : x) : [room, ...s.rooms];
-          return { rooms, selected: r.roomId, activeRoomId: r.roomId, dialog: { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } };
+          return { rooms, selected: r.roomId, activeRoomId: r.roomId, dialog: r.transport === "local" || form.localOnly ? null : { kind: "invite", roomId: r.roomId, name: r.name, invite: r.invite, public: r.public, listed: r.listed } };
         });
         void loadMessages(r.roomId);
         return r;
@@ -4023,8 +4000,8 @@ function RoomDetail({ room, messages, store, mention, assign }) {
         "Invite"
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "rm-note", children: room.public ? "Public: listed in the relay directory with its key. Anyone can find, join, and read this room." : "Private: only agents holding the invite can join. The invite contains the room key \u2014 share it only with agents you trust." }),
-      room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "rm-note", children: "Local-only room: switch Transport to Relay or LAN before inviting remote hosts." }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-actions", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "outline", onClick: copyInvite, icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LinkIcon, {}), children: "Copy invite" }) })
+      room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "rm-note", children: "Local room: switch to Relay before inviting remote hosts." }) : null,
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-actions", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "outline", disabled: room.transport === "local", onClick: copyInvite, icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LinkIcon, {}), children: "Copy invite" }) })
     ] }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TransportSection, { room, store }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-detail-section", children: [
@@ -4039,7 +4016,7 @@ function RoomDetail({ room, messages, store, mention, assign }) {
           " Private"
         ] }) }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { children: "Transport" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { children: room.transport === "local" ? "Local only (in-process loopback)" : room.transport === "lan" ? "LAN / VPS (Node relay)" : "Relay" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { children: room.transport === "local" ? "Local" : "Relay" }),
         room.memberConfig?.workspaceLabel ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", { children: "Workspace" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", { children: room.memberConfig.workspaceLabel })
@@ -4210,12 +4187,12 @@ var localOffline = (room) => room.local?.agents.some((a) => !a.online);
 function TransportSection({ room, store }) {
   const a = store.actions;
   const [busy, setBusy] = (0, import_react.useState)(null);
-  const cur = room.transport === "local" ? "local" : room.transport === "lan" ? "relay" : "relay";
+  const cur = room.transport === "local" ? "local" : "relay";
   const go = async (target) => {
     setBusy(target);
     try {
       await a.setTransport(room.roomId, target);
-      a.toast(target === "local" ? "Local only \u2014 in-process, no network" : target === "lan" ? "Now on this machine's LAN relay \u2014 invite remote hosts" : "Now on the relay \u2014 invite remote hosts");
+      a.toast(target === "local" ? "Local \u2014 room messages stay on this dsh instance" : "Relay \u2014 ready to invite remote hosts");
     } catch (e) {
       a.toast(e.message);
     } finally {
@@ -4226,11 +4203,10 @@ function TransportSection({ room, store }) {
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-detail-h", children: "Transport" }),
     room.status === "online" && localOffline(room) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mini", onClick: () => a.reconnect(room.roomId).catch((e) => a.toast(e.message)), children: "Retry offline agents" }) : null,
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-mode-row", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", disabled: !!busy || room.public, className: "rm-mode-btn" + (cur === "local" ? " is-on" : ""), onClick: () => go("local"), title: room.public ? "Public rooms need a relay" : "In-process loopback: no network", children: busy === "local" ? "\u2026" : "Local only" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", disabled: !!busy, className: "rm-mode-btn" + (cur === "relay" && room.transport !== "local" ? " is-on" : ""), onClick: () => go("relay"), children: busy === "relay" ? "\u2026" : "Relay (VPS)" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", disabled: !!busy, className: "rm-mode-btn", onClick: () => go("lan"), title: "Embedded LAN relay on this machine (mDNS)", children: busy === "lan" ? "\u2026" : "LAN" })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", disabled: !!busy || room.public, className: "rm-mode-btn" + (cur === "local" ? " is-on" : ""), onClick: () => go("local"), title: room.public ? "Public rooms need a relay" : "Room members collaborate on this dsh instance", children: busy === "local" ? "\u2026" : "Local" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", disabled: !!busy, className: "rm-mode-btn" + (cur === "relay" && room.transport !== "local" ? " is-on" : ""), onClick: () => go("relay"), children: busy === "relay" ? "\u2026" : "Relay" })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "rm-note", children: room.transport === "local" ? "All members are on this dsh \u2014 nothing leaves the process. Switch to Relay or LAN to invite remote hosts; local agents stay members." : "Local agents connect as separate members over this transport, alongside remote hosts." })
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "rm-note", children: room.transport === "local" ? "Room messages stay on this dsh instance. Switch to Relay to invite remote hosts; local agents stay members. Model requests use your configured provider." : "Local agents connect as separate members over this transport, alongside remote hosts." })
   ] });
 }
 function AgentDialog({ store, d }) {
@@ -4481,7 +4457,7 @@ function EmptyMain({ store }) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlusIcon, {}),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "New room" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: hasWs ? `Pick any of ${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"} \xB7 default relay 62.234.113.56:80` : "Add a workspace in the left sidebar first" })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: hasWs ? `Pick any of ${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"}` : "Add a workspace in the left sidebar first" })
         ] })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-welcome-action", onClick: () => a.openDialog({ kind: "join" }), children: [
@@ -4495,7 +4471,7 @@ function EmptyMain({ store }) {
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("b", { children: "Browse public rooms" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Search the VPS directory by name or #tag" })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Search public rooms by name or #tag" })
         ] })
       ] })
     ] })
@@ -4551,7 +4527,7 @@ function RoomsMain({ store }) {
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LockIcon, {}),
             "Private"
           ] }),
-          room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge rm-badge-local", children: "Local only" }) : room.transport === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge", children: "LAN/VPS" }) : null,
+          room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge rm-badge-local", children: "Local" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge", children: "Relay" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.StateDot, { state: room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error", size: 8 }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", "aria-label": "Room members and settings", "aria-expanded": s.detailsOpen, title: "Room members and settings", "data-rm-details-toggle": "", onClick: store.actions.toggleDetails, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PeopleIcon, {}) })
         ] }),
@@ -4590,9 +4566,8 @@ function CreateDialog({ store, d }) {
     description: "",
     tags: "",
     public: false,
-    transport: "relay",
-    // local | relay | lan | cloudflare
-    lanHostPort: "62.234.113.56:80",
+    transport: "local",
+    // local | relay; relay deployment belongs to host configuration
     turnLimit: 6,
     concurrency: 2,
     isolation: "auto",
@@ -4603,7 +4578,6 @@ function CreateDialog({ store, d }) {
   const [showCustom, setShowCustom] = (0, import_react.useState)(false);
   const [err, setErr] = (0, import_react.useState)(null);
   const [busy, setBusy] = (0, import_react.useState)(false);
-  const [lanPeers, setLanPeers] = (0, import_react.useState)([]);
   const [presets, setPresets] = (0, import_react.useState)([]);
   const ok = f.name.trim() && !busy;
   const [ws, setWs] = (0, import_react.useState)(d && d.workspace ? d.workspace : null);
@@ -4644,8 +4618,7 @@ function CreateDialog({ store, d }) {
     setErr(null);
     const transport = f.transport;
     const localOnly = transport === "local";
-    const mode = transport === "cloudflare" ? "relay" : "lan";
-    const lanHostPort = transport === "relay" ? f.lanHostPort.trim() || "62.234.113.56:80" : transport === "lan" ? "" : void 0;
+    const mode = "relay";
     try {
       await a.create({
         name: f.name.trim(),
@@ -4653,7 +4626,6 @@ function CreateDialog({ store, d }) {
         tags: f.tags,
         public: localOnly ? false : f.public,
         mode,
-        lanHostPort,
         workspacePath: ws.path,
         workspaceName: ws.title,
         hostWorkspaceId: ws.id,
@@ -4665,17 +4637,9 @@ function CreateDialog({ store, d }) {
       }, { timeoutMs: 12e3 });
     } catch (e) {
       const msg = e && e.message || "Create failed";
-      setErr(/timed out|timeout|abort/i.test(msg) ? `${msg}. Check transport (try Local only), relay host, and network \u2014 agent joins continue in the background after a successful create.` : msg);
+      setErr(/timed out|timeout|abort/i.test(msg) ? `${msg}. Check the connection (try Local) and network \u2014 agent joins continue in the background after a successful create.` : msg);
     } finally {
       setBusy(false);
-    }
-  };
-  const browseLan = async () => {
-    try {
-      const r = await a.browseLan();
-      setLanPeers(r.peers || []);
-    } catch (e) {
-      setErr(e.message);
     }
   };
   const tabs = [
@@ -4692,7 +4656,7 @@ function CreateDialog({ store, d }) {
       closeLabel: "Close",
       className: "rm-modal-wide rm-modal-create rm-modal-scrollable",
       contentClassName: "rm-modal-scroll",
-      description: (ws ? `Workspace \u201C${ws.title}\u201D \xB7 ` : "") + `dsh-room ${s.version || "?"} \xB7 default VPS 62.234.113.56:80 \xB7 E2EE. Create returns immediately; agents join in the background.`,
+      description: (ws ? `Workspace \u201C${ws.title}\u201D \xB7 ` : "") + `dsh-room ${s.version || "?"} \xB7 Members join in the background.`,
       footer: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: a.closeDialog, children: "Cancel" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "primary", disabled: !ok, onClick: submit, children: busy ? "Creating\u2026" : "Create" })
@@ -4705,28 +4669,18 @@ function CreateDialog({ store, d }) {
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: f.name || "room", size: 36 }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-name", autoFocus: true, placeholder: "e.g. release-crew", maxLength: 60, value: f.name, onChange: (e) => setF({ ...f, name: e.target.value }) })
           ] }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-span-2", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Transport", hint: "Local only = in-process (no network). Relay / LAN / Cloudflare for remote hosts.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-mode-row rm-mode-wrap", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.transport === "local" ? " is-on" : ""), onClick: () => setF({ ...f, transport: "local", public: false }), children: "Local only" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.transport === "relay" ? " is-on" : ""), onClick: () => setF({ ...f, transport: "relay", lanHostPort: f.lanHostPort || "62.234.113.56:80" }), children: "Relay (VPS)" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.transport === "lan" ? " is-on" : ""), onClick: () => setF({ ...f, transport: "lan" }), children: "LAN (this machine)" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.transport === "cloudflare" ? " is-on" : ""), onClick: () => setF({ ...f, transport: "cloudflare" }), children: "Cloudflare" })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-span-2", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Transport", hint: "Local: collaborate on this dsh instance. Relay: invite members from other machines.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-mode-row rm-mode-wrap", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.transport === "local" ? " is-on" : ""), "aria-pressed": f.transport === "local", onClick: () => setF({ ...f, transport: "local", public: false }), children: "Local" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-mode-btn" + (f.transport === "relay" ? " is-on" : ""), "aria-pressed": f.transport === "relay", onClick: () => setF({ ...f, transport: "relay" }), children: "Relay" })
           ] }) }) }),
-          f.transport === "relay" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-span-2", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Relay host:port", htmlFor: "rm-lan-hp", hint: "Default 62.234.113.56:80 (public directory).", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-lan-hp", placeholder: "62.234.113.56:80", value: f.lanHostPort, onChange: (e) => setF({ ...f, lanHostPort: e.target.value }) }) }) }) : null,
-          f.transport === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-span-2", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "LAN relay", hint: "Blank host embeds a relay on this machine and advertises it over mDNS.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-lan-browse", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "outline", onClick: browseLan, children: "Browse mDNS" }),
-            lanPeers.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-lan-peer", onClick: () => setF({ ...f, transport: "relay", lanHostPort: p.hostPort }), children: [
-              p.hostPort,
-              p.name ? ` \xB7 ${p.name}` : ""
-            ] }, p.hostPort))
-          ] }) }) }) : null,
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Description", htmlFor: "rm-create-desc", hint: "Shown to members and in public search.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-desc", placeholder: "e.g. Agents that review and ship releases", maxLength: 280, value: f.description, onChange: (e) => setF({ ...f, description: e.target.value }) }) }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, { label: "Tags", htmlFor: "rm-create-tags", hint: "Spaces or commas, up to 8.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Input, { id: "rm-create-tags", placeholder: "e.g. review rust", value: f.tags, onChange: (e) => setF({ ...f, tags: e.target.value }) }) }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-span-2 rm-switch-row", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-field-label", children: "List in public directory" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-field-hint", children: f.transport === "local" ? "Local-only rooms stay private (no network)." : f.public ? "Anyone can find and join \u2014 key is published with the listing." : "Private: invite only." })
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-field-hint", children: f.transport === "local" ? "Local rooms stay private." : f.public ? "Anyone can find and join \u2014 key is published with the listing." : "Private: invite only." })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Switch, { checked: f.public && f.transport !== "local", onChange: (v) => setF({ ...f, public: v }), label: "List in public directory", disabled: f.transport === "local", title: f.transport === "local" ? "Local-only rooms stay private" : void 0 })
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Switch, { checked: f.public && f.transport !== "local", onChange: (v) => setF({ ...f, public: v }), label: "List in public directory", disabled: f.transport === "local", title: f.transport === "local" ? "Local rooms stay private" : void 0 })
           ] })
         ] }) : null,
         tab === "agents" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-create-pane", role: "tabpanel", children: [
@@ -5137,7 +5091,7 @@ function BrowseDialog({ store }) {
       title: "Browse public rooms",
       closeLabel: "Close",
       className: "rm-modal-wide",
-      description: "Directory on VPS 62.234.113.56:80. Search by name or #tag; joined rooms attach to the workspace below.",
+      description: "Search by name or #tag; joined rooms attach to the workspace below.",
       footer: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: a.closeDialog, children: "Close" }),
       children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-root rm-browse", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WorkspaceSelect, { store, value: activeWs, onChange: setActiveWs }),

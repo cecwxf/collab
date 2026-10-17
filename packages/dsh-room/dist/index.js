@@ -2854,7 +2854,7 @@ var HELP = [
   "  /collab agent add <moderator|architect|coder|reviewer|name>   add a local agent (preset or custom name)",
   "  /collab agent rm <name>     remove a local agent",
   "  /collab stop [@agent]       stop all (or one) local agent runs",
-  "  /collab transport <local|relay|lan>   switch transport (relay/lan lets remote hosts join)"
+  "  /collab transport <local|relay>       switch connection (relay lets remote hosts join)"
 ].join("\n");
 function parseCollabCommand(rawInput) {
   const input = rawInput.trim();
@@ -2958,7 +2958,7 @@ function parseCollabCommand(rawInput) {
     case "transport": {
       const t = rest.toLowerCase();
       if (t === "local" || t === "relay" || t === "lan") return { op: "transport", target: t };
-      return { op: "error", message: "usage: /collab transport <local|relay|lan>" };
+      return { op: "error", message: "usage: /collab transport <local|relay>" };
     }
     default:
       if (input.startsWith("@")) return { op: "say", text: input, mentions: extractMentions(input) };

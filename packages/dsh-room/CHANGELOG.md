@@ -1,3 +1,8 @@
+## 0.3.20
+
+- Simplify room connection choices to Local and Relay, with Local selected by default.
+- Hide relay deployment names, IPs and ports from room setup; Relay uses host configuration. Existing invites and legacy LAN rooms remain compatible.
+
 ## 0.3.19
 
 - Restore a visible workspace directory entry above the Room composer, with native workspace/session navigation and the original Add workspace directory flow.
