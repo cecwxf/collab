@@ -19,9 +19,6 @@ const Svg = ({ size = 16, children }) => (
 export const RoomsIcon = ({ size }) => (
   <Svg size={size}><rect x="2.5" y="3" width="11" height="10" rx="2" /><path d="M5.5 6.5h5M5.5 9.5h3.5" /></Svg>
 );
-const FolderIcon = ({ size }) => (
-  <Svg size={size}><path d="M2.5 4.5h4l1.5 1.5H13.5v7.5H2.5z" /></Svg>
-);
 const SearchIcon = () => <Svg><circle cx="7" cy="7" r="4.25" /><path d="m10.2 10.2 3.3 3.3" /></Svg>;
 const PlusIcon = () => <Svg><path d="M8 3v10M3 8h10" /></Svg>;
 const CloseIcon = () => <Svg size={14}><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" /></Svg>;
@@ -68,82 +65,7 @@ function useNativeWorkspaces(store) {
   const snap = useSyncExternalStore(src ? src.subscribe : NO_SUB, src ? src.getSnapshot : NO_SNAP);
   return (snap && snap.items) || [];
 }
-const samePath = sameWorkspacePath;
-/** Group joined rooms under the native workspace whose path they are attached to. */
-function groupRooms(rooms, workspaces) {
-  const groups = workspaces.map((w) => ({ ws: w, rooms: [] }));
-  const other = [];
-  for (const r of rooms) {
-    const byHost = r.hostWorkspaceId && groups.find((x) => x.ws.workspaceId === r.hostWorkspaceId);
-    const path = r.memberConfig && r.memberConfig.workspacePath;
-    const g = byHost || groups.find((x) => samePath(x.ws.path, path));
-    if (g) g.rooms.push(r); else other.push(r);
-  }
-  return { groups, other };
-}
 const wsTitle = (w) => w.title || (w.path || "").split(/[\\/]/).filter(Boolean).pop() || w.path;
-
-function RoomItem({ r, selected, onClick }) {
-  return (
-    <button type="button" className="rm-room-item" aria-current={selected ? "true" : undefined} data-room-id={r.roomId} onClick={onClick}>
-      <span className="rm-avatar-wrap"><Avatar name={r.name} size={26} /><span className={"rm-dot rm-dot-" + r.status} style={{ position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" }} /></span>
-      <span className="rm-room-item-body">
-        <span className="rm-room-item-name">{r.name}</span>
-        <span className="rm-room-item-meta">{r.last ? `${r.last.from}: ${r.last.text}` : (r.description || (r.public ? "Public room" : "Private · invite only"))}</span>
-      </span>
-      {r.public ? <span className="rm-badge rm-badge-public"><GlobeIcon /></span> : <span className="rm-badge"><LockIcon /></span>}
-    </button>
-  );
-}
-
-/** DSH Room panel navigation: rooms grouped by native dsh workspace (sidebar list stays native). */
-function RoomsNav({ store }) {
-  const s = useStore(store);
-  const a = store.actions;
-  const workspaces = useNativeWorkspaces(store);
-  const [q, setQ] = useState("");
-  const qq = q.trim().toLowerCase();
-  const match = (r) => !qq || r.name.toLowerCase().includes(qq) || (r.description || "").toLowerCase().includes(qq) || (r.tags || []).some((t) => ("#" + t).includes(qq));
-  const { groups, other } = groupRooms((s.rooms || []).filter(match), workspaces);
-  const sel = (r) => { a.select(r.roomId); if (s.dialog?.kind === "rooms") a.closeDialog(); };
-  return (
-    <nav className="rm-nav" aria-label="Rooms by workspace" data-rm-nav="">
-      <div className="rm-nav-head">
-        <span className="rm-side-title">Rooms</span>
-        <button type="button" className="rm-icon-btn" title="Browse public rooms" aria-label="Browse public rooms" onClick={() => a.openDialog({ kind: "browse" })}><GlobeIcon /></button>
-        <button type="button" className="rm-icon-btn" title="Join by invite" aria-label="Join by invite" onClick={() => a.openDialog({ kind: "join" })}><LinkIcon /></button>
-      </div>
-      <div className="rm-search">
-        <SearchIcon />
-        <input type="text" placeholder="Filter rooms or #tags" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter rooms" />
-      </div>
-      <div className="rm-nav-scroll">
-        {groups.map(({ ws, rooms }) => (
-          <div key={ws.workspaceId} className="rm-ws-group" data-rm-ws-group={ws.workspaceId}>
-            <div className="rm-ws-head" title={ws.path}>
-              <FolderIcon /><span className="rm-ws-name">{wsTitle(ws)}</span>
-              <button type="button" className="rm-icon-btn rm-ws-add" title={`New room in ${wsTitle(ws)}`} aria-label={`New room in ${wsTitle(ws)}`}
-                onClick={() => a.openDialog({ kind: "create", workspace: { id: ws.workspaceId, path: ws.path, title: wsTitle(ws) } })}><PlusIcon /></button>
-            </div>
-            {rooms.map((r) => <RoomItem key={r.roomId} r={r} selected={r.roomId === s.selected} onClick={() => sel(r)} />)}
-            {!rooms.length && !qq ? <div className="rm-empty-hint rm-ws-empty">No rooms · use + to create one here</div> : null}
-          </div>
-        ))}
-        {other.length ? (
-          <div className="rm-ws-group">
-            <div className="rm-ws-head"><FolderIcon /><span className="rm-ws-name">Other rooms</span></div>
-            {other.map((r) => <RoomItem key={r.roomId} r={r} selected={r.roomId === s.selected} onClick={() => sel(r)} />)}
-          </div>
-        ) : null}
-        {!workspaces.length ? (
-          <div className="rm-empty-hint">No workspaces yet. Add one with the native “Add workspace” in the left sidebar, then use “New room” on it.
-            <div style={{ marginTop: 8 }}><Button size="sm" variant="outline" onClick={() => a.openDialog({ kind: "workspace" })}>Add workspace…</Button></div>
-          </div>
-        ) : null}
-      </div>
-    </nav>
-  );
-}
 
 /** Marker in a native Session row (leading seat) when that Session is a room's agent session. */
 function RoomSessionMark({ store, sessionId }) {
@@ -187,7 +109,6 @@ function WorkspaceSelect({ store, value, onChange, id }) {
   );
 }
 
-function PanelIcon({ size }) { return <RoomsIcon size={size} />; }
 
 
 const MARKDOWN_LABELS = { code: { copyLabel: "Copy", copiedLabel: "Copied" }, footnotes: "Footnotes" };
@@ -1016,7 +937,6 @@ function RoomsMain({ store }) {
             })()}
             {room.public ? <span className="rm-badge rm-badge-public"><GlobeIcon />Public</span> : <span className="rm-badge"><LockIcon />Private</span>}{room.transport === "local" ? <span className="rm-badge rm-badge-local">Local only</span> : room.transport === "lan" ? <span className="rm-badge">LAN/VPS</span> : null}
             <StateDot state={room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error"} size={8} />
-            <Button size="sm" variant="ghost" onClick={() => store.actions.openDialog({ kind: "rooms" })}>Rooms</Button>
             <button type="button" className="rm-icon-btn" aria-label="Room members and settings" aria-expanded={s.detailsOpen} title="Room members and settings" data-rm-details-toggle="" onClick={store.actions.toggleDetails}><PeopleIcon /></button>
           </header>
           <ChatBody messages={messages} members={room.members} room={room} store={store} />
@@ -1282,7 +1202,7 @@ function JoinDialog({ store }) {
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const valid = /^collab:\/\/(join|lan|relay)\/.+#\S+$/.test(invite.trim());
-  const [ws, setWs] = useState(null);
+  const [ws, setWs] = useState(() => s.dialog?.workspace || null);
 
   const submit = async () => {
     if (!valid || busy) return;
@@ -1477,7 +1397,7 @@ function BrowseDialog({ store }) {
   const a = store.actions;
   const [joining, setJoining] = useState(null);
   const inputRef = useRef(null);
-  const [activeWs, setActiveWs] = useState(null);
+  const [activeWs, setActiveWs] = useState(() => s.dialog?.workspace || null);
   useEffect(() => {
     a.setSearchOpen(true);
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -1543,7 +1463,6 @@ function Overlay({ store }) {
       {d?.kind === "browse" ? <BrowseDialog store={store} /> : null}
       {d?.kind === "agent" ? <AgentDialog store={store} d={d} /> : null}
       {d?.kind === "merge" ? <MergeDialog store={store} d={d} /> : null}
-      {d?.kind === "rooms" ? <Modal open onClose={store.actions.closeDialog} title="Rooms" description="Rooms are grouped beneath their native workspaces in the sidebar."><div className="rm-root"><RoomsNav store={store} /></div></Modal> : null}
       {s.toast ? <Toast text={s.toast} onDone={store.actions.clearToast} holdMs={2200} /> : null}
     </>
   );
@@ -1637,6 +1556,12 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
         if (row) newSessionButton(row)?.click();
       }), first);
       menu.insertBefore(mk("New room", ROOM_SVG, () => open(key)), first);
+      const openWorkspaceDialog = (kind) => {
+        const w = wsFor(key);
+        if (w) store.actions.openDialog({ kind, workspace: { id: w.workspaceId, path: w.path, title: wsTitle(w) } });
+      };
+      menu.insertBefore(mk("Join room by invite", ROOM_SVG, () => openWorkspaceDialog("join")), first);
+      menu.insertBefore(mk("Browse public rooms", ROOM_SVG, () => openWorkspaceDialog("browse")), first);
     };
     requestAnimationFrame(augment);
   };
@@ -1650,7 +1575,7 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
     mo.disconnect();
     document.removeEventListener("click", onClickCapture, true);
     if (raf) cancelAnimationFrame(raf);
-    for (const b of document.querySelectorAll("[data-rm-ws-new-room], [data-rm-ws-global-room]")) b.remove();
+    for (const b of document.querySelectorAll("[data-rm-ws-new-room], [data-rm-ws-global-room], [data-rm-ws-menu]")) b.remove();
   };
 }
 
@@ -1671,7 +1596,7 @@ export function apply(ctx) {
   const ensurePanel = () => { try { if (info().getSnapshot().activePanelId !== PANEL_ID) ctx.layout.selectPanel(PANEL_ID); } catch { /* layout busy */ } };
   store.onRoomOpened = ensurePanel;
 
-  ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({ name: "sidebar.panellist", id: PANEL_ID, order: 11, label: () => "DSH Room" }, PanelIcon));
+  // Room content is opened by native workspace rows; no separate sidebar panel entry.
   ctx.slots.inject("main", () => ctx.slots.register({ name: "main", key: PANEL_ID, inject: () => ({ store }) }, RoomsMain));
   ctx.slots.inject("shell.overlay", () => ctx.slots.register({ name: "shell.overlay", id: "dsh-room-dialogs", inject: () => ({ store }) }, Overlay));
   // Native workspace list is never replaced: mark room sessions in it (supported seat)…

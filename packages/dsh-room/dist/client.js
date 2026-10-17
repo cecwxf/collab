@@ -671,7 +671,6 @@ var RoomsIcon = ({ size }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Svg, 
   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", { x: "2.5", y: "3", width: "11", height: "10", rx: "2" }),
   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M5.5 6.5h5M5.5 9.5h3.5" })
 ] });
-var FolderIcon = ({ size }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Svg, { size, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M2.5 4.5h4l1.5 1.5H13.5v7.5H2.5z" }) });
 var SearchIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Svg, { children: [
   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", { cx: "7", cy: "7", r: "4.25" }),
   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "m10.2 10.2 3.3 3.3" })
@@ -742,89 +741,7 @@ function useNativeWorkspaces(store) {
   const snap = (0, import_react.useSyncExternalStore)(src ? src.subscribe : NO_SUB, src ? src.getSnapshot : NO_SNAP);
   return snap && snap.items || [];
 }
-var samePath = sameWorkspacePath;
-function groupRooms(rooms, workspaces) {
-  const groups = workspaces.map((w) => ({ ws: w, rooms: [] }));
-  const other = [];
-  for (const r of rooms) {
-    const byHost = r.hostWorkspaceId && groups.find((x) => x.ws.workspaceId === r.hostWorkspaceId);
-    const path = r.memberConfig && r.memberConfig.workspacePath;
-    const g = byHost || groups.find((x) => samePath(x.ws.path, path));
-    if (g) g.rooms.push(r);
-    else other.push(r);
-  }
-  return { groups, other };
-}
 var wsTitle = (w) => w.title || (w.path || "").split(/[\\/]/).filter(Boolean).pop() || w.path;
-function RoomItem({ r, selected, onClick }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-room-item", "aria-current": selected ? "true" : void 0, "data-room-id": r.roomId, onClick, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-avatar-wrap", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: r.name, size: 26 }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-dot rm-dot-" + r.status, style: { position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" } })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-room-item-body", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-room-item-name", children: r.name }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-room-item-meta", children: r.last ? `${r.last.from}: ${r.last.text}` : r.description || (r.public ? "Public room" : "Private \xB7 invite only") })
-    ] }),
-    r.public ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge rm-badge-public", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlobeIcon, {}) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LockIcon, {}) })
-  ] });
-}
-function RoomsNav({ store }) {
-  const s = useStore(store);
-  const a = store.actions;
-  const workspaces = useNativeWorkspaces(store);
-  const [q, setQ] = (0, import_react.useState)("");
-  const qq = q.trim().toLowerCase();
-  const match = (r) => !qq || r.name.toLowerCase().includes(qq) || (r.description || "").toLowerCase().includes(qq) || (r.tags || []).some((t) => ("#" + t).includes(qq));
-  const { groups, other } = groupRooms((s.rooms || []).filter(match), workspaces);
-  const sel = (r) => {
-    a.select(r.roomId);
-    if (s.dialog?.kind === "rooms") a.closeDialog();
-  };
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("nav", { className: "rm-nav", "aria-label": "Rooms by workspace", "data-rm-nav": "", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-nav-head", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-side-title", children: "Rooms" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", title: "Browse public rooms", "aria-label": "Browse public rooms", onClick: () => a.openDialog({ kind: "browse" }), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlobeIcon, {}) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", title: "Join by invite", "aria-label": "Join by invite", onClick: () => a.openDialog({ kind: "join" }), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LinkIcon, {}) })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-search", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "text", placeholder: "Filter rooms or #tags", value: q, onChange: (e) => setQ(e.target.value), "aria-label": "Filter rooms" })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-nav-scroll", children: [
-      groups.map(({ ws, rooms }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-ws-group", "data-rm-ws-group": ws.workspaceId, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-ws-head", title: ws.path, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FolderIcon, {}),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-ws-name", children: wsTitle(ws) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            "button",
-            {
-              type: "button",
-              className: "rm-icon-btn rm-ws-add",
-              title: `New room in ${wsTitle(ws)}`,
-              "aria-label": `New room in ${wsTitle(ws)}`,
-              onClick: () => a.openDialog({ kind: "create", workspace: { id: ws.workspaceId, path: ws.path, title: wsTitle(ws) } }),
-              children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlusIcon, {})
-            }
-          )
-        ] }),
-        rooms.map((r) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomItem, { r, selected: r.roomId === s.selected, onClick: () => sel(r) }, r.roomId)),
-        !rooms.length && !qq ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-empty-hint rm-ws-empty", children: "No rooms \xB7 use + to create one here" }) : null
-      ] }, ws.workspaceId)),
-      other.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-ws-group", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-ws-head", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FolderIcon, {}),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-ws-name", children: "Other rooms" })
-        ] }),
-        other.map((r) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomItem, { r, selected: r.roomId === s.selected, onClick: () => sel(r) }, r.roomId))
-      ] }) : null,
-      !workspaces.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-empty-hint", children: [
-        "No workspaces yet. Add one with the native \u201CAdd workspace\u201D in the left sidebar, then use \u201CNew room\u201D on it.",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { marginTop: 8 }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "outline", onClick: () => a.openDialog({ kind: "workspace" }), children: "Add workspace\u2026" }) })
-      ] }) : null
-    ] })
-  ] });
-}
 function RoomSessionMark({ store, sessionId }) {
   const s = useStore(store);
   for (const r of s.rooms || []) {
@@ -862,9 +779,6 @@ function WorkspaceSelect({ store, value, onChange, id }) {
       w.path
     ] }, w.workspaceId))
   ] });
-}
-function PanelIcon({ size }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomsIcon, { size });
 }
 var MARKDOWN_LABELS = { code: { copyLabel: "Copy", copiedLabel: "Copied" }, footnotes: "Footnotes" };
 function MessageBody({ text, room, store, from }) {
@@ -1890,7 +1804,6 @@ function RoomsMain({ store }) {
           ] }),
           room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge rm-badge-local", children: "Local only" }) : room.transport === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge", children: "LAN/VPS" }) : null,
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.StateDot, { state: room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error", size: 8 }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "ghost", onClick: () => store.actions.openDialog({ kind: "rooms" }), children: "Rooms" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", "aria-label": "Room members and settings", "aria-expanded": s.detailsOpen, title: "Room members and settings", "data-rm-details-toggle": "", onClick: store.actions.toggleDetails, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PeopleIcon, {}) })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatBody, { messages, members: room.members, room, store }),
@@ -2161,7 +2074,7 @@ function JoinDialog({ store }) {
   const [err, setErr] = (0, import_react.useState)(null);
   const [busy, setBusy] = (0, import_react.useState)(false);
   const valid = /^collab:\/\/(join|lan|relay)\/.+#\S+$/.test(invite.trim());
-  const [ws, setWs] = (0, import_react.useState)(null);
+  const [ws, setWs] = (0, import_react.useState)(() => s.dialog?.workspace || null);
   const submit = async () => {
     if (!valid || busy) return;
     setBusy(true);
@@ -2450,7 +2363,7 @@ function BrowseDialog({ store }) {
   const a = store.actions;
   const [joining, setJoining] = (0, import_react.useState)(null);
   const inputRef = (0, import_react.useRef)(null);
-  const [activeWs, setActiveWs] = (0, import_react.useState)(null);
+  const [activeWs, setActiveWs] = (0, import_react.useState)(() => s.dialog?.workspace || null);
   (0, import_react.useEffect)(() => {
     a.setSearchOpen(true);
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -2533,7 +2446,6 @@ function Overlay({ store }) {
     d?.kind === "browse" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BrowseDialog, { store }) : null,
     d?.kind === "agent" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AgentDialog, { store, d }) : null,
     d?.kind === "merge" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MergeDialog, { store, d }) : null,
-    d?.kind === "rooms" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Modal, { open: true, onClose: store.actions.closeDialog, title: "Rooms", description: "Rooms are grouped beneath their native workspaces in the sidebar.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-root", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomsNav, { store }) }) }) : null,
     s.toast ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Toast, { text: s.toast, onDone: store.actions.clearToast, holdMs: 2200 }) : null
   ] });
 }
@@ -2646,6 +2558,12 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
         if (row2) newSessionButton(row2)?.click();
       }), first);
       menu.insertBefore(mk("New room", ROOM_SVG, () => open(key)), first);
+      const openWorkspaceDialog = (kind) => {
+        const w = wsFor(key);
+        if (w) store.actions.openDialog({ kind, workspace: { id: w.workspaceId, path: w.path, title: wsTitle(w) } });
+      };
+      menu.insertBefore(mk("Join room by invite", ROOM_SVG, () => openWorkspaceDialog("join")), first);
+      menu.insertBefore(mk("Browse public rooms", ROOM_SVG, () => openWorkspaceDialog("browse")), first);
     };
     requestAnimationFrame(augment);
   };
@@ -2664,7 +2582,7 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
     mo.disconnect();
     document.removeEventListener("click", onClickCapture, true);
     if (raf) cancelAnimationFrame(raf);
-    for (const b of document.querySelectorAll("[data-rm-ws-new-room], [data-rm-ws-global-room]")) b.remove();
+    for (const b of document.querySelectorAll("[data-rm-ws-new-room], [data-rm-ws-global-room], [data-rm-ws-menu]")) b.remove();
   };
 }
 function apply(ctx) {
@@ -2692,7 +2610,6 @@ function apply(ctx) {
     }
   };
   store.onRoomOpened = ensurePanel;
-  ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({ name: "sidebar.panellist", id: PANEL_ID, order: 11, label: () => "DSH Room" }, PanelIcon));
   ctx.slots.inject("main", () => ctx.slots.register({ name: "main", key: PANEL_ID, inject: () => ({ store }) }, RoomsMain));
   ctx.slots.inject("shell.overlay", () => ctx.slots.register({ name: "shell.overlay", id: "dsh-room-dialogs", inject: () => ({ store }) }, Overlay));
   ctx.slots.inject("sidebar.session.row.leading", () => ctx.slots.register({ name: "sidebar.session.row.leading", id: "dsh-room-session-mark", inject: () => ({ store }) }, RoomSessionMark));
@@ -3375,7 +3292,6 @@ var RoomsIcon = ({ size }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Svg, 
   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", { x: "2.5", y: "3", width: "11", height: "10", rx: "2" }),
   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M5.5 6.5h5M5.5 9.5h3.5" })
 ] });
-var FolderIcon = ({ size }) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Svg, { size, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M2.5 4.5h4l1.5 1.5H13.5v7.5H2.5z" }) });
 var SearchIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Svg, { children: [
   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", { cx: "7", cy: "7", r: "4.25" }),
   /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "m10.2 10.2 3.3 3.3" })
@@ -3446,89 +3362,7 @@ function useNativeWorkspaces(store) {
   const snap = (0, import_react.useSyncExternalStore)(src ? src.subscribe : NO_SUB, src ? src.getSnapshot : NO_SNAP);
   return snap && snap.items || [];
 }
-var samePath = sameWorkspacePath;
-function groupRooms(rooms, workspaces) {
-  const groups = workspaces.map((w) => ({ ws: w, rooms: [] }));
-  const other = [];
-  for (const r of rooms) {
-    const byHost = r.hostWorkspaceId && groups.find((x) => x.ws.workspaceId === r.hostWorkspaceId);
-    const path = r.memberConfig && r.memberConfig.workspacePath;
-    const g = byHost || groups.find((x) => samePath(x.ws.path, path));
-    if (g) g.rooms.push(r);
-    else other.push(r);
-  }
-  return { groups, other };
-}
 var wsTitle = (w) => w.title || (w.path || "").split(/[\\/]/).filter(Boolean).pop() || w.path;
-function RoomItem({ r, selected, onClick }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", className: "rm-room-item", "aria-current": selected ? "true" : void 0, "data-room-id": r.roomId, onClick, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-avatar-wrap", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: r.name, size: 26 }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-dot rm-dot-" + r.status, style: { position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" } })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-room-item-body", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-room-item-name", children: r.name }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-room-item-meta", children: r.last ? `${r.last.from}: ${r.last.text}` : r.description || (r.public ? "Public room" : "Private \xB7 invite only") })
-    ] }),
-    r.public ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge rm-badge-public", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlobeIcon, {}) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LockIcon, {}) })
-  ] });
-}
-function RoomsNav({ store }) {
-  const s = useStore(store);
-  const a = store.actions;
-  const workspaces = useNativeWorkspaces(store);
-  const [q, setQ] = (0, import_react.useState)("");
-  const qq = q.trim().toLowerCase();
-  const match = (r) => !qq || r.name.toLowerCase().includes(qq) || (r.description || "").toLowerCase().includes(qq) || (r.tags || []).some((t) => ("#" + t).includes(qq));
-  const { groups, other } = groupRooms((s.rooms || []).filter(match), workspaces);
-  const sel = (r) => {
-    a.select(r.roomId);
-    if (s.dialog?.kind === "rooms") a.closeDialog();
-  };
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("nav", { className: "rm-nav", "aria-label": "Rooms by workspace", "data-rm-nav": "", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-nav-head", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-side-title", children: "Rooms" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", title: "Browse public rooms", "aria-label": "Browse public rooms", onClick: () => a.openDialog({ kind: "browse" }), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GlobeIcon, {}) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", title: "Join by invite", "aria-label": "Join by invite", onClick: () => a.openDialog({ kind: "join" }), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LinkIcon, {}) })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-search", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SearchIcon, {}),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "text", placeholder: "Filter rooms or #tags", value: q, onChange: (e) => setQ(e.target.value), "aria-label": "Filter rooms" })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-nav-scroll", children: [
-      groups.map(({ ws, rooms }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-ws-group", "data-rm-ws-group": ws.workspaceId, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-ws-head", title: ws.path, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FolderIcon, {}),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-ws-name", children: wsTitle(ws) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            "button",
-            {
-              type: "button",
-              className: "rm-icon-btn rm-ws-add",
-              title: `New room in ${wsTitle(ws)}`,
-              "aria-label": `New room in ${wsTitle(ws)}`,
-              onClick: () => a.openDialog({ kind: "create", workspace: { id: ws.workspaceId, path: ws.path, title: wsTitle(ws) } }),
-              children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlusIcon, {})
-            }
-          )
-        ] }),
-        rooms.map((r) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomItem, { r, selected: r.roomId === s.selected, onClick: () => sel(r) }, r.roomId)),
-        !rooms.length && !qq ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-empty-hint rm-ws-empty", children: "No rooms \xB7 use + to create one here" }) : null
-      ] }, ws.workspaceId)),
-      other.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-ws-group", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-ws-head", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FolderIcon, {}),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-ws-name", children: "Other rooms" })
-        ] }),
-        other.map((r) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomItem, { r, selected: r.roomId === s.selected, onClick: () => sel(r) }, r.roomId))
-      ] }) : null,
-      !workspaces.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-empty-hint", children: [
-        "No workspaces yet. Add one with the native \u201CAdd workspace\u201D in the left sidebar, then use \u201CNew room\u201D on it.",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { marginTop: 8 }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "outline", onClick: () => a.openDialog({ kind: "workspace" }), children: "Add workspace\u2026" }) })
-      ] }) : null
-    ] })
-  ] });
-}
 function RoomSessionMark({ store, sessionId }) {
   const s = useStore(store);
   for (const r of s.rooms || []) {
@@ -3566,9 +3400,6 @@ function WorkspaceSelect({ store, value, onChange, id }) {
       w.path
     ] }, w.workspaceId))
   ] });
-}
-function PanelIcon({ size }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomsIcon, { size });
 }
 var MARKDOWN_LABELS = { code: { copyLabel: "Copy", copiedLabel: "Copied" }, footnotes: "Footnotes" };
 function MessageBody({ text, room, store, from }) {
@@ -4594,7 +4425,6 @@ function RoomsMain({ store }) {
           ] }),
           room.transport === "local" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge rm-badge-local", children: "Local only" }) : room.transport === "lan" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-badge", children: "LAN/VPS" }) : null,
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.StateDot, { state: room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error", size: 8 }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Button, { size: "sm", variant: "ghost", onClick: () => store.actions.openDialog({ kind: "rooms" }), children: "Rooms" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rm-icon-btn", "aria-label": "Room members and settings", "aria-expanded": s.detailsOpen, title: "Room members and settings", "data-rm-details-toggle": "", onClick: store.actions.toggleDetails, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PeopleIcon, {}) })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatBody, { messages, members: room.members, room, store }),
@@ -4865,7 +4695,7 @@ function JoinDialog({ store }) {
   const [err, setErr] = (0, import_react.useState)(null);
   const [busy, setBusy] = (0, import_react.useState)(false);
   const valid = /^collab:\/\/(join|lan|relay)\/.+#\S+$/.test(invite.trim());
-  const [ws, setWs] = (0, import_react.useState)(null);
+  const [ws, setWs] = (0, import_react.useState)(() => s.dialog?.workspace || null);
   const submit = async () => {
     if (!valid || busy) return;
     setBusy(true);
@@ -5154,7 +4984,7 @@ function BrowseDialog({ store }) {
   const a = store.actions;
   const [joining, setJoining] = (0, import_react.useState)(null);
   const inputRef = (0, import_react.useRef)(null);
-  const [activeWs, setActiveWs] = (0, import_react.useState)(null);
+  const [activeWs, setActiveWs] = (0, import_react.useState)(() => s.dialog?.workspace || null);
   (0, import_react.useEffect)(() => {
     a.setSearchOpen(true);
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -5237,7 +5067,6 @@ function Overlay({ store }) {
     d?.kind === "browse" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BrowseDialog, { store }) : null,
     d?.kind === "agent" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AgentDialog, { store, d }) : null,
     d?.kind === "merge" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MergeDialog, { store, d }) : null,
-    d?.kind === "rooms" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Modal, { open: true, onClose: store.actions.closeDialog, title: "Rooms", description: "Rooms are grouped beneath their native workspaces in the sidebar.", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rm-root", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RoomsNav, { store }) }) }) : null,
     s.toast ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_dsh_client_ui_primitives.Toast, { text: s.toast, onDone: store.actions.clearToast, holdMs: 2200 }) : null
   ] });
 }
@@ -5350,6 +5179,12 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
         if (row2) newSessionButton(row2)?.click();
       }), first);
       menu.insertBefore(mk("New room", ROOM_SVG, () => open(key)), first);
+      const openWorkspaceDialog = (kind) => {
+        const w = wsFor(key);
+        if (w) store.actions.openDialog({ kind, workspace: { id: w.workspaceId, path: w.path, title: wsTitle(w) } });
+      };
+      menu.insertBefore(mk("Join room by invite", ROOM_SVG, () => openWorkspaceDialog("join")), first);
+      menu.insertBefore(mk("Browse public rooms", ROOM_SVG, () => openWorkspaceDialog("browse")), first);
     };
     requestAnimationFrame(augment);
   };
@@ -5368,7 +5203,7 @@ function installWorkspaceDecorator(store, native, onNewRoom) {
     mo.disconnect();
     document.removeEventListener("click", onClickCapture, true);
     if (raf) cancelAnimationFrame(raf);
-    for (const b of document.querySelectorAll("[data-rm-ws-new-room], [data-rm-ws-global-room]")) b.remove();
+    for (const b of document.querySelectorAll("[data-rm-ws-new-room], [data-rm-ws-global-room], [data-rm-ws-menu]")) b.remove();
   };
 }
 function apply(ctx) {
@@ -5396,7 +5231,6 @@ function apply(ctx) {
     }
   };
   store.onRoomOpened = ensurePanel;
-  ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({ name: "sidebar.panellist", id: PANEL_ID, order: 11, label: () => "DSH Room" }, PanelIcon));
   ctx.slots.inject("main", () => ctx.slots.register({ name: "main", key: PANEL_ID, inject: () => ({ store }) }, RoomsMain));
   ctx.slots.inject("shell.overlay", () => ctx.slots.register({ name: "shell.overlay", id: "dsh-room-dialogs", inject: () => ({ store }) }, Overlay));
   ctx.slots.inject("sidebar.session.row.leading", () => ctx.slots.register({ name: "sidebar.session.row.leading", id: "dsh-room-session-mark", inject: () => ({ store }) }, RoomSessionMark));

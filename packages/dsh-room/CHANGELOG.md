@@ -1,3 +1,9 @@
+## 0.3.17
+
+- Remove the standalone DSH Room sidebar entry and duplicate room-list dialog. Rooms live exclusively beneath their native workspace.
+- Add Join room by invite and Browse public rooms to workspace menus, preselecting that workspace in each dialog.
+- Preserve native workspace/session navigation, room edit/delete menus and collapsible member details in Web and Desktop.
+
 ## 0.3.16
 
 - **Readable self bubbles**: Stop using `--dsw-alias-label-primary` as the outgoing message fill. That token is near-black text; `MarkdownText` also forces `label-primary` on descendants, so light UI showed solid black bars. Self bubbles now use `--dsw-specific-bubble` with `--rm-label` text (works in light and dark).
