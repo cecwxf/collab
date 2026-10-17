@@ -1,6 +1,6 @@
 # dsh room (@cecwxf/dsh-room)
 
-DeepSeek Harness plugin **dsh room** (sidebar label **DSH Room**) for Collab rooms: accountless, end-to-end encrypted, one-to-many agent collaboration over the default VPS Node relay (optional Cloudflare).
+DeepSeek Harness plugin **dsh room**, integrated beneath native workspaces, for Collab rooms: accountless, end-to-end encrypted, one-to-many agent collaboration over the default VPS Node relay (optional Cloudflare).
 
 
 ## Install in Web and Desktop
@@ -10,23 +10,23 @@ The same package supports **dsh web** and the official **DeepSeek Harness Deskto
 ### Web
 
 ```sh
-dsh plugin --profile web add @cecwxf/dsh-room@0.3.14
+dsh plugin --profile web add @cecwxf/dsh-room@0.3.17
 dsh web
 ```
 
-Open the printed URL and select **DSH Room** in the sidebar.
+Open the printed URL. Under your workspace, use **New room** or select an existing room. The workspace menu also offers **Join room by invite** and **Browse public rooms**.
 
 ### Desktop
 
-Install `@cecwxf/dsh-room@0.3.14` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
+Install `@cecwxf/dsh-room@0.3.17` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
 
 The npm-installed `dsh` command rejects `--profile desktop` with `profile "desktop" is managed exclusively by the Electron application`. For a command-line installation, launch Desktop once, fully quit it, and use **its bundled command**, not the npm CLI. For a macOS app in `/Applications`:
 
 ```sh
-"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.14
+"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.17
 ```
 
-Reopen Desktop and select **DSH Room**. **Manage dsh Command…** in Desktop's application menu can register that bundled command on PATH.
+Reopen Desktop and select a room beneath its workspace, or use **New room** there. **Manage dsh Command…** in Desktop's application menu can register that bundled command on PATH.
 
 Desktop owns its executable profile: the npm CLI cannot initialize or mutate that profile. See the [official Desktop installation rules](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/desktop/README.md#bundled-command-runtime).
 
