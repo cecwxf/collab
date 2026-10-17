@@ -235,6 +235,48 @@ function MentionMenu({ items, active, onPick, onHover }) {
   );
 }
 
+/** Workspace navigation keeps the native session composer and directory picker in charge. */
+function ComposerWorkspace({ room, store }) {
+  const workspaces = useNativeWorkspaces(store);
+  const [open, setOpen] = useState(false);
+  const root = useRef(null);
+  const current = workspaces.find(w => w.workspaceId === room.hostWorkspaceId)
+    || workspaces.find(w => sameWorkspacePath(w.path, room.memberConfig?.workspacePath));
+  const path = current?.path || room.memberConfig?.workspacePath || "";
+  const title = current ? wsTitle(current) : path.split(/[\\/]/).filter(Boolean).pop() || "Workspace";
+  useEffect(() => {
+    if (!open) return;
+    const outside = e => { if (!root.current?.contains(e.target)) setOpen(false); };
+    const escape = e => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", outside); document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape); };
+  }, [open]);
+  const choose = async w => {
+    setOpen(false);
+    try { await store.actions.openNativeWorkspace(w.workspaceId); } catch (e) { store.actions.toast(e.message); }
+  };
+  const add = () => {
+    setOpen(false);
+    // Reuse the native Host-backed directory flow, including folder creation.
+    const trigger = document.querySelector('button[aria-label="Add workspace"], button[aria-label="添加工作区"]');
+    if (trigger) trigger.click(); else store.actions.openDialog({ kind: "workspace" });
+  };
+  return <div className="rm-composer-context" ref={root}>
+    <button type="button" className="rm-workspace-chip" aria-label="Select workspace" aria-haspopup="menu" aria-expanded={open}
+      title={path} onClick={() => setOpen(v => !v)}>
+      <Svg><path d="M2 4.5h4l1.5 1.5H14v6.5H2zM2 4.5V3h4l1.5 1.5H14V6" /></Svg><span>{title}</span><span aria-hidden="true">⌄</span>
+    </button>
+    {current ? <button type="button" className="rm-native-chat-link" title="Open native chat with files, commands, model and permission controls" onClick={() => choose(current)}>New session</button> : null}
+    {open ? <div className="rm-workspace-menu" role="menu" aria-label="Workspaces">
+      <div className="rm-composer-menu-label">Open workspace</div>
+      {workspaces.map(w => <button type="button" role="menuitem" key={w.workspaceId} onClick={() => choose(w)} title={w.path}>
+        <span>{wsTitle(w)}</span><small>{w.path}</small>
+      </button>)}
+      <button type="button" role="menuitem" onClick={add}><PlusIcon />Add workspace…</button>
+    </div> : null}
+  </div>;
+}
+
 function Composer({ room, store, draft, setDraft }) {
   const a = store.actions;
   const [mode, setMode] = useState("chat");
@@ -321,6 +363,8 @@ function Composer({ room, store, draft, setDraft }) {
   };
 
   return (
+    <div className="rm-composer-seat">
+      <ComposerWorkspace key={room.roomId} room={room} store={store} />
     <div className="rm-composer-card" data-rm-composer="">
       {offline ? <div className="rm-connection-notice" role="status">
         <span>{room.status === "connecting" ? "Connecting to room…" : "Room is offline"}{room.error ? ` · ${room.error}` : ""}. You can edit your draft; reconnect to send.</span>
@@ -419,6 +463,7 @@ function Composer({ room, store, draft, setDraft }) {
           <button type="button" className="rm-composer-send" aria-label={mode === "task" ? "Create task" : "Send"} disabled={!draft.trim() || busy || offline} onClick={submit}><SendIcon /></button>
         </div>
       </div>
+    </div>
     </div>
   );
 }

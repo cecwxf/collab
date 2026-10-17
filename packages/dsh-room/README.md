@@ -10,7 +10,7 @@ The same package supports **dsh web** and the official **DeepSeek Harness Deskto
 ### Web
 
 ```sh
-dsh plugin --profile web add @cecwxf/dsh-room@0.3.18
+dsh plugin --profile web add @cecwxf/dsh-room@0.3.19
 dsh web
 ```
 
@@ -18,12 +18,12 @@ Open the printed URL. Under your workspace, use **New room** or select an existi
 
 ### Desktop
 
-Install `@cecwxf/dsh-room@0.3.18` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
+Install `@cecwxf/dsh-room@0.3.19` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
 
 The npm-installed `dsh` command rejects `--profile desktop` with `profile "desktop" is managed exclusively by the Electron application`. For a command-line installation, launch Desktop once, fully quit it, and use **its bundled command**, not the npm CLI. For a macOS app in `/Applications`:
 
 ```sh
-"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.18
+"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.19
 ```
 
 Reopen Desktop and select a room beneath its workspace, or use **New room** there. **Manage dsh Command…** in Desktop's application menu can register that bundled command on PATH.
@@ -201,3 +201,5 @@ Version 0.3.14 fixes native hostWorkspaceId pinning so created rooms stay under 
 Rooms are opened directly beneath their native workspace. The standalone **DSH Room** sidebar entry and duplicate room-list dialog have been removed. Use a workspace’s **New room** shortcut or its **…** menu to create a room, join by invite, or browse public rooms; all three actions preserve the selected workspace. Room row menus retain edit/delete, and members/settings remain collapsible inside the room. The same navigation is used in Web and Desktop.
 
 Version 0.3.18 removes the persistent New room text row. Use the room icon in the workspace header or toolbar; its tooltip and accessible label identify the action.
+
+Version 0.3.19 shows the Room working directory above its input. The workspace menu opens native workspace conversations or the native Add workspace directory picker. Selecting another workspace opens its native session; it does not silently move an existing Room or its agents. The New session shortcut returns to the complete native composer, including attachments, commands, modes and permissions.

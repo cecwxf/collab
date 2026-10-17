@@ -199,6 +199,11 @@ export function createRoomsStore() {
     async setTransport(roomId, target, force) { return post(`/rooms/${encodeURIComponent(roomId)}/transport`, { target, force: !!force }); },
     async stop(roomId, agentId) { return post(`/rooms/${encodeURIComponent(roomId)}/stop`, agentId ? { agentId } : {}); },
     async diffs(roomId) { return call(`/rooms/${encodeURIComponent(roomId)}/diffs`); },
+    async openNativeWorkspace(workspaceId) {
+      navigation++;
+      if (!api.uiWorkspace?.openWorkspace) throw new Error("Native dsh workspace navigation is unavailable");
+      await api.uiWorkspace.openWorkspace(workspaceId);
+    },
     async openSession(roomId, agentId) {
       const request = ++navigation;
       const result = await post(`/rooms/${encodeURIComponent(roomId)}/session`, { agentId });

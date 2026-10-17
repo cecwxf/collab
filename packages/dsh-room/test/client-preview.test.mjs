@@ -30,3 +30,17 @@ test('shared room output uses the owning native workspace and waits for the prev
     assert.deepEqual(opened,['dsh-resource://file/session/blank-session//private/var/project/report.html']);
   } finally {globalThis.fetch=original;store.dispose();}
 });
+
+
+test('workspace selection delegates to native navigation and fences pending room previews', async () => {
+  const original=globalThis.fetch, store=createRoomsStore(), opened=[];
+  let release;
+  try {
+    store.uiWorkspace={async openWorkspace(id){opened.push(['workspace',id]);},openSession(id){opened.push(['session',id]);}};
+    store.sidebarRight={mounted:{getSnapshot:()=>null},openResource(){throw Error('stale preview');}};
+    globalThis.fetch=()=>new Promise(r=>{release=()=>r({ok:true,text:async()=>JSON.stringify({sessionId:'old-agent',path:'/old.md'})});});
+    const pending=store.actions.preview('room','old.md');
+    await store.actions.openNativeWorkspace('chosen-workspace');release();await pending;
+    assert.deepEqual(opened,[['workspace','chosen-workspace']]);
+  } finally {globalThis.fetch=original;store.dispose();}
+});

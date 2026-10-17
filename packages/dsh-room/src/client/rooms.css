@@ -98,7 +98,7 @@
 .rm-chat-header-title { font-size: 14px; font-weight: 600; }
 .rm-chat-header-sub { font-size: 12px; color: var(--rm-quiet); }
 .rm-messages {
-  flex: 1; min-height: 0; overflow: auto; padding: 16px 18px 8px;
+  flex: 1; min-height: 0; overflow: auto; padding: 20px max(24px, calc((100% - 820px) / 2)) 16px;
   display: flex; flex-direction: column; gap: 2px;
 }
 .rm-day {
@@ -277,20 +277,19 @@
 .rm-composer-card {
   box-sizing: border-box;
   width: 100%;
-  max-width: 920px;
-  margin: 0 auto;
+  margin: 0;
   border-radius: 16px;
-  background: var(--rm-elev, var(--rm-panel, #12151c));
+  background: var(--dsw-specific-input-bg, var(--dsw-alias-button-elevated-fill, var(--rm-panel)));
   border: 1px solid var(--rm-border, #2a2f3a);
   box-shadow: 0 1px 2px rgba(0,0,0,.06);
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 8px 0 6px;
+  padding: 12px 8px 8px;
 }
 .rm-composer-grow { position: relative; padding: 0 4px; }
 .rm-composer-grow textarea {
-  box-sizing: border-box; width: 100%; min-height: 36px; max-height: 160px;
+  box-sizing: border-box; width: 100%; min-height: 54px; max-height: 180px;
   resize: none; border: none; outline: none; background: transparent;
   color: inherit; font: inherit; font-size: 14px; line-height: 22px;
   padding: 4px 12px 0 14px;
@@ -566,3 +565,15 @@
 .rm-room-menu button { display:block; width:100%; border:0; border-radius:4px; padding:6px 10px; text-align:left; background:transparent; color:var(--rm-fg); cursor:pointer; }
 .rm-room-menu button:hover { background:var(--rm-hover); }
 .rm-room-menu .rm-danger { color:var(--dsw-alias-state-error-primary,#e45555); }
+
+/* Room message rail and input share one centered width and native theme tokens. */
+.rm-composer-seat { position:relative; flex:none; box-sizing:border-box; width:100%; max-width:868px; margin:0 auto; padding:8px 24px 20px; }
+.rm-composer-context { position:relative; display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.rm-workspace-chip, .rm-native-chat-link { display:inline-flex; align-items:center; gap:6px; min-width:0; max-width:100%; border:0; border-radius:8px; padding:5px 8px; background:transparent; color:var(--rm-muted); font:inherit; font-size:12px; cursor:pointer; }
+.rm-workspace-chip span:first-of-type { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rm-workspace-chip:hover, .rm-native-chat-link:hover { background:var(--rm-hover); color:var(--rm-label); }
+.rm-workspace-menu { position:absolute; bottom:calc(100% + 6px); left:0; z-index:50; width:min(360px,100%); max-height:320px; overflow:auto; padding:6px; border:1px solid var(--rm-border); border-radius:12px; background:var(--rm-panel); box-shadow:0 8px 28px #0002; }
+.rm-workspace-menu button { display:flex; flex-wrap:wrap; align-items:center; gap:6px; width:100%; border:0; border-radius:6px; padding:8px; text-align:left; font:inherit; font-size:13px; background:transparent; color:var(--rm-label); cursor:pointer; }
+.rm-workspace-menu button:hover { background:var(--rm-hover); }
+.rm-workspace-menu small { display:block; flex-basis:100%; color:var(--rm-quiet); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media (max-width:640px) { .rm-composer-seat { padding:8px 12px 12px; } .rm-messages { padding-inline:12px; } }

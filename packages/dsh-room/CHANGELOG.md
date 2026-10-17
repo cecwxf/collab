@@ -1,3 +1,8 @@
+## 0.3.19
+
+- Restore a visible workspace directory entry above the Room composer, with native workspace/session navigation and the original Add workspace directory flow.
+- Align the message rail and composer width, padding and theme colors; preserve the full native composer in ordinary sessions.
+
 ## 0.3.18
 
 - Remove the persistent New room text row beneath workspaces; creation stays available through compact header/toolbar icons and the workspace menu.
