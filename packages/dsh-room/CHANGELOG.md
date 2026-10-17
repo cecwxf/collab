@@ -1,3 +1,7 @@
+## 0.3.18
+
+- Remove the persistent New room text row beneath workspaces; creation stays available through compact header/toolbar icons and the workspace menu.
+
 ## 0.3.17
 
 - Remove the standalone DSH Room sidebar entry and duplicate room-list dialog. Rooms live exclusively beneath their native workspace.

@@ -27,8 +27,7 @@ async function exerciseGroups(sessions, overrides = {}) {
     assert.ok(original.hasAttribute('data-rm-grouped-session'));
     assert.ok(document.querySelector('#host').hasAttribute('data-rm-grouped-session'));
     assert.ok(document.querySelector('[data-rm-open-host]'));
-    document.querySelector('[data-rm-new-room-shortcut]').click();
-    assert.equal(dialog.kind,'create');assert.equal(dialog.workspace.id,'w');assert.equal(dialog.workspace.path,'/private/var/project');
+    assert.equal(document.querySelector('[data-rm-new-room-shortcut]'),null,'creation belongs to the workspace header, not an extra text row');
     document.querySelector('[data-rm-room-menu-button]').click();assert.equal(document.querySelector('[role=menuitem]').textContent,'Edit room');document.querySelector('[role=menuitem]').click();assert.equal(dialog.kind,'room-settings');assert.equal(dialog.roomId,'r');
     document.querySelector('[data-rm-room-menu-button]').click();[...document.querySelectorAll('[role=menuitem]')].find(e=>e.textContent==='Delete room').click();assert.equal(dialog.kind,'delete-room');assert.equal(document.querySelector('[data-rm-room-menu]'),null);
     await overrides.verify?.(tick);

@@ -86,8 +86,9 @@ test('after create upsert, room appears under the native workspace as session si
   try {
     dispose = installRoomGroups(store, native, layout, {});
     await tick();
-    // Before create: New room shortcut under each workspace, no room groups yet.
-    assert.equal(document.querySelectorAll('[data-rm-new-room-shortcut]').length, 2);
+    // Before create: no extra text row or empty room group beneath either workspace.
+    assert.equal(document.querySelectorAll('[data-rm-new-room-shortcut]').length, 0);
+    assert.equal(document.querySelectorAll('[data-rm-workspace-rooms]').length, 0);
     assert.equal(document.querySelectorAll('[data-rm-room-group]').length, 0);
 
     // Simulate create upsert (what store.actions.create does).
@@ -114,7 +115,7 @@ test('after create upsert, room appears under the native workspace as session si
     assert.ok(document.querySelector('[data-rm-open-room="room-1"]'), 'created room row visible');
     assert.equal(document.querySelector('[data-rm-open-room="room-1"]').textContent.includes('release-crew'), true);
     // Not under the other workspace
-    assert.equal(document.querySelector('[data-rm-workspace-rooms="native-w2"]')?.querySelector('[data-rm-room-group]'), null);
+    assert.equal(document.querySelector('[data-rm-workspace-rooms="native-w2"]'), null);
 
     // React inserts a new session between header and room group — must re-anchor.
     const injected = document.createElement('span');

@@ -557,7 +557,6 @@
 .rm-connection-notice button { flex-shrink:0; }
 
 .rm-room-edit { margin-left:8px; opacity:.7; }
-.rm-native-create-room { color:var(--rm-muted); font-size:12px; }
 
 .rm-native-room-heading { position:relative; }
 .rm-native-room-heading > .rm-native-row { flex:1; min-width:0; }

@@ -1,6 +1,6 @@
 {
   "name": "@cecwxf/dsh-room",
-  "version": "0.3.17",
+  "version": "0.3.18",
   "description": "DSH Room — Web and Desktop plugin for encrypted multi-agent collaboration",
   "type": "module",
   "license": "MIT",

@@ -33,13 +33,13 @@ export function installRoomGroups(store, native, layout, sessions) {
       const key = row.getAttribute('data-row-key').slice('workspace:'.length);
       const ws = workspaces.find(w => w.workspaceId === key);
       const rooms = roomsForWorkspace(state.rooms, key, ws?.path);
-      // Keep a group whenever the native row exists: New room shortcut + any matched rooms.
+      // Creation lives in the workspace header; child rows are actual rooms only.
       // Real workspace headers are wrapped by the native HoverCard anchor span.
       const anchor = row.parentElement?.tagName === 'SPAN' ? row.parentElement : row;
       const parent = anchor.parentElement;
       if (!parent) continue;
       let group = [...parent.children].find(e => e.getAttribute('data-rm-workspace-rooms') === key);
-      if (!ws && !rooms.length) { group?.remove(); continue; }
+      if (!rooms.length) { group?.remove(); continue; }
       if (!group) { group = document.createElement('div'); group.className = 'rm-root rm-native-rooms'; group.setAttribute('data-rm-workspace-rooms', key); group.setAttribute('role', 'group'); wrappers.add(group); }
       // Room is a first-level peer of sessions under the workspace: keep the group
       // immediately after the workspace header even after React reorders children.
@@ -56,9 +56,6 @@ export function installRoomGroups(store, native, layout, sessions) {
       const signature = JSON.stringify([title, path, panelActive, state.selected, current, rooms.map(r => [r.roomId, r.name, r.status, r.sessionId, r.local?.agents.map(a => [a.agentId, a.name, a.sessionId, a.state, a.online]), state.expandedRooms[r.roomId] !== false])]);
       if (group.getAttribute('data-rm-signature') !== signature) {
         group.setAttribute('data-rm-signature', signature); group.replaceChildren();
-        const create = document.createElement('button'); create.type = 'button'; create.className = 'rm-native-row rm-native-create-room'; create.setAttribute('data-rm-new-room-shortcut', key); create.setAttribute('aria-label', `New room in ${title}`);
-        const createIcon = document.createElement('span'); createIcon.innerHTML = ROOM_ICON; const createLabel = document.createElement('span'); createLabel.textContent = 'New room'; create.append(createIcon, createLabel);
-        create.onclick = () => store.actions.openDialog({ kind: 'create', workspace: { id: key, path, title } }); group.append(create);
         for (const room of rooms) {
           const expanded = state.expandedRooms[room.roomId] !== false;
           const section = document.createElement('div'); section.setAttribute('data-rm-room-group', room.roomId);
