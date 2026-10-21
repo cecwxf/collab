@@ -32,17 +32,17 @@ export interface LocalAgentConfig {
 
 export interface RoomLocalSettings {
   agents: LocalAgentConfig[];
-  /** Max agent-originated wakes per task/thread before the room pauses that thread. */
+  /** Max agent-originated wakes per task/thread before the room pauses that thread; 0 means unlimited. */
   turnLimit: number;
-  /** Max local agent runs in parallel; the rest wait in a visible queue. */
+  /** Max local agent runs in parallel; the rest wait in a visible queue; 0 means all agents concurrently. */
   concurrency: number;
   /** In-process loopback transport (no network) — only valid while all members are local. */
   loopback: boolean;
   isolation: IsolationMode;
 }
 
-export const DEFAULT_TURN_LIMIT = 6;
-export const DEFAULT_CONCURRENCY = 2;
+export const DEFAULT_TURN_LIMIT = 0;
+export const DEFAULT_CONCURRENCY = 0;
 
 export function defaultLocalSettings(): RoomLocalSettings {
   return { agents: [], turnLimit: DEFAULT_TURN_LIMIT, concurrency: DEFAULT_CONCURRENCY, loopback: false, isolation: "auto" };
@@ -53,8 +53,8 @@ export function normalizeLocalSettings(s?: Partial<RoomLocalSettings> | null): R
   const n = (v: unknown, def: number, min: number, max: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : def);
   return {
     agents: Array.isArray(s?.agents) ? s!.agents : d.agents,
-    turnLimit: n(s?.turnLimit, d.turnLimit, 1, 100),
-    concurrency: n(s?.concurrency, d.concurrency, 1, 16),
+    turnLimit: n(s?.turnLimit, d.turnLimit, 0, 100),
+    concurrency: n(s?.concurrency, d.concurrency, 0, 16),
     loopback: s?.loopback === true,
     isolation: s?.isolation && ["auto", "worktree", "locks", "off"].includes(s.isolation) ? s.isolation : d.isolation,
   };

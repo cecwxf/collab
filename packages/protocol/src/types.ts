@@ -153,6 +153,7 @@ export type PayloadKind =
   | "presence"
   | "hello"
   | "member.config"
+  | "execution.status"
   | "approval.request"
   | "approval.response"
   | "mcp.call"
@@ -172,6 +173,22 @@ export interface ChatPayload extends PayloadBase {
   kind: "chat";
   text: string;
   mentions?: AgentId[];
+  /** Explicit UI-originated human input; model tools never set this. */
+  human?: boolean;
+}
+
+/** Execution metadata only. Never carries model text, reasoning or tool arguments.
+ * Sent using the executing member's own signed connection. */
+export interface ExecutionStatusPayload extends PayloadBase {
+  kind: "execution.status";
+  runs: {
+    id: string;
+    state: "approval" | "queued" | "running" | "done" | "failed" | "stopped";
+    phase?: "working" | "thinking" | "streaming" | "tool";
+    enqueuedAt: number;
+    startedAt?: number;
+    endedAt?: number;
+  }[];
 }
 
 export interface StatusPayload extends PayloadBase {
@@ -181,6 +198,7 @@ export interface StatusPayload extends PayloadBase {
 
 export interface StreamDeltaPayload extends PayloadBase {
   kind: "stream.delta";
+  phase?: "thinking" | "streaming";
   streamId: string;
   text: string;
 }
@@ -310,6 +328,7 @@ export type CollabPayload =
   | PresencePayload
   | HelloPayload
   | MemberConfigPayload
+  | ExecutionStatusPayload
   | ApprovalRequestPayload
   | ApprovalResponsePayload
   | McpCallPayload

@@ -337,7 +337,7 @@ describe("local multi-agent room (loopback, mock runner)", () => {
     const state = { version: 3, rooms: [], workspaces: [], activeRoomId: null, activeWorkspaceId: null };
     const results = await Promise.allSettled(Array.from({ length: 20 }, () => S.saveState(path, state)));
     assert.deepEqual(results.filter((r) => r.status === "rejected"), []);
-    assert.equal(JSON.parse(await readFile(path, "utf8")).version, 3);
+    assert.equal(JSON.parse(await readFile(path, "utf8")).version, 4);
   });
   test("restart persists room membership before background reconnect; concurrent saves are atomic", async () => {
     const dir = await mkdtemp(join(tmpdir(), "lma-restart-"));

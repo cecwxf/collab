@@ -10,7 +10,7 @@ The same package supports **dsh web** and the official **DeepSeek Harness Deskto
 ### Web
 
 ```sh
-dsh plugin --profile web add @cecwxf/dsh-room@0.3.20
+dsh plugin --profile web add @cecwxf/dsh-room@0.3.21
 dsh web
 ```
 
@@ -18,12 +18,12 @@ Open the printed URL. Under your workspace, use **New room** or select an existi
 
 ### Desktop
 
-Install `@cecwxf/dsh-room@0.3.20` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
+Install `@cecwxf/dsh-room@0.3.21` through Desktop's plugin manager and restart the application. Web and Desktop have separate installation/activation graphs; installing into `web` does not install into `desktop`.
 
 The npm-installed `dsh` command rejects `--profile desktop` with `profile "desktop" is managed exclusively by the Electron application`. For a command-line installation, launch Desktop once, fully quit it, and use **its bundled command**, not the npm CLI. For a macOS app in `/Applications`:
 
 ```sh
-"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.20
+"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add @cecwxf/dsh-room@0.3.21
 ```
 
 Reopen Desktop and select a room beneath its workspace, or use **New room** there. **Manage dsh Command…** in Desktop's application menu can register that bundled command on PATH.
@@ -63,10 +63,12 @@ One dsh can host **several local agents** (Moderator, Architect, Coder, Reviewer
 
 - **Create room** is a wide, tabbed dialog (Room / Agents / Limits) so transport, visibility, presets, custom agents, concurrency and turn limits are all reachable without clipping.
 - **Local** rooms keep collaboration messages in an in-process loopback. Model requests still use the configured provider. One click switches to Relay to invite remote hosts, and the local agents stay members.
-- `@agent` wakes only that agent. `@all` wakes all local agents in parallel.
+- `@agent` wakes only that agent. `@all` and human messages without mentions wake all workers, including remote workers; moderators respond only when explicitly named (or assigned an unassigned task). Model replies without mentions do not wake anyone.
 - After create, **Add agent** opens a free-form form (name, persona, system prompt, model, effort, scope, approval, moderator). Presets only fill the form.
 - An optional **moderator** splits work into tasks and summarizes the results.
-- A turn limit (default 6) applies per thread. A concurrency cap (default 2) comes with a visible run queue. **Stop** stops every local agent run.
+- `concurrency=0` (default) runs all different agents concurrently. `turnLimit=0` (default) permits unlimited hand-offs. Positive values opt into limits. The same agent never overlaps itself, including during cancellation cleanup. **Stop** stops local workers and the host run.
+- The chat header always shows each agent’s queued/running state, including thinking, streaming, and tool execution. Remote execution status travels on the executing member’s signed connection and is merged into SSE; reasoning text is never broadcast. Remote status expires after 45 seconds without an update.
+- Existing v3 room values of concurrency 2 and turn limit 6 migrate once to 0. Other saved limits are retained; v4 settings are never remigrated. `maxWakesPerMinute` now defaults to 0 (unlimited); explicitly configured positive limits remain in effect.
 - Writing agents get their own **git worktree** (`room/<room>/<agent>`). Non-git workspaces fall back to advisory file locks.
 - **Review & merge** shows a per-agent diff, checks for conflicts, and asks you to confirm before it merges into or discards from the main workspace.
 

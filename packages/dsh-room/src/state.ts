@@ -61,7 +61,7 @@ export interface RoomMeta {
  * Invites carry room keys, so the file is always mode 600 inside a mode 700 dir.
  */
 export interface RoomState {
-  version: 3;
+  version: 4;
   activeWorkspaceId: string | null;
   activeRoomId: string | null;
   workspaces: WorkspaceMeta[];
@@ -84,9 +84,14 @@ export function createWorkspaceMeta(name: string, path: string): WorkspaceMeta {
 
 export async function loadState(path: string): Promise<RoomState | null> {
   try {
-    const raw = JSON.parse(await readFile(path, "utf8")) as RoomState & { version?: number };
+    const raw = JSON.parse(await readFile(path, "utf8")) as Omit<RoomState, "version"> & { version?: number };
     if (!Array.isArray(raw.rooms)) return null;
     const rooms = raw.rooms.filter((r) => typeof r?.invite === "string" && typeof r?.roomId === "string");
+    // v4 retires the old defaults once. Explicit limits saved by v4 stay intact.
+    if ((raw.version ?? 0) < 4) for (const room of rooms) {
+      if (room.local?.concurrency === 2) room.local.concurrency = 0;
+      if (room.local?.turnLimit === 6) room.local.turnLimit = 0;
+    }
     let workspaces = Array.isArray(raw.workspaces) ? raw.workspaces.filter((w) => w?.id && w?.path) : [];
     // Migrate v2 → v3: synthesize a default workspace from room memberConfig / first path
     if (workspaces.length === 0 && rooms.length) {
@@ -108,7 +113,7 @@ export async function loadState(path: string): Promise<RoomState | null> {
       }
     }
     return {
-      version: 3,
+      version: 4,
       activeWorkspaceId: raw.activeWorkspaceId ?? workspaces[0]?.id ?? null,
       activeRoomId: raw.activeRoomId ?? null,
       workspaces,
@@ -136,7 +141,7 @@ async function writeState(path: string, state: RoomState): Promise<void> {
   await chmod(dir, 0o700).catch(() => {});
   const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`;
   const body: RoomState = {
-    version: 3,
+    version: 4,
     activeWorkspaceId: state.activeWorkspaceId,
     activeRoomId: state.activeRoomId,
     workspaces: state.workspaces,

@@ -46,7 +46,7 @@ export interface RoomMeta {
  * Invites carry room keys, so the file is always mode 600 inside a mode 700 dir.
  */
 export interface RoomState {
-    version: 3;
+    version: 4;
     activeWorkspaceId: string | null;
     activeRoomId: string | null;
     workspaces: WorkspaceMeta[];

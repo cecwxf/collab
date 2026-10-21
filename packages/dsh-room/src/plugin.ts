@@ -1,3 +1,4 @@
+import { assistantPhase, publicRuns, RemoteExecutions } from "./execution.js";
 import NodeWebSocket from "ws";
 import { resolveSelection, describeModel, type ModelChoice, type ModelSelection } from "./models.js";
 import { randomUUID } from "node:crypto";
@@ -132,7 +133,7 @@ export interface RoomMessage {
 }
 
 function toMessage(p: CollabPayload, self: string, seq?: number): RoomMessage | null {
-  if (p.kind === "presence" || p.kind === "hello" || p.kind === "stream.delta" || p.kind === "member.config") return null;
+  if (p.kind === "presence" || p.kind === "hello" || p.kind === "stream.delta" || p.kind === "member.config" || p.kind === "execution.status") return null;
   const m: RoomMessage = { id: p.messageId, seq, from: p.sender, self: p.sender === self, kind: p.kind, text: describePayload(p), ts: p.ts, replyTo: p.replyTo };
   if (p.kind === "chat") m.mentions = p.mentions;
   if (p.kind === "task.create") Object.assign(m, { taskId: p.taskId, title: p.title, assignee: p.assignee, status: "open" });
@@ -231,7 +232,10 @@ class RoomConn {
   agents = new Map<string, CollabClient>();
   agentJoins = new Map<string, { promise: Promise<void> }>();
   removedAgentIds = new Set<string>();
-  threads = new ThreadTracker(6);
+  threads = new ThreadTracker(0);
+  executions: RemoteExecutions;
+  sentExecutions = new Map<string, string>();
+  executionSending = new Set<string>();
   /** local agentId → thread of its current run (messages it sends belong to that thread). */
   runThread = new Map<string, string>();
   /** moderator-created tasks: taskId → bookkeeping for the summary step. */
@@ -243,7 +247,7 @@ class RoomConn {
   historyTimer?: ReturnType<typeof setTimeout>;
   historySave?: Promise<void>;
   announceTimer?: ReturnType<typeof setTimeout>;
-  constructor(public meta: RoomMeta) {}
+  constructor(public meta: RoomMeta) { this.executions = new RemoteExecutions(meta.roomId); }
   private normalized?: RoomLocalSettings;
   /** Normalized once; the same object afterwards so `conn.local.x = …` always sticks. */
   get local(): RoomLocalSettings {
@@ -366,9 +370,66 @@ export class CollabBridge {
     this.approvals.subscribe(() => this.emit({ type: "rooms" }));
     this.scheduler = new RunScheduler(
       (run, req, signal) => this.execRun(run, req, signal),
-      (roomId) => this.rooms.get(roomId)?.local.concurrency ?? 2,
-      () => this.emit({ type: "rooms" }),
+      (roomId) => this.rooms.get(roomId)?.local.concurrency ?? 0,
+      () => { this.emit({ type: "rooms" }); this.broadcastExecutions(); },
     );
+    this.observeAgents();
+  }
+
+  private eventDisposers: (() => void)[] = [];
+  private executionTimer?: ReturnType<typeof setInterval>;
+
+  private observeAgents() {
+    const locate = (agent: AgentLike) => {
+      const sid = (agent?.session as { id?: string })?.id;
+      if (!sid) return;
+      const worker = this.sessionAgents.get(sid);
+      if (worker) return worker;
+      const conn = [...this.rooms.values()].find(c => c.meta.sessionId === sid);
+      if (conn && this.identity) return { roomId: conn.meta.roomId, agentId: this.identity.agentId };
+    };
+    const onStatus = this.ctx.on?.("agent/status", ({ agent, status }) => {
+      const owner = locate(agent);
+      if (owner && status === "running") this.scheduler.setPhase(owner.roomId, owner.agentId, "working");
+    });
+    const onStream = this.ctx.on?.("agent/assistant-stream", ({ agent, frame }) => {
+      const owner = locate(agent), phase = assistantPhase(frame);
+      if (owner && phase) this.scheduler.setPhase(owner.roomId, owner.agentId, phase);
+    });
+    if (onStatus) this.eventDisposers.push(onStatus);
+    if (onStream) this.eventDisposers.push(onStream);
+    this.executionTimer = setInterval(() => {
+      for (const conn of this.rooms.values()) conn.sentExecutions.clear();
+      this.broadcastExecutions();
+      this.emit({ type: "rooms" });
+    }, 15_000);
+    this.executionTimer.unref?.();
+  }
+
+  private broadcastExecutions() {
+    if (this.disposed || !this.identity) return;
+    for (const conn of this.rooms.values()) {
+      const runs = this.scheduler.list(conn.meta.roomId);
+      for (const agentId of new Set(runs.map(r => r.agentId))) {
+        const client = agentId === this.identity.agentId ? conn.client : conn.agents.get(agentId);
+        if (!client?.isJoined() || conn.executionSending.has(agentId)) continue;
+        const snapshot = publicRuns(runs.filter(r => r.agentId === agentId));
+        const signature = JSON.stringify(snapshot);
+        if (conn.sentExecutions.get(agentId) === signature) continue;
+        conn.executionSending.add(agentId);
+        void client.publish({ kind: "execution.status", runs: snapshot }).then(() => {
+          conn.sentExecutions.set(agentId, signature);
+        }).catch(e => this.log("warn", `execution status: ${(e as Error).message}`)).finally(() => {
+          conn.executionSending.delete(agentId);
+          // A transition during publish must not be lost; failures retry at heartbeat.
+          if (conn.sentExecutions.get(agentId) === signature) this.broadcastExecutions();
+        });
+      }
+    }
+  }
+
+  roomRuns(conn: RoomConn): RunInfo[] {
+    return [...this.scheduler.list(conn.meta.roomId), ...conn.executions.list()];
   }
 
   log(level: "info" | "warn" | "error", ...a: unknown[]) {
@@ -440,7 +501,7 @@ export class CollabBridge {
   }
 
   async persist() {
-    await saveState(this.config.statePath, { version: 3, activeWorkspaceId: this.activeWorkspaceId, activeRoomId: this.activeRoomId, workspaces: [...this.workspaces.values()], rooms: [...this.rooms.values()].map((r) => r.meta) });
+    await saveState(this.config.statePath, { version: 4, activeWorkspaceId: this.activeWorkspaceId, activeRoomId: this.activeRoomId, workspaces: [...this.workspaces.values()], rooms: [...this.rooms.values()].map((r) => r.meta) });
   }
 
   // ── room lifecycle ───────────────────────────────────────────────────────
@@ -556,6 +617,7 @@ export class CollabBridge {
       for (const peer of peers) if (!conn.removedAgentIds.has(peer.agentId)) conn.lastSeenPeers.set(peer.agentId, now);
       if (ev?.type === "joined" && !conn.removedAgentIds.has(ev.agentId)) conn.lastSeenPeers.set(ev.agentId, now);
       // On "left", do NOT delete immediately — grace window in view() keeps them online briefly.
+      if (ev?.type === "left") conn.executions.remove(ev.agentId);
       if (ev) this.log("info", `room ${roomId}: peer ${ev.type} ${ev.agentId} (${peers.length} in room)`);
       // A newly joined remote peer missed earlier member.config: re-announce ours + our local agents (debounced).
       if (ev?.type === "joined" && ev.agentId !== this.identity?.agentId && !conn.local.agents.some((a) => a.agentId === ev.agentId)) {
@@ -563,6 +625,7 @@ export class CollabBridge {
         conn.announceTimer = setTimeout(() => {
           void this.announceMemberConfig(conn).catch(() => {});
           for (const a of conn.local.agents) void this.announceAgentConfig(conn, a).catch(() => {});
+          conn.sentExecutions.clear(); this.broadcastExecutions();
         }, 800);
         (conn.announceTimer as { unref?: () => void }).unref?.();
       }
@@ -919,11 +982,11 @@ export class CollabBridge {
     if (conn.local.loopback || conn.local.agents.length) await this.saveLocalHistory(conn);
     return { roomId: conn.meta.roomId, ...r };
   }
-  send(roomId: string | undefined, textIn: string, mentions?: string[], replyTo?: string) {
+  send(roomId: string | undefined, textIn: string, mentions?: string[], replyTo?: string, human = true) {
     const t = textIn.trim();
     if (!t) throw new Error("empty message");
     const m = mentions?.length ? mentions : extractMentions(t);
-    return this.publishLocal(roomId, { kind: "chat", text: t, mentions: m.length ? m : undefined, replyTo });
+    return this.publishLocal(roomId, { kind: "chat", text: t, mentions: m.length ? m : human ? ["all"] : undefined, replyTo, human });
   }
   sendStatus(roomId: string | undefined, t: string) {
     return this.publishLocal(roomId, { kind: "status", text: t });
@@ -1003,7 +1066,7 @@ export class CollabBridge {
             name: la?.name ?? pc?.displayName,
             persona: la?.persona ?? pc?.persona,
             hostedBy: la ? self : pc?.hostedBy,
-            moderator: la?.moderator === true,
+            moderator: la?.moderator === true || (pc as { moderator?: boolean })?.moderator === true,
           };
         });
       })(),
@@ -1015,7 +1078,7 @@ export class CollabBridge {
       memberConfig: conn.meta.memberConfig ? { ...publicMemberConfig(conn.meta.memberConfig), workspacePath: conn.meta.memberConfig.workspacePath, resolvedModel: this.resolvedModel(conn), effectiveReasoningEffort: this.selectedModel(conn).reasoningEffort, peerGrants: conn.meta.memberConfig.peerGrants, permissions: conn.meta.memberConfig.permissions } : null,
       peerConfigs: Object.fromEntries(this.peerConfigs.get(conn.meta.roomId) ?? []),
       local: this.localView(conn),
-      runs: this.scheduler.list(conn.meta.roomId),
+      runs: this.roomRuns(conn),
     };
   }
   state() {
@@ -1200,6 +1263,18 @@ export class CollabBridge {
   // ── inbound: room → Session wake ─────────────────────────────────────────
   private async onPayload(conn: RoomConn, p: CollabPayload, from: string, seq: number) {
     if (this.disposed || !conn.client) return;
+    const own = from === this.identity?.agentId || conn.local.agents.some(a => a.agentId === from);
+    if (p.kind === "execution.status") {
+      if (!own) conn.executions.receive(from, p, seq);
+      this.emit({ type: "rooms" });
+      return;
+    }
+    if (p.kind === "stream.delta") {
+      if (!own) conn.executions.stream(from, p.streamId, p.phase ?? "streaming", p.ts);
+      this.emit({ type: "rooms" });
+      return;
+    }
+    if (p.kind === "stream.end") { conn.executions.endStream(from); this.emit({ type: "rooms" }); }
     // Control-plane-like E2EE payloads
     if (p.kind === "member.config") {
       const pub = publicMemberConfig({
@@ -1245,7 +1320,7 @@ export class CollabBridge {
     }
     // With local agents the host member is the human: only an explicit @host mention wakes its own session.
     const hostAddressed = !conn.local.agents.length || (p.kind === "chat" && (p.mentions ?? []).includes(this.identity!.agentId));
-    const wake = hostAddressed && conn.client.shouldWake(p) && this.passesLoopGuard(conn, p);
+    const wake = fresh && hostAddressed && conn.client.shouldWake(p) && this.passesLoopGuard(conn, p);
     this.log("info", `recv ${p.kind} room=${conn.meta.roomId} seq=${seq} from=${from} wake=${wake}`);
     try {
       if (wake) await this.wake(conn, p, from);
@@ -1257,13 +1332,14 @@ export class CollabBridge {
 
   /** Loop guard: replies do not wake (unless wakeOnReplies); at most maxWakesPerMinute per room. */
   private passesLoopGuard(conn: RoomConn, p: CollabPayload): boolean {
-    if (p.kind === "chat" && p.replyTo && !this.config.wakeOnReplies) {
+    if (p.kind === "chat" && p.replyTo && !p.human && !this.config.wakeOnReplies) {
       this.log("info", `not waking: ${p.messageId} is a reply (loop guard)`);
       return false;
     }
+    if (this.config.maxWakesPerMinute === 0) return true;
     const now = Date.now();
     conn.wakeTimes = conn.wakeTimes.filter((t) => now - t < 60_000);
-    if (conn.wakeTimes.length >= this.config.maxWakesPerMinute) {
+    if (this.config.maxWakesPerMinute > 0 && conn.wakeTimes.length >= this.config.maxWakesPerMinute) {
       this.log("warn", `not waking: ${conn.wakeTimes.length} wakes in the last minute (loop guard)`);
       return false;
     }
@@ -1344,22 +1420,50 @@ export class CollabBridge {
   }
 
   private async wake(conn: RoomConn, p: CollabPayload, from: string) {
-    const prompt = this.buildPrompt(conn, p, from);
-    const bound = this.boundAgent(conn);
-    if (bound) {
-      bound.followup(this.notice(conn, prompt, from, p.messageId, p.kind));
-      this.log("info", `woke bound session ${conn.meta.sessionId} for ${p.kind} from ${from}`);
-      return;
+    const thread = conn.threads.threadFor(p, conn.runThread.get(from));
+    if (p.kind === "chat" && p.human) conn.threads.reset(thread);
+    else if (!conn.threads.consume(thread, 1)) return;
+    this.scheduler.enqueue({ roomId: conn.meta.roomId, agentId: this.identity!.agentId,
+      threadId: thread, triggerId: p.messageId, reason: "host", summary: `${from}: ${describePayload(p)}`,
+      host: true, trigger: p });
+  }
+
+  private async execHost(conn: RoomConn, p: CollabPayload, signal: AbortSignal) {
+    let agent = this.boundAgent(conn);
+    if (!agent) {
+      const svc = this.agentServices();
+      if (!svc) throw new Error("agent services unavailable");
+      agent = (await this.sessionFor(conn, svc)).agent;
     }
-    const svc = this.agentServices();
-    if (!svc) {
-      this.log("warn", "agent services unavailable — sending automatic acknowledgement instead of waking a session");
-      await conn.client!.streamReply(newMessageId(), [`(auto) ${this.identity!.agentId} received ${p.kind}; no agent session available`], p.messageId);
-      return;
-    }
-    const handle = await this.sessionFor(conn, svc);
-    handle.agent.followup(this.notice(conn, prompt, from, p.messageId, p.kind));
-    this.log("info", `woke session collab:${conn.meta.roomId} for ${p.kind} from ${from}`);
+    await this.followupAndWait(conn, agent, this.buildPrompt(conn, p, p.sender), p, signal);
+  }
+
+  private async followupAndWait(conn: RoomConn, base: AgentLike, prompt: string, p: CollabPayload, signal: AbortSignal) {
+    const agent = base as AgentLike & { whenIdle?(): Promise<void>; cancel?(c: unknown): void; session: { seq?: number } };
+    if (!agent.whenIdle) throw new Error("agent session does not support whenIdle");
+    const cancel = () => { try { agent.cancel?.({ kind: "user" }); } catch { /* stopping */ } };
+    signal.addEventListener("abort", cancel, { once: true });
+    try {
+      signal.throwIfAborted();
+      await withTimeout(agent.whenIdle(), 30_000, "host idle", signal);
+      signal.throwIfAborted();
+      const seq = agent.session.seq;
+      agent.followup(this.notice(conn, prompt, p.sender, p.messageId, p.kind));
+      await withTimeout((async () => {
+        for (let i = 0; i < 40; i++) {
+          await agent.whenIdle!(); signal.throwIfAborted();
+          if (seq === undefined || agent.session.seq !== seq) return;
+          await sleep(250, signal);
+        }
+        throw new Error("host session did not start a turn");
+      })(), 20 * 60_000, "host turn", signal);
+      const failure = seq === undefined ? undefined : this.turnError(agent.session, seq);
+      if (failure) throw new Error(failure.message);
+    } catch (e) {
+      cancel();
+      await withTimeout(agent.whenIdle(), 30_000, "host stop").catch(() => {});
+      throw e;
+    } finally { signal.removeEventListener("abort", cancel); }
   }
 
   /** Same creation sequence as @deepseek-ai/dsh-webhook createWebhookSession. */
@@ -1658,6 +1762,7 @@ export class CollabBridge {
     const next = normalizeLocalSettings({ ...conn.local, ...patch, agents: conn.local.agents, loopback: conn.local.loopback });
     conn.meta.local = next;
     conn.threads.limit = next.turnLimit;
+    this.scheduler.refresh();
     await this.persist();
     this.emit({ type: "rooms" });
     return { turnLimit: next.turnLimit, concurrency: next.concurrency, isolation: next.isolation };
@@ -1748,8 +1853,8 @@ export class CollabBridge {
     if (!agents.length) return;
     const host = this.identity?.agentId;
     const senderLocal = agents.find((a) => a.agentId === p.sender);
-    const thread = conn.threads.threadFor(p as never, senderLocal ? conn.runThread.get(senderLocal.agentId) : undefined);
-    if (p.sender === host && (p.kind === "chat" || p.kind === "task.create")) conn.threads.reset(thread);
+    const thread = conn.threads.threadFor(p as never, conn.runThread.get(p.sender));
+    if ((p.kind === "chat" && p.human) || (p.sender === host && !conn.runThread.has(host!) && p.kind === "task.create")) conn.threads.reset(thread);
 
     // moderator bookkeeping: tasks it creates, and the summary once they are all finished
     if (p.kind === "task.create" && senderLocal?.moderator) {
@@ -1765,7 +1870,7 @@ export class CollabBridge {
     const route = routeLocalTargets(p as never, agents);
     if (!route.targets.length) return;
     let targets = route.targets;
-    if (p.sender !== host) {
+    if (!(p.kind === "chat" && p.human) && (p.sender !== host || conn.runThread.has(host!))) {
       const allowed = conn.threads.consume(thread, targets.length);
       if (allowed < targets.length) {
         const skipped = targets.slice(allowed);
@@ -1841,6 +1946,12 @@ export class CollabBridge {
   private async execRun(run: RunInfo, req: RunRequest, signal: AbortSignal) {
     const conn = this.rooms.get(run.roomId);
     if (!conn) throw new Error("room closed");
+    if (req.host) {
+      conn.runThread.set(run.agentId, run.threadId);
+      try { await this.execHost(conn, req.trigger as CollabPayload, signal); }
+      finally { conn.runThread.delete(run.agentId); }
+      return;
+    }
     const a = conn.local.agents.find((x) => x.agentId === run.agentId);
     if (!a) throw new Error("agent removed");
     const mode = req.mode as LocalRunContext["mode"];
@@ -2297,6 +2408,8 @@ export class CollabBridge {
   async dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    clearInterval(this.executionTimer);
+    for (const dispose of this.eventDisposers.splice(0)) dispose();
     void this.lanRelay?.close();
     this.abort.abort();
     this.listeners.clear();
@@ -2371,7 +2484,7 @@ export class CollabBridge {
         "Send a chat message to a room. Only agents listed in `mentions` (or @agentId in the text) are woken to respond; without mentions it is a broadcast nobody auto-replies to. Use replyTo to answer a specific message.",
         obj({ ...roomArg, text: s("Message text"), mentions: { type: "array", items: { type: "string" }, description: "agentIds to @mention" }, replyTo: s("messageId being answered") }, ["text"]),
         (a, who) => {
-          if (!who) return this.send(str(a.roomId), str(a.text)!, strs(a.mentions), str(a.replyTo));
+          if (!who) return this.send(str(a.roomId), str(a.text)!, strs(a.mentions), str(a.replyTo), false);
           const t = str(a.text)!.trim();
           const m = strs(a.mentions)?.length ? strs(a.mentions)! : extractMentions(t);
           return this.publishAs(who.conn.meta.roomId, who.agent.agentId, { kind: "chat", text: t, mentions: m.length ? m : undefined, replyTo: str(a.replyTo) });

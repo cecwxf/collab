@@ -26,7 +26,7 @@ test('new rooms default to private Local; Relay uses configured endpoint without
   assert.ok(!nodes.some(n=>/VPS|Cloudflare|host:port|LAN relay/.test(String(n.props?.label||n.props?.children||''))));
   nodes.find(n=>n.props?.id==='rm-create-name').props.onChange({target:{value:'Local room'}});
   nodes=f.render();await nodes.find(n=>n.props?.children==='Create').props.onClick();
-  assert.equal(f.created[0].localOnly,true);assert.equal(f.created[0].public,false);assert.equal(f.created[0].mode,'relay');assert.equal('lanHostPort' in f.created[0],false);
+  assert.equal(f.created[0].concurrency,0);assert.equal(f.created[0].turnLimit,0);assert.equal(f.created[0].localOnly,true);assert.equal(f.created[0].public,false);assert.equal(f.created[0].mode,'relay');assert.equal('lanHostPort' in f.created[0],false);
   nodes.find(n=>n.type==='button'&&n.props.children==='Relay').props.onClick();nodes=f.render();
   assert.equal(nodes.find(n=>n.type==='button'&&n.props.children==='Relay').props['aria-pressed'],true);
   await nodes.find(n=>n.props?.children==='Create').props.onClick();assert.equal(f.created[1].localOnly,false);assert.equal(f.created[1].mode,'relay');assert.equal('lanHostPort' in f.created[1],false);

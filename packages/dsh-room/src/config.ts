@@ -29,7 +29,7 @@ export function normalizeConfig(raw: unknown, dataRoot = join(homedir(), ".colla
     agentPreset: str("agentPreset"),
     permissionPreset: str("permissionPreset") ?? "read-only",
     wakeOnReplies: r.wakeOnReplies === true,
-    maxWakesPerMinute: typeof r.maxWakesPerMinute === "number" && r.maxWakesPerMinute > 0 ? Math.floor(r.maxWakesPerMinute) : 6,
+    maxWakesPerMinute: typeof r.maxWakesPerMinute === "number" && Number.isFinite(r.maxWakesPerMinute) && r.maxWakesPerMinute >= 0 ? Math.floor(r.maxWakesPerMinute) : 0,
     localAgentRunner: str("localAgentRunner") === "mock" || process.env.DSH_ROOM_MOCK_AGENTS === "1" ? "mock" : "dsh",
   };
 }

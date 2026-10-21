@@ -36,6 +36,7 @@ export interface Logger {
 }
 /** Cordis 4 Context subset. */
 export interface HostContext {
+    on?(event: string, listener: (payload: any) => void): () => void;
     tools: ToolRegistry;
     logger: Logger;
     /** Register a cleanup tied to this plugin fiber (runs on unload / reload). */
@@ -156,7 +157,7 @@ export interface DshCollabConfig {
     permissionPreset: string;
     /** Wake on chats that are replies (replyTo set). Default false: prevents agent ping-pong. */
     wakeOnReplies: boolean;
-    /** Upper bound on wakes per minute (loop guard). Default 6. */
+    /** Upper bound on wakes per minute (loop guard). Default 0 (unlimited); positive values opt into throttling. */
     maxWakesPerMinute: number;
     /** How local agent runs execute: "dsh" (real sessions, default) or "mock" (deterministic, no model calls). */
     localAgentRunner?: "dsh" | "mock";

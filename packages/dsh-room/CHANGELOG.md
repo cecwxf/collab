@@ -1,3 +1,12 @@
+## 0.3.21
+
+- Show persistent per-agent execution state in chat, including queued/running and thinking/streaming/tool phases from dsh events.
+- Schedule host wakes alongside worker runs, retain per-agent exclusion through cancellation, and refresh the queue immediately when limits change.
+- Broadcast sender-bound execution metadata (never reasoning text); merge remote runs and legacy stream activity into SSE with expiry and replay ordering.
+- Default concurrency, turn limit, and per-minute host wake limit to 0 (unlimited). Migrate legacy room defaults 2/6 once in state v4; preserve explicit positive caps thereafter.
+- Route human messages without mentions to all workers, exclude moderators from implicit broadcasts, and keep unmentioned model replies non-waking.
+- Include the pending workspace/sidebar and readable bubble fixes below.
+
 ## 0.3.20
 
 - Simplify room connection choices to Local and Relay, with Local selected by default.

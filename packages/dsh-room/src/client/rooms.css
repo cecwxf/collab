@@ -566,6 +566,12 @@
 .rm-room-menu button:hover { background:var(--rm-hover); }
 .rm-room-menu .rm-danger { color:var(--dsw-alias-state-error-primary,#e45555); }
 
+/* Visible independently of the optional details panel and chat scroll position. */
+.rm-executions { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px; border-bottom: 1px solid var(--rm-border); flex-shrink: 0; max-height: 140px; overflow-y: auto; font-size: 11px; color: var(--rm-muted); }
+.rm-execution { display: flex; gap: 6px; padding: 5px 8px; border: 1px solid var(--rm-border); border-radius: 8px; }
+.rm-execution-name { color: var(--rm-label); font-weight: 600; }
+.rm-execution-running { border-color: var(--rm-accent); color: var(--rm-accent); }
+.rm-execution-queued { border-style: dashed; }
 /* Room message rail and input share one centered width and native theme tokens. */
 .rm-composer-seat { position:relative; flex:none; box-sizing:border-box; width:100%; max-width:868px; margin:0 auto; padding:8px 24px 20px; }
 .rm-composer-context { position:relative; display:flex; align-items:center; gap:8px; margin-bottom:8px; }

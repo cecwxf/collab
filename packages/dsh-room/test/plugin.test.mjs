@@ -30,7 +30,7 @@ describe("dsh-room plugin module (dsh 0.2 shape)", () => {
     assert.equal(ok.value.autoReply, "mention-or-task");
     assert.equal(ok.value.permissionPreset, "read-only");
     assert.equal(ok.value.wakeOnReplies, false);
-    assert.equal(ok.value.maxWakesPerMinute, 6);
+    assert.equal(ok.value.maxWakesPerMinute, 0);
     assert.ok(plugin.Config["~standard"].validate({ autoReply: "always" }).issues);
     assert.ok(plugin.Config["~standard"].validate({ relayUrl: "http://x" }).issues);
   });
@@ -76,7 +76,7 @@ describe("Web and Desktop storage ownership", () => {
     const statePath=join(dir,'.collab/state.json');
     for(let i=0;i<100;i++){try{await readFile(statePath);break;}catch{await new Promise(r=>setTimeout(r,20));}}
     assert.ok(JSON.parse(await readFile(join(dir,'.collab/identity.json'),'utf8')).agentId);
-    assert.equal(JSON.parse(await readFile(statePath,'utf8')).version,3);
+    assert.equal(JSON.parse(await readFile(statePath,'utf8')).version,4);
     for(const cleanup of ctx._effects)cleanup();
   });
 });

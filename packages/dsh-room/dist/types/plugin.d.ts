@@ -1,3 +1,4 @@
+import { RemoteExecutions } from "./execution.js";
 import { type ModelChoice } from "./models.js";
 import { DirectoryClient, type CollabPayload, type Identity, type McpResultPayload } from "@collab/protocol";
 import { CollabClient, RoomHub } from "@collab/sdk";
@@ -143,6 +144,9 @@ declare class RoomConn {
     }>;
     removedAgentIds: Set<string>;
     threads: ThreadTracker;
+    executions: RemoteExecutions;
+    sentExecutions: Map<string, string>;
+    executionSending: Set<string>;
     /** local agentId → thread of its current run (messages it sends belong to that thread). */
     runThread: Map<string, string>;
     /** moderator-created tasks: taskId → bookkeeping for the summary step. */
@@ -253,6 +257,11 @@ export declare class CollabBridge {
     private resolvedModel;
     private resetAgentSession;
     constructor(ctx: HostContext, config: DshCollabConfig, fetchImpl?: typeof fetch);
+    private eventDisposers;
+    private executionTimer?;
+    private observeAgents;
+    private broadcastExecutions;
+    roomRuns(conn: RoomConn): RunInfo[];
     log(level: "info" | "warn" | "error", ...a: unknown[]): void;
     subscribe(fn: (e: BridgeEvent) => void): () => void;
     private emit;
@@ -459,7 +468,7 @@ export declare class CollabBridge {
     private live;
     setActive(roomId: string): void;
     private publishLocal;
-    send(roomId: string | undefined, textIn: string, mentions?: string[], replyTo?: string): Promise<{
+    send(roomId: string | undefined, textIn: string, mentions?: string[], replyTo?: string, human?: boolean): Promise<{
         messageId: string;
         seq: number;
         roomId: string;
@@ -582,6 +591,8 @@ export declare class CollabBridge {
     private injectContext;
     private buildPrompt;
     private wake;
+    private execHost;
+    private followupAndWait;
     /** Same creation sequence as @deepseek-ai/dsh-webhook createWebhookSession. */
     private sessionFor;
     private inviteUrl;

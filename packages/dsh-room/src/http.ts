@@ -160,7 +160,7 @@ export function createApiHandler(bridge: CollabBridge, connection: () => Connect
       if (lm) {
         const roomId = decodeURIComponent(lm[1]!);
         const action = lm[2]!;
-        if (method === "GET" && action === "runs") return sendJson(res, 200, { runs: bridge.scheduler.list(roomId) });
+        if (method === "GET" && action === "runs") return sendJson(res, 200, { runs: bridge.roomRuns(bridge.room(roomId)) });
         if (method === "GET" && action === "diffs") return sendJson(res, 200, await bridge.agentDiffs(roomId));
         if (method === "POST") {
           const b = await readJson(req);

@@ -39,7 +39,7 @@ export function routeLocalTargets(p: RoutablePayload, agents: LocalAgentConfig[]
     if (mentions.includes("all")) {
       const workers = others.filter((a) => !a.moderator);
       const explicit = mentions.map((m) => resolveLocalMention(m, others)).filter((a): a is LocalAgentConfig => !!a);
-      const set = new Set([...(workers.length ? workers : others), ...explicit].map((a) => a.agentId));
+      const set = new Set([...workers, ...explicit].map((a) => a.agentId));
       return { targets: [...set], reason: "all" };
     }
     const hit = new Set<string>();
@@ -97,7 +97,7 @@ export class ThreadTracker {
   /** Consume up to n turns; returns how many are allowed (0 when the thread is at its limit). */
   consume(thread: string, n: number): number {
     const used = this.used(thread);
-    const allowed = Math.max(0, Math.min(n, this.limit - used));
+    const allowed = Math.max(0, Math.min(n, this.limit === 0 ? n : this.limit - used));
     if (allowed) this.turns.set(thread, used + allowed);
     return allowed;
   }
@@ -125,7 +125,11 @@ export interface RunRequest {
   [k: string]: unknown;
 }
 
+export type RunPhase = "working" | "thinking" | "streaming" | "tool";
+
 export interface RunInfo {
+  phase?: RunPhase;
+  remote?: boolean;
   id: string;
   roomId: string;
   agentId: string;
@@ -232,10 +236,19 @@ export class RunScheduler {
     return new Promise((r) => this.idleWaiters.push(r));
   }
 
+  /** Apply changed room limits immediately to the waiting queue. */
+  refresh() { this.pump(); }
+
+  setPhase(roomId: string, agentId: string, phase: RunPhase) {
+    const run = this.runs.find(r => r.roomId === roomId && r.agentId === agentId && r.state === "running");
+    if (run && run.phase !== phase) { run.phase = phase; this.changed(); }
+  }
+
   private pump() {
     for (const run of this.runs) {
       if (run.state !== "queued") continue;
-      if (this.running(run.roomId) >= Math.max(1, this.limitFor(run.roomId))) continue;
+      const limit = this.limitFor(run.roomId);
+      if (limit > 0 && this.running(run.roomId) >= limit) continue;
       if (this.isExecuting(run.roomId, run.agentId)) continue;
       this.start(run);
     }
@@ -251,6 +264,7 @@ export class RunScheduler {
     const ac = new AbortController();
     this.aborts.set(run.id, ac);
     run.state = "running";
+    run.phase = "working";
     run.startedAt = Date.now();
     const req = this.reqs.get(run.id)!;
     Promise.resolve()

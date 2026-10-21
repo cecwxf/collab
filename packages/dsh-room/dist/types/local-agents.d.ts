@@ -29,16 +29,16 @@ export interface LocalAgentConfig {
 }
 export interface RoomLocalSettings {
     agents: LocalAgentConfig[];
-    /** Max agent-originated wakes per task/thread before the room pauses that thread. */
+    /** Max agent-originated wakes per task/thread before the room pauses that thread; 0 means unlimited. */
     turnLimit: number;
-    /** Max local agent runs in parallel; the rest wait in a visible queue. */
+    /** Max local agent runs in parallel; the rest wait in a visible queue; 0 means all agents concurrently. */
     concurrency: number;
     /** In-process loopback transport (no network) — only valid while all members are local. */
     loopback: boolean;
     isolation: IsolationMode;
 }
-export declare const DEFAULT_TURN_LIMIT = 6;
-export declare const DEFAULT_CONCURRENCY = 2;
+export declare const DEFAULT_TURN_LIMIT = 0;
+export declare const DEFAULT_CONCURRENCY = 0;
 export declare function defaultLocalSettings(): RoomLocalSettings;
 export declare function normalizeLocalSettings(s?: Partial<RoomLocalSettings> | null): RoomLocalSettings;
 export interface AgentPreset {

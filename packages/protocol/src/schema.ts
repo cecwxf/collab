@@ -19,6 +19,7 @@ const PAYLOAD_KINDS = new Set([
   "presence",
   "hello",
   "member.config",
+  "execution.status",
   "approval.request",
   "approval.response",
   "mcp.call",
@@ -36,6 +37,17 @@ export function assertPayload(p: unknown): CollabPayload {
     throw new Error("payload missing messageId/sender");
   }
   if (typeof o.ts !== "number") throw new Error("payload missing ts");
+  if (o.kind === "execution.status") {
+    if (!Array.isArray(o.runs) || o.runs.length > 500) throw new Error("invalid execution runs");
+    for (const r of o.runs) {
+      if (!r || typeof r.id !== "string" || r.id.length > 200 ||
+          !["approval", "queued", "running", "done", "failed", "stopped"].includes(r.state) ||
+          (r.phase !== undefined && !["working", "thinking", "streaming", "tool"].includes(r.phase)) ||
+          !Number.isFinite(r.enqueuedAt) ||
+          (r.startedAt !== undefined && !Number.isFinite(r.startedAt)) ||
+          (r.endedAt !== undefined && !Number.isFinite(r.endedAt))) throw new Error("invalid execution run");
+    }
+  }
   return p as CollabPayload;
 }
 

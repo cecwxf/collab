@@ -55,7 +55,10 @@ export interface RunRequest {
     gate?: (signal: AbortSignal) => Promise<boolean>;
     [k: string]: unknown;
 }
+export type RunPhase = "working" | "thinking" | "streaming" | "tool";
 export interface RunInfo {
+    phase?: RunPhase;
+    remote?: boolean;
     id: string;
     roomId: string;
     agentId: string;
@@ -89,6 +92,9 @@ export declare class RunScheduler {
     stop(roomId: string, agentId?: string): number;
     /** Resolves when no run is approval/queued/running (tests, e2e). */
     whenIdle(): Promise<void>;
+    /** Apply changed room limits immediately to the waiting queue. */
+    refresh(): void;
+    setPhase(roomId: string, agentId: string, phase: RunPhase): void;
     private pump;
     private start;
     private finish;

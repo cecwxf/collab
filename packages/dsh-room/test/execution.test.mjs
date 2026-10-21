@@ -1,0 +1,176 @@
+import { test, before } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { build } from 'esbuild';
+import { CollabBridge, normalizeConfig } from '../dist/index.js';
+import { CollabClient, MockTransport } from '@collab/sdk';
+import { generateIdentity, assertPayload } from '@collab/protocol';
+import { executionRows } from '../src/client/execution.js';
+import vm from 'node:vm';
+import { EventEmitter } from 'node:events';
+let O, L, S, E, H;
+before(async () => {
+  const out = await mkdtemp(join(tmpdir(), 'room-execution-build-'));
+  await build({ entryPoints: ['orchestrator', 'local-agents', 'state', 'execution', 'http'].map(n => new URL(`../src/${n}.ts`, import.meta.url).pathname), outdir: out, bundle: true, platform: 'node', format: 'esm' });
+  [O,L,S,E,H] = await Promise.all(['orchestrator','local-agents','state','execution','http'].map(n => import(join(out, n+'.js'))));
+});
+const tick = () => new Promise(r => setTimeout(r, 5));
+async function until(fn) { for (let i=0;i<400;i++) { if (fn()) return; await tick(); } throw Error('condition timed out'); }
+const req = (agentId, extra = {}) => ({ roomId:'r', agentId, threadId:'t', reason:'test', summary:'test', ...extra });
+async function fixture() {
+  const dir = await mkdtemp(join(tmpdir(), 'room-execution-')), events = new Map();
+  const ctx = { tools:{register:()=>()=>{}}, logger:{ info(){},warn(){},error(){} }, effect(){}, get(){}, on(name,fn){events.set(name,fn);return()=>events.delete(name);} };
+  const b = new CollabBridge(ctx, normalizeConfig({ statePath:join(dir,'state.json'), identityPath:join(dir,'identity.json'), workspacePath:dir, agentName:'human', localAgentRunner:'mock' }));
+  await b.start();
+  return { b, ctx, events, dir };
+}
+async function room(b, agents=['architect','reviewer',{name:'Third',scope:'read'},'moderator']) {
+  const r=await b.createRoom({localOnly:true,agents});
+  await until(()=>b.room(r.roomId).client?.isJoined() && b.room(r.roomId).local.agents.every(a=>b.room(r.roomId).agents.get(a.agentId)?.isJoined()));
+  return b.room(r.roomId);
+}
+
+test('zero defaults, finite bounds, unlimited budgets and one-time v3 migration', async()=>{
+  assert.equal(L.defaultLocalSettings().concurrency,0); assert.equal(L.defaultLocalSettings().turnLimit,0);
+  assert.equal(L.normalizeLocalSettings({concurrency:0,turnLimit:0}).concurrency,0);
+  assert.equal(L.normalizeLocalSettings({concurrency:Infinity,turnLimit:NaN}).turnLimit,0);
+  assert.equal(L.normalizeLocalSettings({concurrency:-1,turnLimit:-2}).concurrency,0);
+  const t=new O.ThreadTracker(0); for(let i=0;i<50;i++) assert.equal(t.consume('t',3),3); assert.equal(t.used('t'),150);
+  const dir=await mkdtemp(join(tmpdir(),'room-migration-')), file=join(dir,'state.json');
+  await writeFile(file,JSON.stringify({version:3,rooms:[{roomId:'r',invite:'test',local:{concurrency:2,turnLimit:6}},{roomId:'s',invite:'test',local:{concurrency:3,turnLimit:8}}]}));
+  let state=await S.loadState(file); assert.deepEqual(state.rooms.map(r=>[r.local.concurrency,r.local.turnLimit]),[[0,0],[3,8]]);
+  state.rooms[0].local={concurrency:2,turnLimit:6}; await S.saveState(file,state);
+  state=await S.loadState(file); assert.equal(state.version,4); assert.equal(state.rooms[0].local.concurrency,2); assert.equal(state.rooms[0].local.turnLimit,6);
+  assert.equal(normalizeConfig({}).maxWakesPerMinute,0); assert.equal(normalizeConfig({maxWakesPerMinute:6}).maxWakesPerMinute,6);
+  assert.equal(normalizeConfig({maxWakesPerMinute:Infinity}).maxWakesPerMinute,0);
+});
+
+test('unlimited scheduler starts four different agents, serializes duplicates through stop cleanup, and refreshes limits',async()=>{
+  const releases=[], started=[]; let limit=1;
+  const s=new O.RunScheduler(async run=>{started.push(run.agentId);await new Promise(r=>releases.push(r));},()=>limit);
+  for(const id of ['a','b','c','d','a'])s.enqueue(req(id));
+  await tick();assert.deepEqual(started,['a']);limit=0;s.refresh();await tick();assert.deepEqual(started,['a','b','c','d']);
+  s.stop('r','a');s.enqueue(req('a'));await tick();assert.equal(started.filter(id=>id==='a').length,1);
+  releases.shift()();await tick();assert.equal(started.filter(id=>id==='a').length,2);
+  for(const release of releases)release();await s.whenIdle();
+});
+
+test('UI human @all and plain messages wake all three workers, exclude moderator, and tools do not create broadcast loops',async()=>{
+  const {b}=await fixture();const releases=[];try {
+    const c=await room(b); const started=[];
+    b.localRunner=async({agent})=>{started.push(agent.agentId);await new Promise(r=>releases.push(r));};
+    for(const text of ['@all first','plain second']) {
+      await b.send(c.meta.roomId,text);await until(()=>started.length===3);
+      assert.equal(b.view(c).runs.filter(r=>r.state==='running').length,3);
+      assert.ok(!started.includes(c.local.agents.find(a=>a.moderator).agentId));
+      for(const release of releases.splice(0))release();await b.scheduler.whenIdle();started.length=0;
+    }
+    await b.tools().find(t=>t.name==='collab_send').execute({roomId:c.meta.roomId,text:'model reply'},{});
+    await tick();assert.equal(started.length,0);
+    assert.deepEqual(O.routeLocalTargets({kind:'chat',messageId:'m',sender:'x',mentions:['all']},[c.local.agents.find(a=>a.moderator)]).targets,[]);
+  }finally{for(const r of releases)r();await b.dispose();}
+});
+
+test('same thread continues past six agent hand-offs by default',async()=>{
+  const {b}=await fixture();try{
+    const c=await room(b,['architect','reviewer']);let count=0;
+    b.localRunner=async({agent,trigger})=>{count++;if(count<10){const other=c.local.agents.find(a=>a.agentId!==agent.agentId);await b.publishAs(c.meta.roomId,agent.agentId,{kind:'chat',text:'next',mentions:[other.agentId],replyTo:trigger.messageId});}};
+    await b.send(c.meta.roomId,'@architect start');await b.scheduler.whenIdle();assert.equal(count,10);
+    assert.ok(!c.messages.some(m=>m.text.includes('Turn limit')));
+    const p={kind:'chat',messageId:'guard',sender:'remote'};
+    for(let i=0;i<12;i++)assert.equal(b.passesLoopGuard(c,p),true);
+    assert.equal(b.passesLoopGuard(c,{...p,replyTo:'root',human:true}),true);
+    assert.equal(b.passesLoopGuard(c,{...p,replyTo:'root',human:false}),false);
+    b.config.maxWakesPerMinute=2;c.wakeTimes=[];assert.equal(b.passesLoopGuard(c,p),true);assert.equal(b.passesLoopGuard(c,p),true);assert.equal(b.passesLoopGuard(c,p),false);
+  }finally{await b.dispose();}
+});
+
+test('real dsh event shapes update phases; signed wire snapshots and SSE contain no reasoning text',async()=>{
+  const {b,events}=await fixture();let remote,release;try{
+    const c=await room(b,['reviewer']);const a=c.local.agents[0];
+    const identity=await generateIdentity('remote-observer'), parsed=CollabClient.parseInvite(c.meta.invite);
+    remote=new CollabClient({identity,roomId:c.meta.roomId,roomKey:parsed.roomKeyB64,transport:new MockTransport(b.hub,'observer')});
+    const received=[];remote.onPayload((p,meta)=>received.push({p,meta}));await remote.join();
+    b.localRunner=async()=>new Promise(r=>{release=r;});
+    c.meta.agentSessions={[a.agentId]:'session-worker'};b.sessionAgents.set('session-worker',{roomId:c.meta.roomId,agentId:a.agentId});
+    await b.send(c.meta.roomId,'@reviewer run');await until(()=>!!release);
+    const subject={session:{id:'session-worker'}};
+    events.get('agent/status')({agent:subject,status:'running'});
+    events.get('agent/assistant-stream')({agent:subject,frame:{type:'chunk',chunk:{type:'reasoning-delta',text:'PRIVATE_REASONING'}}});
+    assert.equal(b.view(c).runs.find(r=>r.state==='running').phase,'thinking');
+    await until(()=>received.some(x=>x.p.kind==='execution.status'&&x.p.runs.some(r=>r.phase==='thinking')));
+    events.get('agent/assistant-stream')({agent:subject,frame:{type:'chunk',chunk:{type:'text-delta',text:'PRIVATE_OUTPUT'}}});
+    assert.equal(b.view(c).runs.find(r=>r.state==='running').phase,'streaming');
+    events.get('agent/assistant-stream')({agent:subject,frame:{type:'chunk',chunk:{type:'tool-call-delta',args:'PRIVATE_ARGS'}}});
+    assert.equal(b.view(c).runs.find(r=>r.state==='running').phase,'tool');
+    assert.ok(!JSON.stringify(received).includes('PRIVATE_'));assert.ok(!JSON.stringify(b.state()).includes('PRIVATE_'));
+    const wire=received.find(x=>x.p.kind==='execution.status');assert.equal(wire.meta.from,a.agentId);
+    assert.deepEqual(Object.keys(wire.p.runs[0]).sort().filter(k=>!['id','state','phase','enqueuedAt','startedAt','endedAt'].includes(k)),[]);
+    release();await b.scheduler.whenIdle();await until(()=>received.some(x=>x.p.kind==='execution.status'&&x.p.runs.some(r=>r.state==='done')));
+    let notified=0;const unsub=b.subscribe(()=>notified++);
+    await remote.publish({kind:'execution.status',runs:[{id:'remote-run',state:'running',phase:'thinking',enqueuedAt:Date.now()}]});
+    await until(()=>b.view(c).runs.some(r=>r.id==='remote-run'));assert.ok(notified>0);unsub();
+    assert.equal(b.view(c).runs.find(r=>r.id==='remote-run').agentId,identity.agentId);
+    assert.ok(!c.messages.some(m=>m.kind==='execution.status'));
+    await remote.publish({kind:'stream.delta',streamId:'legacy',phase:'streaming',text:'DO_NOT_STORE'});
+    await remote.publish({kind:'stream.end',streamId:'legacy',text:'public final'});
+    await until(()=>c.messages.some(m=>m.text==='public final'));assert.ok(!JSON.stringify(b.state()).includes('DO_NOT_STORE'));
+  }finally{release?.();await remote?.dispose();await b.dispose();assert.equal(events.size,0);}
+});
+
+test('remote execution metadata is sender bound, ordered, expired, and validated; delta fallback clears on end',()=>{
+  const e=new E.RemoteExecutions('r'), now=Date.now();
+  const p={v:1,kind:'execution.status',messageId:'m',sender:'spoof',ts:now,runs:[{id:'x',state:'running',phase:'thinking',enqueuedAt:now,agentId:'victim',summary:'SECRET'}]};
+  assertPayload(p);e.receive('actual',p,2,now);e.receive('actual',{...p,runs:[]},1,now);
+  assert.equal(e.list(now)[0].agentId,'actual');assert.ok(!JSON.stringify(e.list(now)).includes('SECRET'));
+  assert.equal(e.list(now+E.EXECUTION_TTL+1).length,0);
+  e.receive('actual',p,3,now+E.EXECUTION_TTL+1);assert.equal(e.list().length,0);
+  e.stream('legacy','s','thinking',now);assert.equal(e.list()[0].phase,'thinking');e.endStream('legacy');assert.equal(e.list().length,0);
+  assert.throws(()=>assertPayload({...p,runs:[{id:'x',state:'bogus',enqueuedAt:now}]}),/invalid execution/);
+});
+
+test('host wake shares the scheduler and waits until native session idle; stop cancels it',async()=>{
+  const {b,events,ctx}=await fixture();let release;try{
+    const c=await room(b,[]);let count=0, cancelled=0, pending=Promise.resolve();
+    const agent={session:{id:'host-session',seq:0},followup(){count++;this.session.seq++;pending=new Promise(r=>{release=r;});},whenIdle(){return pending;},cancel(){cancelled++;release?.();}};
+    ctx.get=n=>n==='agents'?{get:id=>id==='host-session'?agent:undefined}:undefined;
+    b.bind(c,agent);
+    const payload=i=>({v:1,kind:'chat',messageId:'host-'+i,sender:'remote',ts:Date.now(),mentions:['all'],text:'go'});
+    await b.wake(c,payload(1),'remote');await b.wake(c,payload(2),'remote');await until(()=>count===1);
+    assert.equal(b.scheduler.list(c.meta.roomId).filter(r=>r.state==='queued').length,1);
+    events.get('agent/assistant-stream')({agent,frame:{type:'chunk',chunk:{type:'reasoning-delta',text:'PRIVATE'}}});
+    assert.equal(b.view(c).runs.find(r=>r.state==='running').phase,'thinking');
+    release();await until(()=>count===2);b.stopLocal(c.meta.roomId);await b.scheduler.whenIdle();assert.ok(cancelled>0);
+  }finally{release?.();await b.dispose();}
+});
+
+test('chat strip stays mounted with details closed and labels individual running/queued phases',async()=>{
+  const room={members:[{agentId:'a',name:'Alpha'},{agentId:'b',name:'Beta'}],runs:[{agentId:'a',state:'running',phase:'thinking'},{agentId:'a',state:'queued'},{agentId:'b',state:'queued',remote:true}]};
+  const rows=executionRows(room);assert.match(rows[0].label,/running.*thinking.*1 queued/);assert.equal(rows[1].state,'queued');
+  const code=(await readFile(new URL('../dist/client.js',import.meta.url),'utf8')).replaceAll('return module.exports;','return { ...module.exports, ExecutionStrip, RoomsMain };');
+  let client;const jsx=(type,props)=>({type,props}), react={useState:x=>[x,()=>{}],useSyncExternalStore:(s,g)=>g()};
+  vm.runInNewContext(code,{window:{__ModuleLoader__:{load({id,factory}){if(id==='@cecwxf/dsh-room')client=factory(n=>n==='react'?react:n==='react/jsx-runtime'?{jsx,jsxs:jsx}:{});}}}});
+  assert.equal(client.ExecutionStrip({room}).props['data-rm-executions'],'');
+  const r={...room,roomId:'r',name:'Room',status:'online'};
+  const main=client.RoomsMain({store:{subscribe(){},getSnapshot:()=>({selected:'r',rooms:[r],messages:{},detailsOpen:false}),actions:{}}});
+  function has(n){return !!n&&(Array.isArray(n)?n.some(has):typeof n==='object'&&(n.type===client.ExecutionStrip||has(n.props?.children)));}
+  assert.ok(has(main));
+});
+
+
+test('SSE and runs endpoint expose merged remote state with a strict text-free payload',async()=>{
+  const {b}=await fixture();const request=new EventEmitter(),response=new EventEmitter();let body='';
+  try{
+    const c=await room(b,[]);request.url='/api/collab/stream';request.method='GET';
+    response.writeHead=()=>{};response.write=data=>{body+=data;return true;};
+    const handler=H.createApiHandler(b,()=>({requestRejection:()=>undefined}));
+    await handler(request,response);
+    await b.onPayload(c,{v:1,kind:'execution.status',messageId:'x',ts:Date.now(),sender:'remote',runs:[{id:'rx',state:'running',phase:'thinking',enqueuedAt:Date.now(),summary:'SECRET',text:'SECRET'}]},'remote',1);
+    await until(()=>body.includes('"id":"rx"'));
+    assert.match(body, /"phase":"thinking"/);assert.ok(!body.includes('SECRET'));
+    let json;await handler({url:'/api/collab/rooms/'+c.meta.roomId+'/runs',method:'GET'},{setHeader(){},end(value){json=JSON.parse(value);}});
+    assert.equal(json.runs[0].id,'rx');assert.equal(json.runs[0].remote,true);
+  }finally{request.emit('close');response.emit('close');await b.dispose();}
+});

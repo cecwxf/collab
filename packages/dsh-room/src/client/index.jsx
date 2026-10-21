@@ -7,6 +7,7 @@ import { Button, Input, Modal, StateDot, Switch, Tag, Toast, MarkdownText, Markd
 import roomsCss from "./rooms.css";
 import { createRoomsStore } from "./store.js";
 import { sameWorkspacePath, fileCandidates, inlineFile } from "./files.js";
+import { executionRows } from "./execution.js";
 import { installRoomGroups } from "./workspace-rooms.js";
 
 export const name = "dsh-room-client";
@@ -183,6 +184,15 @@ function Message({ m, showAuthor, who, room, store }) {
   );
 }
 
+function ExecutionStrip({ room }) {
+  const rows = executionRows(room);
+  return <div className="rm-executions" data-rm-executions="" role="status" aria-live="polite" aria-label="Agent execution status">
+    {rows.length ? rows.map(r => <div key={r.agentId} data-rm-agent={r.agentId} data-state={r.state} className={"rm-execution rm-execution-" + r.state}>
+      <span className="rm-execution-name">{r.name}</span><span>{r.label}{r.remote ? " · remote" : ""}</span>
+    </div>) : <span>No agent runs yet.</span>}
+  </div>;
+}
+
 function ChatBody({ messages, members, room, store }) {
   const byId = useMemo(() => Object.fromEntries((members || []).map((x) => [x.agentId, x])), [members]);
   const ref = useRef(null);
@@ -198,7 +208,7 @@ function ChatBody({ messages, members, room, store }) {
   }
   return (
     <div className="rm-messages" ref={ref}>
-      {nodes.length ? nodes : <div className="rm-chat-hint">No messages yet. Send a message, @mention an agent to wake it, or create a task from the composer.</div>}
+      {nodes.length ? nodes : <div className="rm-chat-hint">No messages yet. Send a message to all workers, @mention a specific agent, or create a task.</div>}
     </div>
   );
 }
@@ -673,7 +683,7 @@ function RunQueue({ room, store, compact }) {
         </div>
       )) : null}
       {!active.length && !recent.length ? <p className="rm-note">No agent runs yet.</p> : null}
-      {active.length ? <div className="rm-actions"><Button size="sm" variant="outline" className="rm-danger" icon={<StopIcon />} onClick={() => a.stop(room.roomId).then((r) => a.toast(`Stopped ${r.stopped} run(s)`)).catch((e) => a.toast(e.message))}>Stop all agents</Button></div> : null}
+      {active.some(r => !r.remote) ? <div className="rm-actions"><Button size="sm" variant="outline" className="rm-danger" icon={<StopIcon />} onClick={() => a.stop(room.roomId).then((r) => a.toast(`Stopped ${r.stopped} run(s)`)).catch((e) => a.toast(e.message))}>Stop local agents</Button></div> : null}
     </div>
   );
 }
@@ -686,10 +696,10 @@ function OrchestrationSection({ room, store }) {
   const active = (room.runs || []).filter((r) => r.state === "running" || r.state === "queued" || r.state === "approval");
   return (
     <div className="rm-detail-section" data-rm-orchestration="">
-      <div className="rm-detail-h">Runs · {active.filter((r) => r.state === "running").length}/{local.concurrency} running{active.length > local.concurrency ? ` · ${active.length - Math.min(local.concurrency, active.filter((r) => r.state === "running").length)} queued` : ""}</div>
+      <div className="rm-detail-h">Runs · {active.filter((r) => r.state === "running").length}/{local.concurrency || "∞"} running · {active.filter(r => r.state === "queued").length} queued</div>
       <div className="rm-num-row">
-        <NumberSetting label="Parallel runs" value={local.concurrency} min={1} max={16} onSave={(n) => save({ concurrency: n })} hint="Max local agent runs at once; the rest wait in the queue." />
-        <NumberSetting label="Turn limit" value={local.turnLimit} min={1} max={100} onSave={(n) => save({ turnLimit: n })} hint="Max agent-to-agent hand-offs per task/thread. A human message resets it." />
+        <NumberSetting label="Parallel runs" value={local.concurrency} min={0} max={16} onSave={(n) => save({ concurrency: n })} hint="0 = all agents concurrently; a positive value limits parallel runs." />
+        <NumberSetting label="Turn limit" value={local.turnLimit} min={0} max={100} onSave={(n) => save({ turnLimit: n })} hint="0 = unlimited hand-offs; a positive value limits each thread. A human message resets it." />
       </div>
       <RunQueue room={room} store={store} />
     </div>
@@ -970,7 +980,7 @@ function RoomsMain({ store }) {
               <div className="rm-chat-header-sub">{room.members.filter((m) => m.online !== false).length} online{room.local && room.local.agents.length ? ` · ${room.local.agents.length} local agent${room.local.agents.length === 1 ? "" : "s"}` : ""} · {room.public ? "public" : "private"}{room.status !== "online" ? ` · room ${room.status}` : ""}</div>
             </div>
             {(() => {
-              const act = (room.runs || []).filter((r) => r.state === "running" || r.state === "queued" || r.state === "approval");
+              const act = (room.runs || []).filter((r) => !r.remote && (r.state === "running" || r.state === "queued" || r.state === "approval"));
               if (!act.length) return null;
               const running = act.filter((r) => r.state === "running").length;
               return (
@@ -983,6 +993,7 @@ function RoomsMain({ store }) {
             <StateDot state={room.status === "online" ? "done" : room.status === "connecting" ? "ongoing" : "error"} size={8} />
             <button type="button" className="rm-icon-btn" aria-label="Room members and settings" aria-expanded={s.detailsOpen} title="Room members and settings" data-rm-details-toggle="" onClick={store.actions.toggleDetails}><PeopleIcon /></button>
           </header>
+          <ExecutionStrip room={room} />
           <ChatBody messages={messages} members={room.members} room={room} store={store} />
           <Composer room={room} store={store} draft={draft} setDraft={setDraft} />
         </section>
@@ -1006,7 +1017,7 @@ function CreateDialog({ store, d }) {
   const [f, setF] = useState({
     name: "", description: "", tags: "", public: false,
     transport: "local", // local | relay; relay deployment belongs to host configuration
-    turnLimit: 6, concurrency: 2, isolation: "auto",
+    turnLimit: 0, concurrency: 0, isolation: "auto",
     agents: [], // draft agents: { key?, name, persona, systemPrompt, scope, moderator, reasoningEffort, approvalRequired, model }
   });
   const [draft, setDraft] = useState({ name: "", persona: "", systemPrompt: "", scope: "read", moderator: false, reasoningEffort: "medium", approvalRequired: false, model: "" });
@@ -1188,11 +1199,11 @@ function CreateDialog({ store, d }) {
         ) : null}
         {tab === "limits" ? (
           <div className="rm-form rm-form-wide rm-create-pane" role="tabpanel">
-            <Field label="Parallel runs" htmlFor="rm-create-conc" hint="Max local agent runs at once (1–16). The rest wait in a visible queue.">
-              <Input id="rm-create-conc" type="number" min={1} max={16} value={String(f.concurrency)} onChange={(e) => setF({ ...f, concurrency: Math.min(16, Math.max(1, Number(e.target.value) || 1)) })} />
+            <Field label="Parallel runs" htmlFor="rm-create-conc" hint="0 = all agents concurrently; 1–16 sets a cap.">
+              <Input id="rm-create-conc" type="number" min={0} max={16} value={String(f.concurrency)} onChange={(e) => setF({ ...f, concurrency: Math.min(16, Math.max(0, Number(e.target.value) || 0)) })} />
             </Field>
-            <Field label="Turn limit" htmlFor="rm-create-turns" hint="Max agent-to-agent hand-offs per task/thread (1–100). A human message resets it.">
-              <Input id="rm-create-turns" type="number" min={1} max={100} value={String(f.turnLimit)} onChange={(e) => setF({ ...f, turnLimit: Math.min(100, Math.max(1, Number(e.target.value) || 6)) })} />
+            <Field label="Turn limit" htmlFor="rm-create-turns" hint="0 = unlimited; 1–100 caps hand-offs per task/thread. A human message resets it.">
+              <Input id="rm-create-turns" type="number" min={0} max={100} value={String(f.turnLimit)} onChange={(e) => setF({ ...f, turnLimit: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
             </Field>
             <div className="rm-span-2">
               <Field label="Workspace isolation" hint="Writing agents get their own git worktree by default when the workspace is a git repo.">
