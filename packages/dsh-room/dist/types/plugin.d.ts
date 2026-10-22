@@ -37,6 +37,7 @@ export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId" | "membe
         agentId: string;
         self: boolean;
         online?: boolean;
+        connectionStatus?: RoomStatus;
         local?: boolean;
         name?: string;
         persona?: string;
@@ -285,6 +286,7 @@ export declare class CollabBridge {
             agentId: string;
             self: boolean;
             online?: boolean;
+            connectionStatus?: RoomStatus;
             local?: boolean;
             name?: string;
             persona?: string;
@@ -354,6 +356,7 @@ export declare class CollabBridge {
             agentId: string;
             self: boolean;
             online?: boolean;
+            connectionStatus?: RoomStatus;
             local?: boolean;
             name?: string;
             persona?: string;
@@ -412,6 +415,7 @@ export declare class CollabBridge {
             agentId: string;
             self: boolean;
             online?: boolean;
+            connectionStatus?: RoomStatus;
             local?: boolean;
             name?: string;
             persona?: string;
@@ -641,6 +645,7 @@ export declare class CollabBridge {
             agentId: string;
             self: boolean;
             online?: boolean;
+            connectionStatus?: RoomStatus;
             local?: boolean;
             name?: string;
             persona?: string;
@@ -813,6 +818,7 @@ export declare class CollabBridge {
         released: number;
         note?: undefined;
     };
+    private agentConnectionStatus;
     localView(conn: RoomConn): LocalView;
     dispose(): Promise<void>;
     tools(): ToolDefinition[];

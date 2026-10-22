@@ -1,3 +1,9 @@
+## 0.3.22
+
+- Publish newly added agents as connecting before their asynchronous join, eliminating the initial offline snapshot.
+- Preserve connecting in the execution strip and use the same connection state for member and local-agent indicators.
+- Add a regression test covering every emitted snapshot during a delayed join, then the transition to online/idle.
+
 ## 0.3.21
 
 - Show persistent per-agent execution state in chat, including queued/running and thinking/streaming/tool phases from dsh events.

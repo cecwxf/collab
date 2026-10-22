@@ -437,7 +437,7 @@ function executionRows(room) {
     const running = own.find((r) => r.state === "running");
     const waiting = own.filter((r) => r.state === "queued");
     const current = running || own.find((r) => active.has(r.state)) || own.at(-1);
-    const state = current?.state || (m.online === false ? "offline" : "idle");
+    const state = current?.state || (m.online === false ? m.connectionStatus === "connecting" ? "connecting" : "offline" : "idle");
     const phase = running?.phase;
     const label = state === "running" ? `running \xB7 ${phase === "thinking" ? "thinking / \u63A8\u7406\u4E2D" : phase === "streaming" ? "streaming / \u8F93\u51FA\u4E2D" : phase === "tool" ? "tool / \u5DE5\u5177\u6267\u884C" : "working / \u6267\u884C\u4E2D"}` : state;
     return { agentId: m.agentId, name: m.name || m.agentId, state, label: label + (running && waiting.length ? ` \xB7 ${waiting.length} queued` : ""), remote: !!current?.remote };
@@ -1324,7 +1324,7 @@ function RoomDetail({ room, messages, store, mention, assign }) {
       room.members.map((m) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-member", "data-agent-id": m.agentId, children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-avatar-wrap", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: m.agentId, size: 26 }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-dot rm-dot-" + (m.online === false ? "offline" : "online"), style: { position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" } })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-dot rm-dot-" + (m.connectionStatus || (m.online === false ? "offline" : "online")), style: { position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" } })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-member-name", children: m.name ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
           m.name,
@@ -1437,7 +1437,7 @@ function LocalAgentsSection({ room, store, mention }) {
     local.agents.map((ag) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-agent-row", "data-agent-id": ag.agentId, children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-avatar-wrap", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: ag.name, size: 26 }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-dot rm-dot-" + (ag.state === "running" ? "busy" : ag.online ? "online" : "offline"), style: { position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" } })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-dot rm-dot-" + (ag.state === "running" ? "busy" : ag.connectionStatus || (ag.online ? "online" : "offline")), style: { position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" } })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-agent-main", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-agent-name", children: [
@@ -3130,7 +3130,7 @@ function executionRows(room) {
     const running = own.find((r) => r.state === "running");
     const waiting = own.filter((r) => r.state === "queued");
     const current = running || own.find((r) => active.has(r.state)) || own.at(-1);
-    const state = current?.state || (m.online === false ? "offline" : "idle");
+    const state = current?.state || (m.online === false ? m.connectionStatus === "connecting" ? "connecting" : "offline" : "idle");
     const phase = running?.phase;
     const label = state === "running" ? `running \xB7 ${phase === "thinking" ? "thinking / \u63A8\u7406\u4E2D" : phase === "streaming" ? "streaming / \u8F93\u51FA\u4E2D" : phase === "tool" ? "tool / \u5DE5\u5177\u6267\u884C" : "working / \u6267\u884C\u4E2D"}` : state;
     return { agentId: m.agentId, name: m.name || m.agentId, state, label: label + (running && waiting.length ? ` \xB7 ${waiting.length} queued` : ""), remote: !!current?.remote };
@@ -4017,7 +4017,7 @@ function RoomDetail({ room, messages, store, mention, assign }) {
       room.members.map((m) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-member", "data-agent-id": m.agentId, children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-avatar-wrap", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: m.agentId, size: 26 }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-dot rm-dot-" + (m.online === false ? "offline" : "online"), style: { position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" } })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-dot rm-dot-" + (m.connectionStatus || (m.online === false ? "offline" : "online")), style: { position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" } })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-member-name", children: m.name ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
           m.name,
@@ -4130,7 +4130,7 @@ function LocalAgentsSection({ room, store, mention }) {
     local.agents.map((ag) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rm-agent-row", "data-agent-id": ag.agentId, children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-avatar-wrap", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, { name: ag.name, size: 26 }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-dot rm-dot-" + (ag.state === "running" ? "busy" : ag.online ? "online" : "offline"), style: { position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" } })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rm-dot rm-dot-" + (ag.state === "running" ? "busy" : ag.connectionStatus || (ag.online ? "online" : "offline")), style: { position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" } })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-agent-main", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "rm-agent-name", children: [

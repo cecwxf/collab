@@ -174,3 +174,35 @@ test('SSE and runs endpoint expose merged remote state with a strict text-free p
     assert.equal(json.runs[0].id,'rx');assert.equal(json.runs[0].remote,true);
   }finally{request.emit('close');response.emit('close');await b.dispose();}
 });
+
+test('new agent stays connecting in every published snapshot until its join completes', async () => {
+  const { b } = await fixture();
+  let release;
+  try {
+    const c = await room(b, []);
+    const original = b.transportFor.bind(b);
+    const gate = new Promise(resolve => { release = resolve; });
+    b.transportFor = (...args) => {
+      const transport = original(...args), connect = transport.connect.bind(transport);
+      transport.connect = async (...input) => { await gate; return connect(...input); };
+      return transport;
+    };
+    const snapshots = [];
+    const off = b.subscribe(() => {
+      const view = b.view(c);
+      if (view.local.agents.length) snapshots.push(view);
+    });
+    const a = await b.addLocalAgent(c.meta.roomId, { name: 'Joining worker' });
+    await tick();
+    off();
+    assert.ok(snapshots.length);
+    for (const view of snapshots) {
+      assert.equal(view.local.agents[0].connectionStatus, 'connecting', 'creation must not publish offline before starting its join');
+      assert.equal(view.members.find(m => m.agentId === a.agentId).connectionStatus, 'connecting', 'member list and local agent list must agree');
+      assert.equal(executionRows(view).find(r => r.agentId === a.agentId).state, 'connecting', 'the chat strip must preserve connecting instead of claiming offline');
+    }
+    release();
+    await until(() => c.agents.get(a.agentId)?.isJoined());
+    assert.equal(executionRows(b.view(c)).find(r => r.agentId === a.agentId).state, 'idle');
+  } finally { release?.(); await b.dispose(); }
+});

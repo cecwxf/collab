@@ -149,7 +149,7 @@ export interface RoomView extends Omit<RoomMeta, "invite" | "sessionId" | "membe
   sessionId?: string;
   status: RoomStatus;
   error?: string;
-  members: { agentId: string; self: boolean; online?: boolean; local?: boolean; name?: string; persona?: string; hostedBy?: string; moderator?: boolean }[];
+  members: { agentId: string; self: boolean; online?: boolean; connectionStatus?: RoomStatus; local?: boolean; name?: string; persona?: string; hostedBy?: string; moderator?: boolean }[];
   last?: { from: string; text: string; ts: number };
   sessionTitle: string;
   bound: boolean;
@@ -1063,6 +1063,7 @@ export class CollabBridge {
             self: agentId === self,
             online: la ? !!conn.agents.get(agentId)?.isJoined() : agentId === self ? !!conn.client?.isJoined() : (conn.client?.getPeers() ?? []).some((p) => p.agentId === agentId),
             local: !!la,
+            connectionStatus: la ? this.agentConnectionStatus(conn, agentId) : undefined,
             name: la?.name ?? pc?.displayName,
             persona: la?.persona ?? pc?.persona,
             hostedBy: la ? self : pc?.hostedBy,
@@ -1701,10 +1702,13 @@ export class CollabBridge {
     if (cfg.moderator) for (const a of conn.local.agents) a.moderator = false;
     conn.removedAgentIds.delete(cfg.agentId);
     conn.local.agents.push(cfg);
+    // Publish the pending join state with the first member snapshot. Consumers
+    // must not see an offline member between persistence and background join.
+    const shouldConnect = opts.connect !== false && !!conn.client?.isJoined();
+    if (shouldConnect) conn.agentStatuses.set(cfg.agentId, "connecting");
     await this.persist();
     this.emit({ type: "rooms" });
     // Collab join / keygen must not block the HTTP response. dsh model sessions stay deferred until first wake.
-    const shouldConnect = opts.connect !== false && !!conn.client?.isJoined();
     if (shouldConnect) {
       void this.connectAgent(conn, cfg).then(
         () => this.emit({ type: "rooms" }),
@@ -2377,6 +2381,10 @@ export class CollabBridge {
     return r;
   }
 
+  private agentConnectionStatus(conn: RoomConn, agentId: string): RoomStatus {
+    return conn.agents.get(agentId)?.isJoined() ? "online" : conn.agentStatuses.get(agentId) ?? (conn.agentJoins.has(agentId) || conn.status === "connecting" ? "connecting" : "offline");
+  }
+
   localView(conn: RoomConn): LocalView {
     const runs = this.scheduler.list(conn.meta.roomId, 0);
     return {
@@ -2388,7 +2396,7 @@ export class CollabBridge {
           resolvedModel: this.resolvedModel(conn, a),
           sessionId: conn.meta.agentSessions?.[a.agentId],
           online: !!conn.agents.get(a.agentId)?.isJoined(),
-          connectionStatus: conn.agents.get(a.agentId)?.isJoined() ? "online" : conn.agentStatuses.get(a.agentId) ?? (conn.agentJoins.has(a.agentId) || conn.status === "connecting" ? "connecting" : "offline"),
+          connectionStatus: this.agentConnectionStatus(conn, a.agentId),
           error: conn.agentErrors.get(a.agentId),
           state: (r?.state as LocalAgentView["state"]) ?? "idle",
           worktree: wt ? { branch: wt.branch, path: wt.path } : null,

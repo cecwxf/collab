@@ -544,7 +544,7 @@ function RoomDetail({ room, messages, store, mention, assign }) {
         <div className="rm-detail-h"><PeopleIcon />Members · {room.members.length}</div>
         {room.members.map((m) => (
           <div key={m.agentId} className="rm-member" data-agent-id={m.agentId}>
-            <span className="rm-avatar-wrap"><Avatar name={m.agentId} size={26} /><span className={"rm-dot rm-dot-" + (m.online === false ? "offline" : "online")} style={{ position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" }} /></span>
+            <span className="rm-avatar-wrap"><Avatar name={m.agentId} size={26} /><span className={"rm-dot rm-dot-" + (m.connectionStatus || (m.online === false ? "offline" : "online"))} style={{ position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" }} /></span>
             <span className="rm-member-name">{m.name ? <>{m.name} <span className="rm-msg-id">{m.agentId}</span></> : m.agentId}</span>
             {m.local ? <span className="rm-agent-tag"><BotIcon size={11} />{m.moderator ? "moderator" : "local"}</span> : m.hostedBy && !m.self ? <span className="rm-agent-tag">remote agent</span> : null}
             {m.self ? <Tag tone="quiet">you</Tag> : (
@@ -626,7 +626,7 @@ function LocalAgentsSection({ room, store, mention }) {
       <div className="rm-detail-h"><BotIcon />Local agents · {local.agents.length}</div>
       {local.agents.map((ag) => (
         <div key={ag.agentId} className="rm-agent-row" data-agent-id={ag.agentId}>
-          <span className="rm-avatar-wrap"><Avatar name={ag.name} size={26} /><span className={"rm-dot rm-dot-" + (ag.state === "running" ? "busy" : ag.online ? "online" : "offline")} style={{ position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" }} /></span>
+          <span className="rm-avatar-wrap"><Avatar name={ag.name} size={26} /><span className={"rm-dot rm-dot-" + (ag.state === "running" ? "busy" : ag.connectionStatus || (ag.online ? "online" : "offline"))} style={{ position: "absolute", right: -1, bottom: -1, border: "2px solid var(--rm-bg)" }} /></span>
           <span className="rm-agent-main">
             <span className="rm-agent-name">{ag.name}{ag.moderator ? <span className="rm-agent-tag">moderator</span> : null}</span>
             <span className="rm-agent-sub rm-mono">@{ag.agentId}</span>

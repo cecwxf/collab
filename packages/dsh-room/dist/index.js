@@ -3961,6 +3961,7 @@ var CollabBridge = class {
             self: agentId === self,
             online: la ? !!conn.agents.get(agentId)?.isJoined() : agentId === self ? !!conn.client?.isJoined() : (conn.client?.getPeers() ?? []).some((p) => p.agentId === agentId),
             local: !!la,
+            connectionStatus: la ? this.agentConnectionStatus(conn, agentId) : void 0,
             name: la?.name ?? pc?.displayName,
             persona: la?.persona ?? pc?.persona,
             hostedBy: la ? self : pc?.hostedBy,
@@ -4579,9 +4580,10 @@ Do what is asked using your tools. Answer in the room by calling collab_send wit
     if (cfg.moderator) for (const a of conn.local.agents) a.moderator = false;
     conn.removedAgentIds.delete(cfg.agentId);
     conn.local.agents.push(cfg);
+    const shouldConnect = opts.connect !== false && !!conn.client?.isJoined();
+    if (shouldConnect) conn.agentStatuses.set(cfg.agentId, "connecting");
     await this.persist();
     this.emit({ type: "rooms" });
-    const shouldConnect = opts.connect !== false && !!conn.client?.isJoined();
     if (shouldConnect) {
       void this.connectAgent(conn, cfg).then(
         () => this.emit({ type: "rooms" }),
@@ -5235,6 +5237,9 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
     this.emit({ type: "rooms" });
     return r;
   }
+  agentConnectionStatus(conn, agentId) {
+    return conn.agents.get(agentId)?.isJoined() ? "online" : conn.agentStatuses.get(agentId) ?? (conn.agentJoins.has(agentId) || conn.status === "connecting" ? "connecting" : "offline");
+  }
   localView(conn) {
     const runs = this.scheduler.list(conn.meta.roomId, 0);
     return {
@@ -5246,7 +5251,7 @@ Do what is asked, then answer with collab_send replyTo "${p.messageId}".`;
           resolvedModel: this.resolvedModel(conn, a),
           sessionId: conn.meta.agentSessions?.[a.agentId],
           online: !!conn.agents.get(a.agentId)?.isJoined(),
-          connectionStatus: conn.agents.get(a.agentId)?.isJoined() ? "online" : conn.agentStatuses.get(a.agentId) ?? (conn.agentJoins.has(a.agentId) || conn.status === "connecting" ? "connecting" : "offline"),
+          connectionStatus: this.agentConnectionStatus(conn, a.agentId),
           error: conn.agentErrors.get(a.agentId),
           state: r?.state ?? "idle",
           worktree: wt ? { branch: wt.branch, path: wt.path } : null,
