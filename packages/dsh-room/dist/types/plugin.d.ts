@@ -1,4 +1,4 @@
-import { RemoteExecutions } from "./execution.js";
+import { publicRuns, RemoteExecutions } from "./execution.js";
 import { type ModelChoice } from "./models.js";
 import { DirectoryClient, type CollabPayload, type Identity, type McpResultPayload } from "@collab/protocol";
 import { CollabClient, RoomHub } from "@collab/sdk";
@@ -13,6 +13,7 @@ export declare const PLUGIN_VERSION: string;
 export declare function describePayload(p: CollabPayload): string;
 /** UI/transcript view of one decrypted room payload. */
 export interface RoomMessage {
+    execution?: ReturnType<typeof publicRuns>[number];
     id: string;
     seq?: number;
     from: string;
@@ -259,9 +260,13 @@ export declare class CollabBridge {
     private resetAgentSession;
     constructor(ctx: HostContext, config: DshCollabConfig, fetchImpl?: typeof fetch);
     private eventDisposers;
+    private executionUpdate?;
+    private scheduleExecutionUpdate;
+    private activityTracker;
     private executionTimer?;
     private observeAgents;
     private broadcastExecutions;
+    private saveExecutionMessages;
     roomRuns(conn: RoomConn): RunInfo[];
     log(level: "info" | "warn" | "error", ...a: unknown[]): void;
     subscribe(fn: (e: BridgeEvent) => void): () => void;

@@ -193,21 +193,51 @@ function ExecutionStrip({ room }) {
   </div>;
 }
 
+function ExecutionMessage({ run, from, who, room, store }) {
+  const name = who?.name || who?.displayName || from;
+  const labels = { thinking: "Thinking…", streaming: "Responding…", tool: "Calling tools…", working: "Working…", queued: "Queued", approval: "Waiting for approval", done: "Completed", failed: "Failed", stopped: "Stopped" };
+  const label = labels[run.state === "running" ? run.phase || "working" : run.state] || run.state;
+  return <article className="rm-run-message" data-rm-run={run.id} data-state={run.state} aria-label={`${name} · ${label}`}>
+    <Avatar name={name} size={28} />
+    <div className="rm-run-content">
+      <div className="rm-run-heading"><strong>{name}</strong><span role="status">{label}</span></div>
+      {!!run.activity?.tools?.length && <details className="rm-run-tools" open={run.state === "running" || undefined}>
+        <summary>{run.activity.tools.length} tool calls</summary>
+        <ul>{run.activity.tools.map(t => <li key={t.id} data-tool-state={t.state}><code>{t.name}</code><span>{({ running: "Running…", done: "Completed", failed: "Failed", stopped: "Stopped" })[t.state]}</span></li>)}</ul>
+      </details>}
+      {run.activity?.output && <MessageBody text={run.activity.output} room={room} store={store} from={from} />}
+    </div>
+  </article>;
+}
+
 function ChatBody({ messages, members, room, store }) {
   const byId = useMemo(() => Object.fromEntries((members || []).map((x) => [x.agentId, x])), [members]);
   const ref = useRef(null);
-  useEffect(() => { const el = ref.current; if (el) el.scrollTop = el.scrollHeight; }, [messages.length]);
+  const following = useRef(true);
+  const entries = [...messages];
+  const saved = new Set(messages.filter(m => m.execution).map(m => `${m.from}:${m.execution.id}`));
+  for (const run of room.runs || []) {
+    if (saved.has(`${run.agentId}:${run.id}`)) continue;
+    entries.push({ id: `run:${run.agentId}:${run.id}`, from: run.agentId, ts: run.startedAt || run.enqueuedAt, execution: run });
+  }
+  entries.sort((a, b) => a.ts - b.ts);
+  useEffect(() => { const el = ref.current; if (el && following.current) el.scrollTop = el.scrollHeight; }, [messages, room.runs]);
   const nodes = [];
   let day = null, prev = null;
-  for (const m of messages) {
+  for (const m of entries) {
     const d = fmtDay(m.ts);
     if (d !== day) { nodes.push(<div key={"d" + m.ts} className="rm-day">{d}</div>); day = d; prev = null; }
+    if (m.execution) {
+      nodes.push(<ExecutionMessage key={m.id} run={m.execution} from={m.from} who={byId[m.from]} room={room} store={store} />);
+      prev = null;
+      continue;
+    }
     const showAuthor = !prev || prev.from !== m.from || m.ts - prev.ts > 5 * 60_000;
     nodes.push(<Message key={m.id} m={m} showAuthor={showAuthor} who={byId[m.from]} room={room} store={store} />);
     prev = m;
   }
   return (
-    <div className="rm-messages" ref={ref}>
+    <div className="rm-messages" ref={ref} onScroll={() => { const el = ref.current; if (el) following.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
       {nodes.length ? nodes : <div className="rm-chat-hint">No messages yet. Send a message to all workers, @mention a specific agent, or create a task.</div>}
     </div>
   );

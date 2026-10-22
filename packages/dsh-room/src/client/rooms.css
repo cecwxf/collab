@@ -583,3 +583,17 @@
 .rm-workspace-menu button:hover { background:var(--rm-hover); }
 .rm-workspace-menu small { display:block; flex-basis:100%; color:var(--rm-quiet); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 @media (max-width:640px) { .rm-composer-seat { padding:8px 12px 12px; } .rm-messages { padding-inline:12px; } }
+
+/* Agent progress belongs to the conversation, including ordinary assistant replies. */
+.rm-run-message { display: flex; gap: 10px; padding: 14px 20px; }
+.rm-run-content { min-width: 0; flex: 1; }
+.rm-run-heading { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+.rm-run-heading span, .rm-run-tools { color: var(--rm-muted, #888); font-size: 12px; }
+.rm-run-message[data-state="running"] .rm-run-heading span { color: var(--rm-accent, #5894e8); }
+.rm-run-message[data-state="failed"] .rm-run-heading span { color: #dc6565; }
+.rm-run-tools { border-left: 2px solid var(--rm-border, #8884); padding-left: 10px; margin: 8px 0 12px; }
+.rm-run-tools summary { cursor: pointer; }
+.rm-run-tools ul { margin: 6px 0; padding: 0; list-style: none; }
+.rm-run-tools li { display: flex; gap: 14px; padding: 3px 0; }
+.rm-run-tools li[data-tool-state="failed"] { color: #dc6565; }
+.rm-run-tools code { color: inherit; }

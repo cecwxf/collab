@@ -1,3 +1,10 @@
+## 0.3.23
+
+- Render per-agent execution cards inside Room chat: thinking/responding state, native tool names and completion/failure status, and streamed ordinary assistant answers.
+- Keep completed cards in conversation history and restore them after restart, including signed Relay history. Normal answers no longer require collab_send; explicit messages and hand-offs still use it.
+- Observe native tools/execute and tools/result without changing execution or approval behavior. Never broadcast raw reasoning, tool arguments/results, prompts or raw errors. Bound answer/tool history and coalesce live updates.
+- Validate with 103 plugin tests, 13 protocol tests, 9 SDK tests, and real Mac Desktop 0.2.0-rc.2 agents using DeepSeek-V41-Flash: upgrade retains the Room/four agents, two agents read a fixture and answer without collab_send, and restart retains their answers/tool records. Windows was not directly exercised.
+
 ## 0.3.22
 
 - Publish newly added agents as connecting before their asynchronous join, eliminating the initial offline snapshot.

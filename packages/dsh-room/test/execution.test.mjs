@@ -101,19 +101,23 @@ test('real dsh event shapes update phases; signed wire snapshots and SSE contain
     events.get('agent/assistant-stream')({agent:subject,frame:{type:'chunk',chunk:{type:'reasoning-delta',text:'PRIVATE_REASONING'}}});
     assert.equal(b.view(c).runs.find(r=>r.state==='running').phase,'thinking');
     await until(()=>received.some(x=>x.p.kind==='execution.status'&&x.p.runs.some(r=>r.phase==='thinking')));
-    events.get('agent/assistant-stream')({agent:subject,frame:{type:'chunk',chunk:{type:'text-delta',text:'PRIVATE_OUTPUT'}}});
+    events.get('agent/assistant-stream')({agent:subject,frame:{type:'chunk',chunk:{type:'text-delta',text:'Public answer'}}});
     assert.equal(b.view(c).runs.find(r=>r.state==='running').phase,'streaming');
     events.get('agent/assistant-stream')({agent:subject,frame:{type:'chunk',chunk:{type:'tool-call-delta',args:'PRIVATE_ARGS'}}});
     assert.equal(b.view(c).runs.find(r=>r.state==='running').phase,'tool');
     assert.ok(!JSON.stringify(received).includes('PRIVATE_'));assert.ok(!JSON.stringify(b.state()).includes('PRIVATE_'));
     const wire=received.find(x=>x.p.kind==='execution.status');assert.equal(wire.meta.from,a.agentId);
-    assert.deepEqual(Object.keys(wire.p.runs[0]).sort().filter(k=>!['id','state','phase','enqueuedAt','startedAt','endedAt'].includes(k)),[]);
+    assert.deepEqual(Object.keys(wire.p.runs[0]).sort().filter(k=>!['id','state','phase','enqueuedAt','startedAt','endedAt','activity'].includes(k)),[]);
     release();await b.scheduler.whenIdle();await until(()=>received.some(x=>x.p.kind==='execution.status'&&x.p.runs.some(r=>r.state==='done')));
     let notified=0;const unsub=b.subscribe(()=>notified++);
-    await remote.publish({kind:'execution.status',runs:[{id:'remote-run',state:'running',phase:'thinking',enqueuedAt:Date.now()}]});
+    await remote.publish({kind:'execution.status',runs:[{id:'remote-run',state:'running',phase:'thinking',enqueuedAt:Date.now(),activity:{output:'Remote answer',tools:[{id:'remote-tool',name:'read',state:'running'}]}}]});
     await until(()=>b.view(c).runs.some(r=>r.id==='remote-run'));assert.ok(notified>0);unsub();
     assert.equal(b.view(c).runs.find(r=>r.id==='remote-run').agentId,identity.agentId);
-    assert.ok(!c.messages.some(m=>m.kind==='execution.status'));
+    assert.equal(b.view(c).runs.find(r=>r.id==='remote-run').activity.output,'Remote answer');
+    await remote.publish({kind:'execution.status',runs:[{id:'remote-run',state:'done',enqueuedAt:Date.now(),activity:{output:'Remote answer',tools:[{id:'remote-tool',name:'read',state:'done'}]}}]});
+    await until(()=>c.messages.some(m=>m.execution?.id==='remote-run'));
+    assert.equal(c.messages.find(m=>m.execution?.id==='remote-run').from,identity.agentId);
+    assert.ok(c.messages.some(m=>m.kind==='execution.status' && m.text==='Public answer'));
     await remote.publish({kind:'stream.delta',streamId:'legacy',phase:'streaming',text:'DO_NOT_STORE'});
     await remote.publish({kind:'stream.end',streamId:'legacy',text:'public final'});
     await until(()=>c.messages.some(m=>m.text==='public final'));assert.ok(!JSON.stringify(b.state()).includes('DO_NOT_STORE'));
@@ -205,4 +209,74 @@ test('new agent stays connecting in every published snapshot until its join comp
     await until(() => c.agents.get(a.agentId)?.isJoined());
     assert.equal(executionRows(b.view(c)).find(r => r.agentId === a.agentId).state, 'idle');
   } finally { release?.(); await b.dispose(); }
+});
+
+test('room chat receives ordinary output and tool lifecycle without reasoning or arguments, and saves terminal activity', async () => {
+  const {b,events}=await fixture();let release;
+  try {
+    const c=await room(b,['reviewer']); const a=c.local.agents[0];
+    b.sessionAgents.set('activity-session',{roomId:c.meta.roomId,agentId:a.agentId});
+    b.localRunner=async()=>new Promise(r=>{release=r;});
+    await b.send(c.meta.roomId,'@reviewer inspect');await until(()=>!!release);
+    const agent={session:{id:'activity-session'}}, stream=frame=>events.get('agent/assistant-stream')({agent,frame});
+    stream({type:'start',attemptId:'one'});
+    stream({type:'chunk',chunk:{type:'reasoning-delta',text:'PRIVATE_REASONING'}});
+    stream({type:'chunk',chunk:{type:'text-delta',text:'Reading the file.'}});
+    const exec={agent,callId:'read-1',name:'read',arguments:{secret:'PRIVATE_ARGS'}};
+    let delegated=false;
+    await events.get('tools/execute')(exec,async()=>{delegated=true;return {isError:false};});
+    assert.equal(delegated,true,'observation must delegate tool execution');
+    events.get('tools/result')(exec,{isError:false,content:'PRIVATE_RESULT'});
+    let run=b.view(c).runs.find(r=>r.state==='running');
+    assert.equal(run.activity.output,'Reading the file.');
+    assert.deepEqual(run.activity.tools,[{id:'read-1',name:'read',state:'done'}]);
+    stream({type:'end',outcome:{kind:'committed',eventType:'assistant/message'}});
+    stream({type:'start',attemptId:'two'});
+    stream({type:'chunk',chunk:{type:'text-delta',text:'Looks correct.'}});
+    stream({type:'end',outcome:{kind:'committed',eventType:'assistant/message'}});
+    release();await b.scheduler.whenIdle();
+    await until(()=>c.messages.some(m=>m.execution?.id===run.id));
+    const message=c.messages.find(m=>m.execution?.id===run.id);
+    assert.match(message.text,/Reading the file\.[\s\S]*Looks correct\./);
+    assert.equal(message.from,a.agentId);assert.equal(message.execution.state,'done');
+    assert.ok(!JSON.stringify(b.state()).includes('PRIVATE_'));
+    assert.ok(!JSON.stringify(c.messages).includes('PRIVATE_'));
+    await b.saveLocalHistory(c);
+    const saved=await readFile(b.historyPath(c.meta.roomId),'utf8');assert.ok(saved.includes('Looks correct.'));
+  } finally {release?.();await b.dispose();}
+});
+
+test('activity projection rejects oversize input, strips private fields, rolls back failed attempts and separates agents', async () => {
+  const tracker=new E.ExecutionActivityTracker(), releases=[];
+  const s=new O.RunScheduler(()=>new Promise(r=>releases.push(r)),()=>0);
+  const a=s.enqueue(req('a')),b=s.enqueue(req('b'));await tick();
+  tracker.stream(a,{type:'start',attemptId:'retry'});
+  tracker.stream(a,{type:'chunk',attemptId:'retry',chunk:{type:'text-delta',text:'discarded'}});
+  tracker.stream(a,{type:'end',attemptId:'retry',outcome:{kind:'committed',eventType:'assistant/attempt'}});
+  assert.equal(a.activity.output,'');
+  tracker.stream(a,{type:'start',attemptId:'success'});
+  tracker.stream(a,{type:'chunk',attemptId:'old',chunk:{type:'text-delta',text:'wrong'}});
+  tracker.stream(a,{type:'chunk',attemptId:'success',chunk:{type:'text-delta',text:'A answer'}});
+  tracker.stream(b,{type:'chunk',chunk:{type:'text-delta',text:'B answer'}});
+  tracker.tool(a,'1','read','running');tracker.tool(a,'1','read','failed');
+  tracker.tool(a,'2','bash','running');s.stop('r','a');
+  assert.deepEqual(a.activity.tools.map(t=>t.state),['failed','stopped']);
+  assert.equal(b.activity.output,'B answer');assert.equal(a.activity.output,'A answer');
+  const projected=E.publicRuns([{...a,activity:{...a.activity,reasoning:'SECRET',tools:[{id:'1',name:'read',state:'done',args:'SECRET'}]}}]);
+  assert.ok(!JSON.stringify(projected).includes('SECRET'));
+  const payload={v:1,kind:'execution.status',messageId:'m',sender:'a',ts:Date.now(),runs:projected};assertPayload(payload);
+  assert.throws(()=>assertPayload({...payload,runs:[{...projected[0],activity:{output:'x'.repeat(16385),tools:[]}}]}),/activity/);
+  for(const r of releases)r();await s.whenIdle();
+});
+
+test('chat renders per-agent live activity and replaces it with one persisted execution card',async()=>{
+  const code=(await readFile(new URL('../dist/client.js',import.meta.url),'utf8')).replaceAll('return module.exports;','return { ...module.exports, ChatBody, ExecutionMessage };');
+  let client;const jsx=(type,props)=>({type,props}),react={useMemo:f=>f(),useRef:()=>({current:null}),useEffect(){}};
+  vm.runInNewContext(code,{window:{__ModuleLoader__:{load({id,factory}){if(id==='@cecwxf/dsh-room')client=factory(n=>n==='react'?react:n==='react/jsx-runtime'?{jsx,jsxs:jsx}:{});}}}});
+  const run={id:'r',agentId:'a',state:'running',phase:'thinking',enqueuedAt:Date.now(),activity:{output:'Answer',tools:[{id:'t',name:'read',state:'done'}]}};
+  function cards(n){return !n?[]:Array.isArray(n)?n.flatMap(cards):typeof n==='object'?[...(n.type===client.ExecutionMessage?[n]:[]),...cards(n.props?.children)]:[];}
+  const props={members:[{agentId:'a',name:'Alpha'}],room:{runs:[run]},store:{}};
+  let tree=client.ChatBody({...props,messages:[]});assert.equal(cards(tree).length,1);
+  const card=client.ExecutionMessage(cards(tree)[0].props);assert.equal(card.props['aria-label'],'Alpha · Thinking…');
+  tree=client.ChatBody({...props,messages:[{id:'saved',from:'a',ts:run.enqueuedAt,execution:{...run,state:'done'}}]});assert.equal(cards(tree).length,1);assert.equal(cards(tree)[0].props.run.state,'done');
 });

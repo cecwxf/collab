@@ -38,7 +38,7 @@ export interface Logger {
 
 /** Cordis 4 Context subset. */
 export interface HostContext {
-  on?(event: string, listener: (payload: any) => void): () => void;
+  on?(event: string, listener: (...payload: any[]) => any): () => void;
   tools: ToolRegistry;
   logger: Logger;
   /** Register a cleanup tied to this plugin fiber (runs on unload / reload). */

@@ -2,9 +2,11 @@ import type { ExecutionStatusPayload } from '@collab/protocol';
 import type { RunInfo, RunPhase } from './orchestrator.js';
 
 export const EXECUTION_TTL = 45_000;
-/** Deliberate allowlist: never publish summary, errors, prompts, or assistant text. */
+/** Explicit public projection: no prompts, reasoning, tool arguments/results or raw errors. */
 export function publicRuns(runs: RunInfo[]): ExecutionStatusPayload['runs'] {
-  return runs.map(({ id, state, phase, enqueuedAt, startedAt, endedAt }) => ({ id, state, phase, enqueuedAt, startedAt, endedAt }));
+  return runs.map(({ id, state, phase, enqueuedAt, startedAt, endedAt, activity }) => ({ id, state, phase, enqueuedAt, startedAt, endedAt,
+    ...(activity ? { activity: { output: activity.output.slice(0, 16384), tools: activity.tools.slice(-32).map(({ id, name, state }) => ({ id, name, state })) } } : {}),
+  }));
 }
 
 export function assistantPhase(frame: { type?: string; chunk?: { type?: string } }): RunPhase | undefined {
@@ -14,6 +16,40 @@ export function assistantPhase(frame: { type?: string; chunk?: { type?: string }
     case 'reasoning-delta': return 'thinking';
     case 'text-delta': return 'streaming';
     case 'tool-call-delta': return 'tool';
+  }
+}
+
+
+/** Per-run attempt bookkeeping is private and never copied into room snapshots. */
+export class ExecutionActivityTracker {
+  private attempts = new WeakMap<RunInfo, { base: string; id?: string }>();
+  stream(run: RunInfo, frame: { type?: string; attemptId?: string; outcome?: { kind?: string; eventType?: string }; chunk?: { type?: string; text?: string } }) {
+    const phase = assistantPhase(frame);
+    if (phase) run.phase = phase;
+    if (frame.type === 'start') {
+      this.attempts.set(run, { base: run.activity?.output ?? '', id: frame.attemptId });
+      return;
+    }
+    const attempt = this.attempts.get(run);
+    if (attempt?.id && frame.attemptId && attempt.id !== frame.attemptId) return;
+    if (frame.type === 'end') {
+      if (attempt && (frame.outcome?.kind === 'abandoned' || frame.outcome?.eventType === 'assistant/attempt') && run.activity) run.activity.output = attempt.base;
+      this.attempts.delete(run);
+      return;
+    }
+    if (frame.type !== 'chunk' || frame.chunk?.type !== 'text-delta' || typeof frame.chunk.text !== 'string') return;
+    const activity = run.activity ??= { output: '', tools: [] };
+    const prefix = attempt && activity.output === attempt.base && attempt.base ? '\n\n' : '';
+    activity.output = (activity.output + prefix + frame.chunk.text).slice(0, 16384);
+  }
+  tool(run: RunInfo, id: string, name: string, state: 'running' | 'done' | 'failed') {
+    if (typeof id !== 'string' || typeof name !== 'string') return;
+    const activity = run.activity ??= { output: '', tools: [] };
+    const tool = activity.tools.find(t => t.id === id);
+    if (tool) tool.state = state;
+    else activity.tools.push({ id: id.slice(0, 200), name: name.slice(0, 120), state });
+    activity.tools = activity.tools.slice(-32);
+    run.phase = state === 'running' ? 'tool' : 'working';
   }
 }
 

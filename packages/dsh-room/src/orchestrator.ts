@@ -5,6 +5,7 @@
  *  - ThreadTracker: agent-to-agent turn limit per task/thread (human posts reset the budget).
  *  - RunScheduler: concurrency cap for local agent runs with a visible FIFO queue and Stop.
  */
+import type { ExecutionActivity } from "@collab/protocol";
 import type { LocalAgentConfig } from "./local-agents.js";
 
 export interface RoutablePayload {
@@ -128,6 +129,7 @@ export interface RunRequest {
 export type RunPhase = "working" | "thinking" | "streaming" | "tool";
 
 export interface RunInfo {
+  activity?: ExecutionActivity;
   phase?: RunPhase;
   remote?: boolean;
   id: string;
@@ -244,6 +246,13 @@ export class RunScheduler {
     if (run && run.phase !== phase) { run.phase = phase; this.changed(); }
   }
 
+  updateActivity(roomId: string, agentId: string, update: (run: RunInfo) => void) {
+    const run = this.runs.find(r => r.roomId === roomId && r.agentId === agentId && r.state === "running");
+    if (!run) return;
+    update(run);
+    this.changed();
+  }
+
   private pump() {
     for (const run of this.runs) {
       if (run.state !== "queued") continue;
@@ -281,6 +290,7 @@ export class RunScheduler {
 
   private finish(run: RunInfo, state: RunState, error?: string) {
     run.state = state;
+    for (const tool of run.activity?.tools ?? []) if (tool.state === "running") tool.state = "stopped";
     run.endedAt = Date.now();
     if (error) run.error = error;
     this.reqs.delete(run.id);

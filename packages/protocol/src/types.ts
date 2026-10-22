@@ -177,7 +177,13 @@ export interface ChatPayload extends PayloadBase {
   human?: boolean;
 }
 
-/** Execution metadata only. Never carries model text, reasoning or tool arguments.
+/** Public assistant text and tool names/status only; never reasoning or tool arguments. */
+export interface ExecutionActivity {
+  output: string;
+  tools: { id: string; name: string; state: "running" | "done" | "failed" | "stopped" }[];
+}
+
+/** Execution progress with the answer intended for room participants.
  * Sent using the executing member's own signed connection. */
 export interface ExecutionStatusPayload extends PayloadBase {
   kind: "execution.status";
@@ -185,6 +191,7 @@ export interface ExecutionStatusPayload extends PayloadBase {
     id: string;
     state: "approval" | "queued" | "running" | "done" | "failed" | "stopped";
     phase?: "working" | "thinking" | "streaming" | "tool";
+    activity?: ExecutionActivity;
     enqueuedAt: number;
     startedAt?: number;
     endedAt?: number;
